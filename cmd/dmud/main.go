@@ -1,15 +1,13 @@
 package main
 
-// https://github.com/kelindar/ecs
-
 import (
-  "fmt"
-	"github.com/EngoEngine/ecs"
+	"github.com/duinodu/dmud/internal/net"
 )
 
 func main() {
-	world := ecs.World{}
-	world.Update(0.1)
-
-  fmt.Println("Hello, World!")
+  server := New(&Config{
+    Host: "localhost",
+    Port: "3333",
+  })
+  server.Run()
 }
