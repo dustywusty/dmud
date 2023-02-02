@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/duinodu/dmud/internal/net"
+  "dmud/internal/net"
 )
 
 func main() {
