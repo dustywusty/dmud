@@ -5,7 +5,7 @@ import (
 )
 
 func main() {
-  server := New(&Config{
+  server := net.NewServer(&net.ServerConfig{
     Host: "localhost",
     Port: "3333",
   })
