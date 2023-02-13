@@ -2,7 +2,7 @@ package net
 
 import (
   "bufio"
-  "fmt"
+	"log"
   "net"
 )
 
@@ -11,6 +11,7 @@ type Client struct {
 }
 
 func (client *Client) handleRequest() {
+	client.conn.Write([]byte("Welcome to the server!\n\n> "));
   reader := bufio.NewReader(client.conn)
   for {
     message, err := reader.ReadString('\n')
@@ -18,7 +19,7 @@ func (client *Client) handleRequest() {
       client.conn.Close()
       return
     }
-    fmt.Printf("Message incoming: %s", string(message))
-    client.conn.Write([]byte("Message received.\n"))
+		log.Printf("Message incoming: %s", string(message));
+    client.conn.Write([]byte("> "))
   }
 }
