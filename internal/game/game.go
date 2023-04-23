@@ -119,11 +119,10 @@ func (g *Game) handleLook(player Player) {
 	room, ok := g.findPlayerRoom(player)
 	if !ok {
 		message := room.Description
-		player.SendMessage(message)
 	} else {
 		message := "You aren't sure where you are."
-		player.SendMessage(message)
 	}
+	player.SendMessage(message)
 }
 
 func (g *Game) handleMove(player Player, direction string) {
