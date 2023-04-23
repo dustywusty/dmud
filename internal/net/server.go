@@ -4,11 +4,15 @@ import (
   "fmt"
   "log"
   "net"
+
+  "dmud/internal/game"
 )
 
 type Server struct {
-  host string
-  port string
+  host        string
+  port        string
+  connections map[string]*Client
+  game        *game.Game
 }
 
 func (server *Server) Run() {
@@ -18,19 +22,25 @@ func (server *Server) Run() {
   }
   defer listener.Close()
 
-	log.Printf("Listening on %s:%s", server.host, server.port);
+  log.Printf("Listening on %s:%s", server.host, server.port)
 
-  for {
-    conn, err := listener.Accept()
-    if err != nil {
-      log.Fatal(err)
-    }
+  server.game = game.NewGame()
 
-		log.Printf("Accepted connection from %s", conn.RemoteAddr().String());
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Fatal(err)
+		}
 
-    client := &Client{
-      conn: conn,
-    }
-    go client.handleRequest()
-  }
+		log.Printf("Accepted connection from %s", conn.RemoteAddr().String())
+
+		client := &Client{
+			conn: conn,
+			game: server.game,
+			name: "",
+		}
+		client.name = client.generateRandomName()
+		server.game.AddPlayer(client)
+		go client.handleRequest()
+	}
 }
