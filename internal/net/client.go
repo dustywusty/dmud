@@ -1,15 +1,14 @@
 package net
 
 import (
-  "fmt"
-  "math/rand"
-  "time"
   "bufio"
   "dmud/internal/game"
   "dmud/internal/util"
   "log"
+  "math/rand"
   "net"
   "strings"
+  "time"
 )
 
 // Client represents a connected player in the MUD server.
@@ -31,7 +30,11 @@ func (client *Client) RemoteAddr() string {
 
 // SendMessage sends a message to the client.
 func (client *Client) SendMessage(msg string) {
-  client.conn.Write([]byte(msg))
+	client.conn.Write([]byte("\b\b" + msg + "\n\n> "))
+}
+
+func (client *Client) CloseConnection() {
+  client.conn.Close()
 }
 
 // generateRandomName generates a random name for the client.
@@ -47,8 +50,6 @@ func (client *Client) generateRandomName() string {
 
 // handleRequest processes incoming messages from the client and executes game commands.
 func (client *Client) handleRequest() {
-  client.SendMessage(fmt.Sprintf("Welcome to the server, %s!\n\n> ", client.name))
-
   reader := bufio.NewReader(client.conn)
 
   for {
@@ -63,13 +64,10 @@ func (client *Client) handleRequest() {
     cmd := parseCommand(message)
     if cmd != nil {
       log.Printf("Received command: %s, args: %s", cmd.Name, cmd.Arguments)
-      client.SendMessage("\n")
       client.game.ExecuteCommand(client, cmd)
     } else {
       log.Printf("Invalid command: %s", message)
     }
-
-    client.SendMessage("\n\n> ")
   }
 }
 
