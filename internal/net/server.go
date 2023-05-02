@@ -7,6 +7,18 @@ import (
   "dmud/internal/game"
 )
 
+type ServerConfig struct {
+  Host string
+  Port string
+}
+
+func NewServer(config *ServerConfig) *Server {
+  return &Server{
+    host: config.Host,
+    port: config.Port,
+  }
+}
+
 type Server struct {
   host        string
   port        string

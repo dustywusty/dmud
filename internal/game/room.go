@@ -1,19 +1,19 @@
 package game
 
 type Room struct {
-	ID      int
-	Name    string
 	Description string
-	Exits   map[string]*Room
-	Players map[string]Player
+	ID          int
+	Exits       map[string]*Room
+	Name        string
+	Players     map[string]Player
 }
 
 func NewRoom(id int, name string, description string) *Room {
 	return &Room{
-		ID:          id,
-		Name:        name,
 		Description: description,
 		Exits:       make(map[string]*Room),
+		ID:          id,
+		Name:        name,
 		Players:     make(map[string]Player),
 	}
 }
