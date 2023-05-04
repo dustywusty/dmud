@@ -1,11 +1,14 @@
 package game
 
 import (
+	"dmud/internal/components"
 	"log"
 	"time"
 
 	"dmud/internal/ecs"
 )
+
+type Client interface{}
 
 type Game struct {
 	World            *ecs.World
@@ -23,8 +26,16 @@ func NewGame() *Game {
 	return game
 }
 
-func (g *Game) AddPlayer(id ecs.EntityID) {
-	log.Printf("Adding player %v", string(id))
+func (g *Game) AddPlayer(c Client) {
+	playerEntity := ecs.NewEntity()
+	playerComponent := components.PlayerComponent{
+		Client: c,
+	}
+
+	g.World.AddEntity(playerEntity)
+	g.World.AddComponent(playerEntity, &playerComponent)
+
+	log.Printf("Adding player %v", string(playerEntity.ID))
 }
 
 func (g *Game) RemovePlayer(e *ecs.Entity) {

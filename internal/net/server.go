@@ -1,13 +1,11 @@
 package net
 
 import (
-	game2 "dmud/internal/game"
 	"fmt"
 	"log"
 	"net"
 
-	"dmud/internal/components"
-	"dmud/internal/ecs"
+	"dmud/internal/game"
 )
 
 type ServerConfig struct {
@@ -26,7 +24,7 @@ type Server struct {
 	host        string
 	port        string
 	connections map[string]*Client
-	game        *game2.Game
+	game        *game.Game
 }
 
 func (s *Server) Run() {
@@ -43,7 +41,7 @@ func (s *Server) Run() {
 
 	log.Printf("Listening on %s:%s", s.host, s.port)
 
-	s.game = game2.NewGame()
+	s.game = game.NewGame()
 
 	for {
 		conn, err := listener.Accept()
@@ -57,15 +55,7 @@ func (s *Server) Run() {
 			conn: conn,
 		}
 
-		playerEntity := ecs.NewEntity()
-		playerComponent := components.PlayerComponent{
-			Client: client,
-		}
-
-		s.game.World.AddEntity(playerEntity)
-		s.game.World.AddComponent(playerEntity, &playerComponent)
-
-		s.game.AddPlayer(playerEntity.ID)
+		s.game.AddPlayer(client)
 
 		go client.handleRequest()
 	}
