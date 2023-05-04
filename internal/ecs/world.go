@@ -1,77 +1,77 @@
 package ecs
 
 import (
+	"dmud/internal/util"
+	"errors"
+	"fmt"
+	"reflect"
 	"sync"
 )
 
 type World struct {
-	entities    map[EntityID]*Entity
-	components  map[string]map[EntityID]interface{}
+	entities    map[EntityID]Entity
+	components  map[EntityID]map[string]Component
 	systems     []System
-	entitiesMux sync.RWMutex
+	entityMutex sync.Mutex
 }
 
 func NewWorld() *World {
 	return &World{
-		entities:   make(map[EntityID]*Entity),
-		components: make(map[string]map[EntityID]interface{}),
+		entities:   make(map[EntityID]Entity),
+		components: make(map[EntityID]map[string]Component),
 	}
+}
+
+func (w *World) AddEntity(entity Entity) {
+	w.entityMutex.Lock()
+	defer w.entityMutex.Unlock()
+	w.entities[entity.ID] = entity
+	w.components[entity.ID] = make(map[string]Component)
+}
+
+func (world *World) FindEntityByComponentPredicate(componentType string, predicate func(interface{}) bool) (EntityID, error) {
+	for entity, components := range world.components {
+		component, ok := components[componentType]
+		if ok && predicate(component) {
+			return entity, nil
+		}
+	}
+	return EntityID(0), fmt.Errorf("no entity found matching the predicate")
+}
+
+func (w *World) RemoveEntity(entityID EntityID) {
+	w.entityMutex.Lock()
+	defer w.entityMutex.Unlock()
+	delete(w.entities, entityID)
+	delete(w.components, entityID)
+}
+
+func (w *World) AddComponent(entity Entity, component Component) {
+	w.entityMutex.Lock()
+	defer w.entityMutex.Unlock()
+	componentName := reflect.TypeOf(component).Elem().Name()
+	w.components[entity.ID][componentName] = component
 }
 
 func (w *World) AddSystem(system System) {
-	system.SetWorld(w)
 	w.systems = append(w.systems, system)
 }
 
-func (w *World) Update(deltaTime float64) {
+func (w *World) GetComponent(entityID EntityID, componentName string) (Component, error) {
+	w.entityMutex.Lock()
+	defer w.entityMutex.Unlock()
+	if components, ok := w.components[entityID]; ok {
+		if component, ok := components[componentName]; ok {
+			return component, nil
+		}
+		return nil, errors.New("component not found")
+	}
+	return nil, errors.New("entity not found")
+}
+
+func (w *World) Update() {
+	deltaTime := util.CalculateDeltaTime()
 	for _, system := range w.systems {
-		system.Update(deltaTime, w)
+		system.Update(w, deltaTime)
 	}
-}
-
-func (w *World) CreateEntity() *Entity {
-	entity := NewEntity()
-	w.entitiesMux.Lock()
-	defer w.entitiesMux.Unlock()
-	w.entities[entity.ID] = entity
-	return entity
-}
-
-func (w *World) GetEntity(id EntityID) *Entity {
-	w.entitiesMux.RLock()
-	defer w.entitiesMux.RUnlock()
-	return w.entities[id]
-}
-
-func (w *World) AddComponent(entity *Entity, component interface{}) {
-	componentName := GetComponentName(component)
-	if _, ok := w.components[componentName]; !ok {
-		w.components[componentName] = make(map[EntityID]interface{})
-	}
-	w.components[componentName][entity.ID] = component
-}
-
-func (w *World) GetComponent(entity *Entity, componentName string) interface{} {
-	components, ok := w.components[componentName]
-	if !ok {
-		return nil
-	}
-	return components[entity.ID]
-}
-
-func (w *World) GetEntitiesWithComponents(componentNames ...string) []*Entity {
-	var result []*Entity
-	for id, entity := range w.entities {
-		includesAll := true
-		for _, componentName := range componentNames {
-			if _, ok := w.components[componentName][id]; !ok {
-				includesAll = false
-				break
-			}
-		}
-		if includesAll {
-			result = append(result, entity)
-		}
-	}
-	return result
 }

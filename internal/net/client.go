@@ -9,39 +9,37 @@ import (
 )
 
 type Client struct {
-	conn   net.Conn
-	game   *game.Game
-	player *game.Player
+	conn net.Conn
+	game *game.Game
 }
 
-func (client *Client) RemoteAddr() string {
-	return client.conn.RemoteAddr().String()
+func (c *Client) RemoteAddr() string {
+	return c.conn.RemoteAddr().String()
 }
 
-func (client *Client) SendMessage(msg string) {
-	client.conn.Write([]byte("\b\b" + msg + "\n\n> "))
+func (c *Client) SendMessage(msg string) {
+	c.conn.Write([]byte("\b\b" + msg + "\n\n> "))
 }
 
-func (client *Client) CloseConnection() {
-	client.conn.Close()
+func (c *Client) CloseConnection() {
+	c.conn.Close()
 }
 
-func (client *Client) handleRequest() {
-	reader := bufio.NewReader(client.conn)
+func (c *Client) handleRequest() {
+	reader := bufio.NewReader(c.conn)
 
 	for {
 		message, err := reader.ReadString('\n')
 
 		if err != nil {
-			client.conn.Close()
-			client.game.RemovePlayer(client.player)
+			c.conn.Close()
+			c.game.RemovePlayer(c)
 			return
 		}
 
 		cmd := parseCommand(message)
 		if cmd != nil {
 			log.Printf("Received command: %s, args: %s", cmd.Name, cmd.Arguments)
-			client.game.ExecuteCommand(client, cmd)
 		} else {
 			log.Printf("Invalid command: %s", message)
 		}

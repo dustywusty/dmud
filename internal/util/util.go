@@ -1,5 +1,20 @@
 package util
 
+import "time"
+
+var lastTime time.Time
+
+func CalculateDeltaTime() float64 {
+	if lastTime.IsZero() {
+		lastTime = time.Now()
+		return 0
+	}
+	currentTime := time.Now()
+	deltaTime := currentTime.Sub(lastTime).Seconds()
+	lastTime = currentTime
+	return deltaTime
+}
+
 var AdjectiveVerbs1 = []string{
 	"vacuous",
 	"cheerful",
@@ -258,7 +273,6 @@ var AdjectiveVerbs1 = []string{
 	"assisting",
 	"addictive",
 }
-
 var AdjectiveVerbs2 = []string{
 	"threatening",
 	"handsomely",
@@ -517,7 +531,6 @@ var AdjectiveVerbs2 = []string{
 	"greasy",
 	"chilly",
 }
-
 var Nouns = []string{
 	"abomination",
 	"agent",

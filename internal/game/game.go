@@ -1,77 +1,60 @@
 package game
 
 import (
+	"dmud/internal/components"
 	"dmud/internal/ecs"
-	"log"
-	"net"
+	"dmud/internal/net"
 	"time"
 )
 
 type Game struct {
-	World *ecs.World
+	world            *ecs.World
+	AddPlayerChan    chan *net.Client
+	RemovePlayerChan chan *net.Client
 }
 
 func NewGame() *Game {
 	game := &Game{
-		World: ecs.NewWorld(),
+		world:            ecs.NewWorld(),
+		AddPlayerChan:    make(chan *net.Client),
+		RemovePlayerChan: make(chan *net.Client),
 	}
-
 	go game.loop()
-
 	return game
 }
 
-func (g *Game) AddNewPlayer(conn net.Conn) {
-	// Create a new player entity
-	player := g.World.CreateEntity()
-	g.World.AddComponent(player, &ecs.Player{Conn: conn})
-
-	// Set up the connection listener for the player
-	go func() {
-		buf := make([]byte, 1024)
-		for {
-			n, err := conn.Read(buf)
-			if err != nil {
-				log.Printf("Error reading from connection: %v", err)
-				break
-			}
-			// Process the received data
-			data := string(buf[:n])
-			// You may want to create a new command and add it to the World's CommandChan
-			// based on the received data
-		}
-	}()
+func (g *Game) AddPlayer(c *net.Client) {
+	playerEntity := ecs.Entity{}
+	playerComponent := &components.PlayerComponent{
+		Client: c,
+	}
+	g.world.AddComponent(playerEntity, playerComponent)
 }
 
-func calculateDeltaTime() float64 {
-	if lastTime.IsZero() {
-		lastTime = time.Now()
-		return 0
+func (g *Game) RemovePlayer(c *net.Client) {
+	// Find the player entity associated with the given client
+	playerEntity, err := g.world.FindEntityByComponentPredicate("PlayerComponent", func(component interface{}) bool {
+		if playerComponent, ok := component.(*components.PlayerComponent); ok {
+			return playerComponent.Client == c
+		}
+		return false
+	})
+	if err {
+		return
 	}
-	currentTime := time.Now()
-	deltaTime := currentTime.Sub(lastTime).Seconds()
-	lastTime = currentTime
-	return deltaTime
+	g.world.RemoveEntity(playerEntity.ID)
 }
 
 func (g *Game) loop() {
 	for {
 		select {
-		case player := <-g.World.AddPlayerChan:
-			g.World.AddPlayer(player)
-		case player := <-g.World.RemovePlayerChan:
-			g.World.RemovePlayer(player)
-		case playerCmd := <-g.World.CommandChan:
-			g.ExecuteCommand(playerCmd.player, playerCmd.command)
+		case player := <-g.AddPlayerChan:
+			g.AddPlayer(player)
+		case player := <-g.RemovePlayerChan:
+			g.RemovePlayer(player)
 		default:
-			dt := calculateDeltaTime()
-			g.World.Update(dt)
+			g.world.Update()
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
-}
-
-// Implement the command execution logic in the ECS systems, not in the game loop
-func (g *Game) ExecuteCommand(player ecs.Entity, cmd *ecs.Command) {
-	// Add the command execution logic to your ECS systems
 }

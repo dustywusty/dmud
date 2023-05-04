@@ -1,10 +1,10 @@
 package net
 
 import (
-  "dmud/internal/game"
-  "fmt"
-  "log"
-  "net"
+	"dmud/internal/game"
+	"fmt"
+	"log"
+	"net"
 )
 
 type ServerConfig struct {
@@ -48,11 +48,9 @@ func (server *Server) Run() {
 		client := &Client{
 			conn: conn,
 			game: server.game,
-			name: "",
 		}
-		client.name = client.generateRandomName()
 
-		client.SendMessage(fmt.Sprintf("Welcome to the server, %s!", client.name))
+		client.SendMessage(fmt.Sprintf("Welcome to the server!"))
 
 		server.game.AddPlayer(client)
 
