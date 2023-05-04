@@ -36,7 +36,15 @@ func (world *World) FindEntityByComponentPredicate(componentType string, predica
 			return entity, nil
 		}
 	}
-	return EntityID(0), fmt.Errorf("no entity found matching the predicate")
+	return EntityID("0"), fmt.Errorf("no entity found matching the predicate")
+}
+
+func (world *World) FindEntityById(id EntityID) (Entity, error) {
+	entity, ok := world.entities[id]
+	if !ok {
+		return Entity{}, errors.New("no entity found with that ID")
+	}
+	return entity, nil
 }
 
 func (w *World) RemoveEntity(entityID EntityID) {

@@ -1,19 +1,24 @@
 package ecs
 
 import (
-	"sync/atomic"
+	"github.com/google/uuid"
+	"log"
 )
 
-type EntityID uint64
+type EntityID string
 
 type Entity struct {
 	ID EntityID
 }
 
-var entityIDCounter EntityID
-
 func NewEntity() Entity {
+	_uuid := uuid.New()
+	log.Printf("Created entity %v", _uuid.String())
 	return Entity{
-		ID: EntityID(atomic.AddUint64((*uint64)(&entityIDCounter), 1)),
+		ID: EntityID(_uuid.String()),
 	}
+}
+
+func (e Entity) String() string {
+	return string(e.ID)
 }

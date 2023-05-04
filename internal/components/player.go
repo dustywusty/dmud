@@ -1,13 +1,14 @@
 package components
 
 import (
-	"dmud/internal/net"
 	"fmt"
 	"math/rand"
 )
 
+type Client interface{}
+
 type PlayerComponent struct {
-	Client *net.Client
+	Client Client
 	name   string
 }
 

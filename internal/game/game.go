@@ -1,59 +1,46 @@
 package game
 
 import (
-	"dmud/internal/components"
-	"dmud/internal/ecs"
-	"dmud/internal/net"
+	"log"
 	"time"
+
+	"dmud/internal/ecs"
 )
 
 type Game struct {
-	world            *ecs.World
-	AddPlayerChan    chan *net.Client
-	RemovePlayerChan chan *net.Client
+	World            *ecs.World
+	AddPlayerChan    chan *ecs.Entity
+	RemovePlayerChan chan *ecs.Entity
 }
 
 func NewGame() *Game {
 	game := &Game{
-		world:            ecs.NewWorld(),
-		AddPlayerChan:    make(chan *net.Client),
-		RemovePlayerChan: make(chan *net.Client),
+		World:            ecs.NewWorld(),
+		AddPlayerChan:    make(chan *ecs.Entity),
+		RemovePlayerChan: make(chan *ecs.Entity),
 	}
 	go game.loop()
 	return game
 }
 
-func (g *Game) AddPlayer(c *net.Client) {
-	playerEntity := ecs.Entity{}
-	playerComponent := &components.PlayerComponent{
-		Client: c,
-	}
-	g.world.AddComponent(playerEntity, playerComponent)
+func (g *Game) AddPlayer(id ecs.EntityID) {
+	log.Printf("Adding player %v", string(id))
 }
 
-func (g *Game) RemovePlayer(c *net.Client) {
-	// Find the player entity associated with the given client
-	playerEntity, err := g.world.FindEntityByComponentPredicate("PlayerComponent", func(component interface{}) bool {
-		if playerComponent, ok := component.(*components.PlayerComponent); ok {
-			return playerComponent.Client == c
-		}
-		return false
-	})
-	if err {
-		return
-	}
-	g.world.RemoveEntity(playerEntity.ID)
+func (g *Game) RemovePlayer(e *ecs.Entity) {
+	log.Printf("Removing player %v", e.ID)
+	g.World.RemoveEntity(e.ID)
 }
 
 func (g *Game) loop() {
 	for {
 		select {
 		case player := <-g.AddPlayerChan:
-			g.AddPlayer(player)
+			g.AddPlayer(player.ID)
 		case player := <-g.RemovePlayerChan:
 			g.RemovePlayer(player)
 		default:
-			g.world.Update()
+			g.World.Update()
 			time.Sleep(10 * time.Millisecond)
 		}
 	}

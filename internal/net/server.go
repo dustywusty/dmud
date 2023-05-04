@@ -1,10 +1,13 @@
 package net
 
 import (
-	"dmud/internal/game"
+	game2 "dmud/internal/game"
 	"fmt"
 	"log"
 	"net"
+
+	"dmud/internal/components"
+	"dmud/internal/ecs"
 )
 
 type ServerConfig struct {
@@ -23,19 +26,24 @@ type Server struct {
 	host        string
 	port        string
 	connections map[string]*Client
-	game        *game.Game
+	game        *game2.Game
 }
 
-func (server *Server) Run() {
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%s", server.host, server.port))
+func (s *Server) Run() {
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%s", s.host, s.port))
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer listener.Close()
+	defer func(listener net.Listener) {
+		err := listener.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(listener)
 
-	log.Printf("Listening on %s:%s", server.host, server.port)
+	log.Printf("Listening on %s:%s", s.host, s.port)
 
-	server.game = game.NewGame()
+	s.game = game2.NewGame()
 
 	for {
 		conn, err := listener.Accept()
@@ -47,12 +55,17 @@ func (server *Server) Run() {
 
 		client := &Client{
 			conn: conn,
-			game: server.game,
 		}
 
-		client.SendMessage(fmt.Sprintf("Welcome to the server!"))
+		playerEntity := ecs.NewEntity()
+		playerComponent := components.PlayerComponent{
+			Client: client,
+		}
 
-		server.game.AddPlayer(client)
+		s.game.World.AddEntity(playerEntity)
+		s.game.World.AddComponent(playerEntity, &playerComponent)
+
+		s.game.AddPlayer(playerEntity.ID)
 
 		go client.handleRequest()
 	}
