@@ -1,10 +1,10 @@
 package game
 
 import (
-	"dmud/internal/components"
 	"log"
 	"time"
 
+	"dmud/internal/components"
 	"dmud/internal/ecs"
 )
 
@@ -38,9 +38,19 @@ func (g *Game) AddPlayer(c Client) {
 	log.Printf("Adding player %v", string(playerEntity.ID))
 }
 
-func (g *Game) RemovePlayer(e *ecs.Entity) {
-	log.Printf("Removing player %v", e.ID)
-	g.World.RemoveEntity(e.ID)
+func (g *Game) RemovePlayer(c *Client) {
+	playerEntity, err := g.World.FindEntityByComponentPredicate("PlayerComponent", func(component interface{}) bool {
+		if playerComponent, ok := component.(*components.PlayerComponent); ok {
+			return playerComponent.Client == c
+		}
+		return false
+	})
+	if err != nil {
+		log.Printf("Error removing player: %v", err)
+		return
+	}
+	g.World.RemoveEntity(playerEntity)
+	log.Printf("Removing player %v", string(playerEntity.ID))
 }
 
 func (g *Game) loop() {

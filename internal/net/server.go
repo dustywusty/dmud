@@ -53,6 +53,7 @@ func (s *Server) Run() {
 
 		client := &Client{
 			conn: conn,
+			game: s.game,
 		}
 
 		s.game.AddPlayer(client)

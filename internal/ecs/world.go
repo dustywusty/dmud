@@ -29,8 +29,8 @@ func (w *World) AddEntity(entity Entity) {
 	w.components[entity.ID] = make(map[string]Component)
 }
 
-func (world *World) FindEntityByComponentPredicate(componentType string, predicate func(interface{}) bool) (EntityID, error) {
-	for entity, components := range world.components {
+func (w *World) FindEntityByComponentPredicate(componentType string, predicate func(interface{}) bool) (EntityID, error) {
+	for entity, components := range w.components {
 		component, ok := components[componentType]
 		if ok && predicate(component) {
 			return entity, nil
@@ -39,8 +39,8 @@ func (world *World) FindEntityByComponentPredicate(componentType string, predica
 	return EntityID("0"), fmt.Errorf("no entity found matching the predicate")
 }
 
-func (world *World) FindEntityById(id EntityID) (Entity, error) {
-	entity, ok := world.entities[id]
+func (w *World) FindEntity(id EntityID) (Entity, error) {
+	entity, ok := w.entities[id]
 	if !ok {
 		return Entity{}, errors.New("no entity found with that ID")
 	}

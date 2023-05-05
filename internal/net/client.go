@@ -2,16 +2,14 @@ package net
 
 import (
 	"bufio"
-	"dmud/internal/ecs"
 	"dmud/internal/game"
 	"log"
 	"net"
 )
 
 type Client struct {
-	conn     net.Conn
-	game     *game.Game
-	EntityID ecs.EntityID
+	conn net.Conn
+	game *game.Game
 }
 
 func (c *Client) RemoteAddr() string {
@@ -21,6 +19,7 @@ func (c *Client) RemoteAddr() string {
 func (c *Client) SendMessage(msg string) {
 	_, err := c.conn.Write([]byte("\b\b" + msg + "\n\n> "))
 	if err != nil {
+		log.Printf("Error sending message to client: %v", err)
 		return
 	}
 }
@@ -28,6 +27,7 @@ func (c *Client) SendMessage(msg string) {
 func (c *Client) CloseConnection() {
 	err := c.conn.Close()
 	if err != nil {
+		log.Printf("Error closing connection: %v", err)
 		return
 	}
 }
@@ -38,7 +38,7 @@ func (c *Client) handleRequest() {
 		message, err := reader.ReadString('\n')
 		if err != nil {
 			c.conn.Close()
-			//c.game.RemovePlayer(c.EntityID)
+			c.game.RemovePlayer(c.conn)
 			return
 		}
 		//cmd := parseCommand(message)
