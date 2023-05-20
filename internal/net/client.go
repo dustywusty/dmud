@@ -2,14 +2,24 @@ package net
 
 import (
 	"bufio"
-	"dmud/internal/game"
 	"log"
 	"net"
+
+	"dmud/internal/common"
+	"dmud/internal/game"
 )
 
 type Client struct {
 	conn net.Conn
 	game *game.Game
+	id   string
+}
+
+// Ensure Client implements the common.Client interface.
+var _ common.Client = (*Client)(nil)
+
+func (c *Client) ID() string {
+	return c.id
 }
 
 func (c *Client) RemoteAddr() string {
@@ -38,7 +48,7 @@ func (c *Client) handleRequest() {
 		message, err := reader.ReadString('\n')
 		if err != nil {
 			c.conn.Close()
-			c.game.RemovePlayer(c.conn)
+			c.game.RemovePlayer(c)
 			return
 		}
 		//cmd := parseCommand(message)

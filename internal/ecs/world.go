@@ -29,14 +29,17 @@ func (w *World) AddEntity(entity Entity) {
 	w.components[entity.ID] = make(map[string]Component)
 }
 
-func (w *World) FindEntityByComponentPredicate(componentType string, predicate func(interface{}) bool) (EntityID, error) {
-	for entity, components := range w.components {
+func (w *World) FindEntityByComponentPredicate(componentType string, predicate func(interface{}) bool) (Entity, error) {
+	for entityID, components := range w.components {
 		component, ok := components[componentType]
 		if ok && predicate(component) {
-			return entity, nil
+			if entity, exists := w.entities[entityID]; exists {
+				return entity, nil
+			}
+			return Entity{}, fmt.Errorf("no entity found matching the entity id")
 		}
 	}
-	return EntityID("0"), fmt.Errorf("no entity found matching the predicate")
+	return Entity{}, fmt.Errorf("no entity found matching the predicate")
 }
 
 func (w *World) FindEntity(id EntityID) (Entity, error) {

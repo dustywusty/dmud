@@ -1,19 +1,10 @@
 package util
 
-import "time"
-
-var lastTime time.Time
-
-func CalculateDeltaTime() float64 {
-	if lastTime.IsZero() {
-		lastTime = time.Now()
-		return 0
-	}
-	currentTime := time.Now()
-	deltaTime := currentTime.Sub(lastTime).Seconds()
-	lastTime = currentTime
-	return deltaTime
-}
+import (
+	"fmt"
+	"math/rand"
+	"time"
+)
 
 var AdjectiveVerbs1 = []string{
 	"vacuous",
@@ -788,4 +779,29 @@ var Nouns = []string{
 	"zerg",
 	"zombie",
 	"baron",
+}
+
+var lastTime time.Time
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+func CalculateDeltaTime() float64 {
+	if lastTime.IsZero() {
+		lastTime = time.Now()
+		return 0
+	}
+	currentTime := time.Now()
+	deltaTime := currentTime.Sub(lastTime).Seconds()
+	lastTime = currentTime
+	return deltaTime
+}
+
+func GenerateRandomName() string {
+	noun := Nouns[rand.Intn(len(Nouns))]
+	verb1 := AdjectiveVerbs1[rand.Intn(len(AdjectiveVerbs1))]
+	verb2 := AdjectiveVerbs2[rand.Intn(len(AdjectiveVerbs2))]
+
+	return fmt.Sprintf("%s-%s-%s", noun, verb1, verb2)
 }

@@ -1,14 +1,9 @@
 package components
 
-import (
-	"fmt"
-	"math/rand"
-)
-
-type Client interface{}
+import "dmud/internal/common"
 
 type PlayerComponent struct {
-	Client Client
+	Client common.Client
 	name   string
 }
 
@@ -18,8 +13,4 @@ func (p *PlayerComponent) Name() string {
 
 func (p *PlayerComponent) SetName(name string) {
 	p.name = name
-}
-
-func (p *PlayerComponent) GenerateRandomName() {
-	p.name = fmt.Sprintf("Guest%d", rand.Intn(10000))
 }

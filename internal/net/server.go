@@ -56,7 +56,7 @@ func (s *Server) Run() {
 			game: s.game,
 		}
 
-		s.game.AddPlayer(client)
+		s.game.AddPlayerChan <- client
 
 		go client.handleRequest()
 	}
