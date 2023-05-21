@@ -50,19 +50,7 @@ func (g *Game) AddPlayer(c common.Client) {
 
 	g.messageAllPlayers(fmt.Sprintf("%v has joined the game.", playerComponent.Name()), c)
 
-	banner := `
-	▓█████▄  ███▄ ▄███▓ █    ██ ▓█████▄ 
-	▒██▀ ██▌▓██▒▀█▀ ██▒ ██  ▓██▒▒██▀ ██▌
-	░██   █▌▓██    ▓██░▓██  ▒██░░██   █▌
-	░▓█▄   ▌▒██    ▒██ ▓▓█  ░██░░▓█▄   ▌
-	░▒████▓ ▒██▒   ░██▒▒▒█████▓ ░▒████▓ 
-	 ▒▒▓  ▒ ░ ▒░   ░  ░░▒▓▒ ▒ ▒  ▒▒▓  ▒ 
-	 ░ ▒  ▒ ░  ░      ░░░▒░ ░ ░  ░ ▒  ▒ 
-	 ░ ░  ░ ░      ░    ░░░ ░ ░  ░ ░  ░ 
-	   ░           ░      ░        ░    
-	 ░                           ░      
-`
-	c.SendMessage(banner)
+	c.SendMessage(util.WelcomeBanner)
 	c.SendMessage(roomComponent.Description)
 
 	log.Printf("Adding player %v", string(playerComponent.Name()))
@@ -139,14 +127,13 @@ func (g *Game) getPlayerComponent(c common.Client) (*components.PlayerComponent,
 }
 
 func (g *Game) messageAllPlayers(m string, excludeClients ...common.Client) {
-	w := g.World
-	players, _ := w.FindEntitiesByComponentPredicate("PlayerComponent", func(c interface{}) bool {
+	players, _ := g.World.FindEntitiesByComponentPredicate("PlayerComponent", func(c interface{}) bool {
 		_, ok := c.(*components.PlayerComponent)
 		return ok
 	})
 
 	for _, player := range players {
-		playerComponent, err := w.GetComponent(player.ID, "PlayerComponent")
+		playerComponent, err := g.World.GetComponent(player.ID, "PlayerComponent")
 		if err != nil {
 			fmt.Println("Error getting PlayerComponent:", err)
 			continue
@@ -170,7 +157,7 @@ func (g *Game) handleCommand(command *Command) {
 	case "shout":
 		g.handleShout(command)
 	default:
-		// unrecognized command
+		g.handleUnknownCommand(command)
 	}
 }
 
@@ -192,8 +179,13 @@ func (g *Game) handleShout(command *Command) {
 	g.messageAllPlayers(message, client)
 }
 
+func (g *Game) handleUnknownCommand(command *Command) {
+	client := command.Client.(common.Client)
+	client.SendMessage("What?")
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////
-// ..
+// New game helper
 //
 
 func NewGame() *Game {
@@ -204,16 +196,7 @@ func NewGame() *Game {
 		CommandChan:      make(chan *Command),
 	}
 
-	defaultRoomEntity := ecs.NewEntityWithID("Room1")
-	game.World.AddEntity(defaultRoomEntity)
-
-	defaultRoomComponent := &components.RoomComponent{
-		Description: "It's dark and damp, and you can't see anything. You hear a faint dripping sound.\n\nYou feel a sense of dread, and you're not sure why.",
-		ID:          "Room1",
-	}
-
-	game.World.AddComponent(defaultRoomEntity, defaultRoomComponent)
-
 	go game.loop()
+
 	return game
 }

@@ -802,6 +802,5 @@ func GenerateRandomName() string {
 	noun := Nouns[rand.Intn(len(Nouns))]
 	verb1 := AdjectiveVerbs1[rand.Intn(len(AdjectiveVerbs1))]
 	verb2 := AdjectiveVerbs2[rand.Intn(len(AdjectiveVerbs2))]
-
 	return fmt.Sprintf("%s-%s-%s", verb1, verb2, noun)
 }

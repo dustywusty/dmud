@@ -1,0 +1,10 @@
+[
+    {
+        "id": "Room1",
+        "description": "It's dark and damp, and you can't see anything. You hear a faint dripping sound. You feel a sense of dread, and you're not sure why."
+    },
+    {
+        "id": "Room2",
+        "description": "A cold wind blows through this empty stone chamber, carrying with it the faint sound of distant screams."
+    }
+]

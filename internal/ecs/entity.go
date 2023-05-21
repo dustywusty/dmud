@@ -20,10 +20,10 @@ func NewEntity() Entity {
 	}
 }
 
-func NewEntityWithID(id EntityID) Entity {
+func NewEntityWithID(id string) Entity {
 	log.Printf("Created entity %v", id)
 	return Entity{
-		ID: id,
+		ID: EntityID(id),
 	}
 }
 

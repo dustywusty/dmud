@@ -1,11 +1,15 @@
 package ecs
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"reflect"
 	"sync"
 
+	"dmud/internal/components"
 	"dmud/internal/util"
 )
 
@@ -17,10 +21,24 @@ type World struct {
 }
 
 func NewWorld() *World {
-	return &World{
+	world := &World{
 		entities:   make(map[EntityID]Entity),
 		components: make(map[EntityID]map[string]Component),
 	}
+
+	rooms := loadRoomsFromFile("./resources/rooms.json")
+	for _, room := range rooms {
+		roomEntity := NewEntityWithID(room.ID)
+		roomComponent := &components.RoomComponent{
+			Description: room.Description,
+			ID:          room.ID,
+		}
+
+		world.AddEntity(roomEntity)
+		world.AddComponent(roomEntity, roomComponent)
+	}
+
+	return world
 }
 
 func (w *World) AddEntity(entity Entity) {
@@ -109,4 +127,27 @@ func (w *World) Update() {
 	for _, system := range w.systems {
 		system.Update(w, deltaTime)
 	}
+}
+
+///////////////////////////////////////////////////////////////////////////////////
+
+type Room struct {
+	ID          string `json:"id"`
+	Description string `json:"description"`
+}
+
+func loadRoomsFromFile(filename string) []Room {
+	// Read the file
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Unmarshal the JSON data
+	var rooms []Room
+	if err := json.Unmarshal(data, &rooms); err != nil {
+		log.Fatal(err)
+	}
+
+	return rooms
 }
