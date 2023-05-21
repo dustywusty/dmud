@@ -1,11 +1,12 @@
 package ecs
 
 import (
-	"dmud/internal/util"
 	"errors"
 	"fmt"
 	"reflect"
 	"sync"
+
+	"dmud/internal/util"
 )
 
 type World struct {
@@ -29,6 +30,11 @@ func (w *World) AddEntity(entity Entity) {
 	w.components[entity.ID] = make(map[string]Component)
 }
 
+/* FindEntityByComponentPredicate finds an entity with a component matching the given predicate.
+ * The predicate is a function that takes an interface{} and returns a bool. The interface{} is the component
+ * that is being checked. The bool is whether or not the component matches the predicate.
+ */
+
 func (w *World) FindEntityByComponentPredicate(componentType string, predicate func(interface{}) bool) (Entity, error) {
 	for entityID, components := range w.components {
 		component, ok := components[componentType]
@@ -40,6 +46,24 @@ func (w *World) FindEntityByComponentPredicate(componentType string, predicate f
 		}
 	}
 	return Entity{}, fmt.Errorf("no entity found matching the predicate")
+}
+
+func (w *World) FindEntitiesByComponentPredicate(componentType string, predicate func(interface{}) bool) ([]Entity, error) {
+	entities := make([]Entity, 0)
+	for entityID, components := range w.components {
+		component, ok := components[componentType]
+		if ok && predicate(component) {
+			if entity, exists := w.entities[entityID]; exists {
+				entities = append(entities, entity)
+			} else {
+				return nil, fmt.Errorf("no entity found matching the entity ID")
+			}
+		}
+	}
+	if len(entities) == 0 {
+		return nil, fmt.Errorf("no entities found matching the predicate")
+	}
+	return entities, nil
 }
 
 func (w *World) FindEntity(id EntityID) (Entity, error) {

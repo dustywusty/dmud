@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
 
 	"dmud/internal/game"
 )
@@ -15,8 +16,9 @@ type ServerConfig struct {
 
 func NewServer(config *ServerConfig) *Server {
 	return &Server{
-		host: config.Host,
-		port: config.Port,
+		host:        config.Host,
+		port:        config.Port,
+		connections: make(map[string]*Client),
 	}
 }
 
@@ -25,6 +27,7 @@ type Server struct {
 	port        string
 	connections map[string]*Client
 	game        *game.Game
+	mu          sync.Mutex
 }
 
 func (s *Server) Run() {
@@ -49,14 +52,19 @@ func (s *Server) Run() {
 			log.Fatal(err)
 		}
 
-		log.Printf("Accepted connection from %s", conn.RemoteAddr().String())
+		remoteAddr := conn.RemoteAddr().String()
+		log.Printf("Accepted connection from %s", remoteAddr)
 
 		client := &Client{
 			conn: conn,
 			game: s.game,
 		}
 
-		s.game.AddPlayerChan <- client
+		s.mu.Lock()
+		s.connections[remoteAddr] = client
+		s.mu.Unlock()
+
+		s.game.AddPlayer(client)
 
 		go client.handleRequest()
 	}

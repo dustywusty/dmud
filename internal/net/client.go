@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"log"
 	"net"
+	"strings"
 
 	"dmud/internal/common"
 	"dmud/internal/game"
@@ -15,7 +16,6 @@ type Client struct {
 	id   string
 }
 
-// Ensure Client implements the common.Client interface.
 var _ common.Client = (*Client)(nil)
 
 func (c *Client) ID() string {
@@ -34,12 +34,15 @@ func (c *Client) SendMessage(msg string) {
 	}
 }
 
-func (c *Client) CloseConnection() {
+func (c *Client) CloseConnection() error {
+	c.conn.Write([]byte("\nGoodbye!\n\n"))
 	err := c.conn.Close()
 	if err != nil {
 		log.Printf("Error closing connection: %v", err)
-		return
+		return err
 	}
+	log.Printf("Closed connection to %s", c.RemoteAddr())
+	return nil
 }
 
 func (c *Client) handleRequest() {
@@ -51,26 +54,22 @@ func (c *Client) handleRequest() {
 			c.game.RemovePlayer(c)
 			return
 		}
-		//cmd := parseCommand(message)
-		//if cmd != nil {
-		//	log.Printf("Received command: %s, args: %s", cmd.Name, cmd.Arguments)
-		//} else {
-		//	log.Printf("Invalid command: %s", message)
-		//}
-		log.Printf("Received command: %s", message)
+
+		parts := strings.SplitN(strings.TrimSpace(message), " ", 2)
+		cmd := parts[0]
+		var args []string
+		if len(parts) > 1 {
+			args = strings.Split(parts[1], " ")
+		}
+
+		command := &game.Command{
+			Cmd:    cmd,
+			Args:   args,
+			Client: c,
+		}
+
+		c.game.CommandChan <- command
+
+		c.conn.Write([]byte("\n> "))
 	}
 }
-
-//func parseCommand(message string) *Command {
-//	words := strings.Fields(message)
-//	if len(words) == 0 {
-//		return nil
-//	}
-//
-//	cmd := &Command{
-//		Name:      strings.ToLower(words[0]),
-//		Arguments: words[1:],
-//	}
-//
-//	return cmd
-//}

@@ -2,5 +2,6 @@ package common
 
 type Client interface {
 	ID() string
-	// other methods...
+	CloseConnection() error
+	SendMessage(msg string)
 }

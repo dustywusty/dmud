@@ -4,7 +4,9 @@ import "dmud/internal/common"
 
 type PlayerComponent struct {
 	Client common.Client
-	name   string
+	Room   *RoomComponent
+
+	name string
 }
 
 func (p *PlayerComponent) Name() string {

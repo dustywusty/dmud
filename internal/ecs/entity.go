@@ -1,8 +1,9 @@
 package ecs
 
 import (
-	"github.com/google/uuid"
 	"log"
+
+	"github.com/google/uuid"
 )
 
 type EntityID string
@@ -16,6 +17,13 @@ func NewEntity() Entity {
 	log.Printf("Created entity %v", _uuid.String())
 	return Entity{
 		ID: EntityID(_uuid.String()),
+	}
+}
+
+func NewEntityWithID(id EntityID) Entity {
+	log.Printf("Created entity %v", id)
+	return Entity{
+		ID: id,
 	}
 }
 
