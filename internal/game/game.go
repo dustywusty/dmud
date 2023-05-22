@@ -177,6 +177,7 @@ func (g *Game) handleShout(command *Command) {
 	}
 	message := fmt.Sprintf("%s shouts %s", player.Name(), strings.Join(command.Args, " "))
 	g.messageAllPlayers(message, client)
+	client.SendMessage(fmt.Sprintf("You shout %s", strings.Join(command.Args, " ")))
 }
 
 func (g *Game) handleUnknownCommand(command *Command) {

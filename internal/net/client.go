@@ -77,7 +77,5 @@ func (c *Client) handleRequest() {
 		}
 
 		c.game.CommandChan <- command
-
-		c.conn.Write([]byte("\n> "))
 	}
 }

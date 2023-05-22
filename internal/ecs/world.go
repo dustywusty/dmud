@@ -25,7 +25,6 @@ func NewWorld() *World {
 		entities:   make(map[EntityID]Entity),
 		components: make(map[EntityID]map[string]Component),
 	}
-
 	rooms := loadRoomsFromFile("./resources/rooms.json")
 	for _, room := range rooms {
 		roomEntity := NewEntityWithID(room.ID)
@@ -33,11 +32,9 @@ func NewWorld() *World {
 			Description: room.Description,
 			ID:          room.ID,
 		}
-
 		world.AddEntity(roomEntity)
 		world.AddComponent(roomEntity, roomComponent)
 	}
-
 	return world
 }
 
@@ -47,11 +44,6 @@ func (w *World) AddEntity(entity Entity) {
 	w.entities[entity.ID] = entity
 	w.components[entity.ID] = make(map[string]Component)
 }
-
-/* FindEntityByComponentPredicate finds an entity with a component matching the given predicate.
- * The predicate is a function that takes an interface{} and returns a bool. The interface{} is the component
- * that is being checked. The bool is whether or not the component matches the predicate.
- */
 
 func (w *World) FindEntityByComponentPredicate(componentType string, predicate func(interface{}) bool) (Entity, error) {
 	for entityID, components := range w.components {
