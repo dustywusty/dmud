@@ -151,19 +151,24 @@ func (g *Game) messageAllPlayers(m string, excludeClients ...common.Client) {
 //
 
 func (g *Game) handleCommand(command *Command) {
+	client := command.Client.(common.Client)
+	player, err := g.getPlayerComponent(client)
+	if err != nil {
+		fmt.Println("Error getting player component:", err)
+		return
+	}
 	switch command.Cmd {
 	case "exit":
-		g.handleExit(command)
+		g.handleExit(command, player)
 	case "shout":
-		g.handleShout(command)
+		g.handleShout(command, player)
 	default:
-		g.handleUnknownCommand(command)
+		g.handleUnknownCommand(command, player)
 	}
 }
 
-func (g *Game) handleExit(command *Command) {
+func (g *Game) handleExit(command *Command, player *components.PlayerComponent) {
 	client := command.Client.(common.Client)
-	player, _ := g.getPlayerComponent(client)
 	client.CloseConnection()
 	g.messageAllPlayers(fmt.Sprintf("%s has left the game.", player.Name()), client)
 }
