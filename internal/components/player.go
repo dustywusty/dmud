@@ -1,18 +1,11 @@
 package components
 
-import "dmud/internal/common"
+import (
+	"dmud/internal/common"
+)
 
 type PlayerComponent struct {
 	Client common.Client
+	Name   string
 	Room   *RoomComponent
-
-	name string
-}
-
-func (p *PlayerComponent) Name() string {
-	return p.name
-}
-
-func (p *PlayerComponent) SetName(name string) {
-	p.name = name
 }

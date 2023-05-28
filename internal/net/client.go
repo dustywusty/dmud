@@ -70,12 +70,11 @@ func (c *Client) handleRequest() {
 			args = strings.Split(parts[1], " ")
 		}
 
-		command := &game.Command{
-			Cmd:    cmd,
-			Args:   args,
-			Client: c,
+		command := game.Command{
+			Cmd:  cmd,
+			Args: args,
 		}
 
-		c.game.CommandChan <- command
+		c.game.CommandChan <- game.ClientCommand{Command: command, Client: c}
 	}
 }

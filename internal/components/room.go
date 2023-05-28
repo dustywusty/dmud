@@ -8,5 +8,4 @@ type Exit struct {
 type RoomComponent struct {
 	Description string
 	Exits       []Exit
-	ID          string
 }

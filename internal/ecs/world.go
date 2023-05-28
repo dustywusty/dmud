@@ -30,7 +30,6 @@ func NewWorld() *World {
 		roomEntity := NewEntityWithID(room.ID)
 		roomComponent := &components.RoomComponent{
 			Description: room.Description,
-			ID:          room.ID,
 		}
 		world.AddEntity(roomEntity)
 		world.AddComponent(roomEntity, roomComponent)

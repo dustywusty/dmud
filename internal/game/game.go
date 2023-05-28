@@ -17,10 +17,12 @@ import (
 //
 
 type Game struct {
-	World            *ecs.World
+	World *ecs.World
+
 	AddPlayerChan    chan common.Client
 	RemovePlayerChan chan common.Client
-	CommandChan      chan *Command
+
+	CommandChan chan ClientCommand
 }
 
 func (g *Game) AddPlayer(c common.Client) {
@@ -38,22 +40,21 @@ func (g *Game) AddPlayer(c common.Client) {
 
 	playerComponent := components.PlayerComponent{
 		Client: c,
+		Name:   util.GenerateRandomName(),
 		Room:   roomComponent,
 	}
 
 	playerEntity := ecs.NewEntity()
 
-	playerComponent.SetName(util.GenerateRandomName())
-
 	g.World.AddEntity(playerEntity)
 	g.World.AddComponent(playerEntity, &playerComponent)
 
-	g.messageAllPlayers(fmt.Sprintf("%v has joined the game.", playerComponent.Name()), c)
+	g.messageAllPlayers(fmt.Sprintf("%v has joined the game.", playerComponent.Name), c)
 
 	c.SendMessage(util.WelcomeBanner)
 	c.SendMessage(roomComponent.Description)
 
-	log.Printf("Adding player %v", string(playerComponent.Name()))
+	log.Printf("Adding player %v", string(playerComponent.Name))
 }
 
 func (g *Game) RemovePlayer(c common.Client) {
@@ -72,7 +73,7 @@ func (g *Game) RemovePlayer(c common.Client) {
 		log.Printf("Error getting player component: %v", err)
 		return
 	}
-	log.Printf("Removing player %v", playerComponent.(*components.PlayerComponent).Name())
+	log.Printf("Removing player %v", playerComponent.(*components.PlayerComponent).Name)
 	g.World.RemoveEntity(playerEntity.ID)
 }
 
@@ -87,8 +88,8 @@ func (g *Game) loop() {
 			g.AddPlayer(client)
 		case client := <-g.RemovePlayerChan:
 			g.RemovePlayer(client)
-		case command := <-g.CommandChan:
-			g.handleCommand(command)
+		case clientCommand := <-g.CommandChan:
+			g.handleCommand(clientCommand)
 		default:
 			g.World.Update()
 			time.Sleep(10 * time.Millisecond)
@@ -150,44 +151,36 @@ func (g *Game) messageAllPlayers(m string, excludeClients ...common.Client) {
 // Commands
 //
 
-func (g *Game) handleCommand(command *Command) {
-	client := command.Client.(common.Client)
+func (g *Game) handleCommand(c ClientCommand) {
+	client := c.Client
 	player, err := g.getPlayerComponent(client)
 	if err != nil {
 		fmt.Println("Error getting player component:", err)
 		return
 	}
-	switch command.Cmd {
+	switch c.Command.Cmd {
 	case "exit":
-		g.handleExit(command, player)
+		g.handleExit(&c.Command, player)
 	case "shout":
-		g.handleShout(command, player)
+		g.handleShout(&c.Command, player)
 	default:
-		g.handleUnknownCommand(command, player)
+		g.handleUnknownCommand(&c.Command, player)
 	}
 }
 
 func (g *Game) handleExit(command *Command, player *components.PlayerComponent) {
-	client := command.Client.(common.Client)
-	client.CloseConnection()
-	g.messageAllPlayers(fmt.Sprintf("%s has left the game.", player.Name()), client)
+	player.Client.CloseConnection()
+	g.messageAllPlayers(fmt.Sprintf("%s has left the game.", player.Name), player.Client)
 }
 
-func (g *Game) handleShout(command *Command) {
-	client := command.Client.(common.Client)
-	player, err := g.getPlayerComponent(client)
-	if err != nil {
-		fmt.Println("Error getting player component:", err)
-		return
-	}
-	message := fmt.Sprintf("%s shouts %s", player.Name(), strings.Join(command.Args, " "))
-	g.messageAllPlayers(message, client)
-	client.SendMessage(fmt.Sprintf("You shout %s", strings.Join(command.Args, " ")))
+func (g *Game) handleShout(command *Command, player *components.PlayerComponent) {
+	message := fmt.Sprintf("%s shouts %s", player.Name, strings.Join(command.Args, " "))
+	g.messageAllPlayers(message, player.Client)
+	player.Client.SendMessage(fmt.Sprintf("You shout %s", strings.Join(command.Args, " ")))
 }
 
-func (g *Game) handleUnknownCommand(command *Command) {
-	client := command.Client.(common.Client)
-	client.SendMessage("What?")
+func (g *Game) handleUnknownCommand(command *Command, player *components.PlayerComponent) {
+	player.Client.SendMessage("What?")
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -199,7 +192,7 @@ func NewGame() *Game {
 		World:            ecs.NewWorld(),
 		AddPlayerChan:    make(chan common.Client),
 		RemovePlayerChan: make(chan common.Client),
-		CommandChan:      make(chan *Command),
+		CommandChan:      make(chan ClientCommand),
 	}
 
 	go game.loop()
