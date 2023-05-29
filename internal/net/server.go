@@ -6,6 +6,7 @@ import (
 	"net"
 	"sync"
 
+	"dmud/internal/common"
 	"dmud/internal/game"
 )
 
@@ -18,14 +19,14 @@ func NewServer(config *ServerConfig) *Server {
 	return &Server{
 		host:        config.Host,
 		port:        config.Port,
-		connections: make(map[string]*Client),
+		connections: make(map[string]common.Client),
 	}
 }
 
 type Server struct {
 	host        string
 	port        string
-	connections map[string]*Client
+	connections map[string]common.Client
 	game        *game.Game
 	mu          sync.Mutex
 }
@@ -55,7 +56,7 @@ func (s *Server) Run() {
 		remoteAddr := conn.RemoteAddr().String()
 		log.Printf("Accepted connection from %s", remoteAddr)
 
-		client := &Client{
+		client := &TCPClient{
 			conn: conn,
 			game: s.game,
 		}

@@ -11,37 +11,37 @@ import (
 	"dmud/internal/game"
 )
 
-type Client struct {
-	conn     net.Conn   // the network connection to the client
+type TCPClient struct {
+	conn     net.Conn   // the network connection to the TCPClient
 	game     *game.Game // reference to the game object
-	id       string     // unique identifier for the client
+	id       string     // unique identifier for the TCPClient
 	playerId ecs.EntityID
 }
 
-// Check that Client implements the common.Client interface.
-var _ common.Client = (*Client)(nil)
+// Check that TCPClient implements the common.TCPClient interface.
+var _ common.Client = (*TCPClient)(nil)
 
-// ID returns the client's unique identifier.
-func (c *Client) ID() string {
+// ID returns the TCPClient's unique identifier.
+func (c *TCPClient) ID() string {
 	return c.id
 }
 
-// RemoteAddr returns the remote network address of the client.
-func (c *Client) RemoteAddr() string {
+// RemoteAddr returns the remote network address of the TCPClient.
+func (c *TCPClient) RemoteAddr() string {
 	return c.conn.RemoteAddr().String()
 }
 
-// SendMessage sends a message to the client.
-func (c *Client) SendMessage(msg string) {
+// SendMessage sends a message to the TCPClient.
+func (c *TCPClient) SendMessage(msg string) {
 	_, err := c.conn.Write([]byte("\b\b" + msg + "\n\n> "))
 	if err != nil {
-		log.Printf("Error sending message to client: %v", err)
+		log.Printf("Error sending message to TCPClient: %v", err)
 		return
 	}
 }
 
-// CloseConnection closes the network connection to the client.
-func (c *Client) CloseConnection() error {
+// CloseConnection closes the network connection to the TCPClient.
+func (c *TCPClient) CloseConnection() error {
 	c.conn.Write([]byte("\nGoodbye!\n\n"))
 	err := c.conn.Close()
 	if err != nil {
@@ -52,8 +52,8 @@ func (c *Client) CloseConnection() error {
 	return nil
 }
 
-// handleRequest reads and handles requests from the client.
-func (c *Client) handleRequest() {
+// handleRequest reads and handles requests from the TCPClient.
+func (c *TCPClient) handleRequest() {
 	reader := bufio.NewReader(c.conn)
 	for {
 		message, err := reader.ReadString('\n')
