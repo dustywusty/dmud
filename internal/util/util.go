@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
+	"unicode"
 )
 
 var lastTime time.Time
@@ -32,6 +33,15 @@ func GenerateRandomName() string {
 	verb1 := AdjectiveVerbs1[rand.Intn(len(AdjectiveVerbs1))]
 	verb2 := AdjectiveVerbs2[rand.Intn(len(AdjectiveVerbs2))]
 	return fmt.Sprintf("%s-%s-%s", verb1, verb2, noun)
+}
+
+func IsAlphaNumeric(str string) bool {
+	for _, c := range str {
+		if !unicode.IsLetter(c) && !unicode.IsNumber(c) {
+			return false
+		}
+	}
+	return true
 }
 
 var AdjectiveVerbs1 = []string{

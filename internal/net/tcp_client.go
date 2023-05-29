@@ -2,6 +2,8 @@ package net
 
 import (
 	"bufio"
+	"errors"
+	"io"
 	"log"
 	"net"
 	"strings"
@@ -16,6 +18,7 @@ type TCPClient struct {
 	game     *game.Game
 	id       string
 	playerId ecs.EntityID
+	reader   *bufio.Reader
 }
 
 var _ common.Client = (*TCPClient)(nil)
@@ -33,6 +36,24 @@ func (c *TCPClient) CloseConnection() error {
 	}
 	log.Printf("Closed connection to %s", c.RemoteAddr())
 	return nil
+}
+
+func (client *TCPClient) GetMessage(maxLength int) (string, error) {
+	msg, err := client.reader.ReadString('\n')
+	if err != nil {
+		if err == io.EOF {
+			return "", errors.New("Client disconnected")
+		}
+		return "", err
+	}
+
+	msg = strings.TrimSpace(msg)
+
+	if len(msg) > maxLength {
+		return "", errors.New("message exceeds maximum length")
+	}
+
+	return msg, nil
 }
 
 func (c *TCPClient) ID() string {

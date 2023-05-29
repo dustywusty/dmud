@@ -64,8 +64,7 @@ func (g *Game) AddPlayer(c common.Client) {
 
 	g.messageAllPlayers(fmt.Sprintf("%v has joined the game.", playerComponent.Name), c)
 
-	c.SendMessage(util.WelcomeBanner)
-	c.SendMessage(g.defaultRoom.Description)
+	// enter the room
 
 	log.Printf("Adding player %v", string(playerComponent.Name))
 }
