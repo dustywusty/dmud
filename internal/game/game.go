@@ -17,8 +17,9 @@ import (
 //
 
 type Game struct {
-	players []ecs.Component
-	world   *ecs.World
+	defaultRoom *components.RoomComponent
+	players     []ecs.Component
+	world       *ecs.World
 
 	AddPlayerChan    chan common.Client
 	RemovePlayerChan chan common.Client
@@ -27,9 +28,13 @@ type Game struct {
 }
 
 func NewGame() *Game {
-	game := &Game{
+	world := ecs.NewWorld()
+	defaultRoom, _ := world.GetComponent("1", "RoomComponent")
+
+	game := Game{
+		defaultRoom:      defaultRoom.(*components.RoomComponent),
 		players:          make([]ecs.Component, 0),
-		world:            ecs.NewWorld(),
+		world:            world,
 		AddPlayerChan:    make(chan common.Client),
 		RemovePlayerChan: make(chan common.Client),
 		CommandChan:      make(chan ClientCommand),
@@ -37,7 +42,7 @@ func NewGame() *Game {
 
 	go game.loop()
 
-	return game
+	return &game
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -45,22 +50,10 @@ func NewGame() *Game {
 //
 
 func (g *Game) AddPlayer(c common.Client) {
-	defaultRoomComponent, err := g.world.GetComponent("Room1", "RoomComponent")
-	if err != nil {
-		log.Printf("Default room does not have a RoomComponent")
-		return
-	}
-
-	roomComponent, ok := defaultRoomComponent.(*components.RoomComponent)
-	if !ok {
-		log.Printf("Default room does not have a RoomComponent")
-		return
-	}
-
 	playerComponent := components.PlayerComponent{
 		Client: c,
 		Name:   util.GenerateRandomName(),
-		Room:   roomComponent,
+		Room:   g.defaultRoom,
 	}
 	g.players = append(g.players, &playerComponent)
 
@@ -72,7 +65,7 @@ func (g *Game) AddPlayer(c common.Client) {
 	g.messageAllPlayers(fmt.Sprintf("%v has joined the game.", playerComponent.Name), c)
 
 	c.SendMessage(util.WelcomeBanner)
-	c.SendMessage(roomComponent.Description)
+	c.SendMessage(g.defaultRoom.Description)
 
 	log.Printf("Adding player %v", string(playerComponent.Name))
 }
@@ -136,8 +129,8 @@ func (g *Game) handleCommand(c ClientCommand) {
 	switch c.Command.Cmd {
 	case "exit":
 		g.handleExit(player, command)
-	case "say":
-		g.handleSay(player, command)
+	case "shout":
+		g.handleShout(player, command)
 	default:
 		g.handleUnknownCommand(player, command)
 	}
@@ -145,10 +138,11 @@ func (g *Game) handleCommand(c ClientCommand) {
 
 func (g *Game) handleExit(player *components.PlayerComponent, command Command) {
 	player.Client.CloseConnection()
+
 	g.messageAllPlayers(fmt.Sprintf("%s has left the game.", player.Name), player.Client)
 }
 
-func (g *Game) handleSay(player *components.PlayerComponent, command Command) {
+func (g *Game) handleShout(player *components.PlayerComponent, command Command) {
 	message := fmt.Sprintf("%s shouts %s", player.Name, strings.Join(command.Args, " "))
 	g.messageAllPlayers(message, player.Client)
 	player.Client.SendMessage(fmt.Sprintf("You shout %s", strings.Join(command.Args, " ")))
