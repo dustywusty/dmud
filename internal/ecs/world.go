@@ -25,16 +25,40 @@ func NewWorld() *World {
 		entities:   make(map[EntityID]Entity),
 		components: make(map[EntityID]map[string]Component),
 	}
+
 	rooms := loadRoomsFromFile("./resources/rooms.json")
 	for _, room := range rooms {
 		roomEntity := NewEntityWithID(room.ID)
+
+		// Convert map of exits into slice of Exit
+		var exits []components.Exit
+		for direction, roomID := range room.Exits {
+			exits = append(exits, components.Exit{
+				Direction: direction,
+				RoomID:    roomID,
+			})
+		}
+
 		roomComponent := &components.RoomComponent{
 			Description: room.Description,
+			Exits:       exits,
 		}
 		world.AddEntity(roomEntity)
 		world.AddComponent(roomEntity, roomComponent)
 	}
+
 	return world
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+// Public
+//
+
+func (w *World) AddComponent(entity Entity, component Component) {
+	w.entityMutex.Lock()
+	defer w.entityMutex.Unlock()
+	componentName := reflect.TypeOf(component).Elem().Name()
+	w.components[entity.ID][componentName] = component
 }
 
 func (w *World) AddEntity(entity Entity) {
@@ -44,17 +68,16 @@ func (w *World) AddEntity(entity Entity) {
 	w.components[entity.ID] = make(map[string]Component)
 }
 
-func (w *World) FindEntityByComponentPredicate(componentType string, predicate func(interface{}) bool) (Entity, error) {
-	for entityID, components := range w.components {
-		component, ok := components[componentType]
-		if ok && predicate(component) {
-			if entity, exists := w.entities[entityID]; exists {
-				return entity, nil
-			}
-			return Entity{}, fmt.Errorf("no entity found matching the entity id")
-		}
+func (w *World) AddSystem(system System) {
+	w.systems = append(w.systems, system)
+}
+
+func (w *World) FindEntity(id EntityID) (Entity, error) {
+	entity, ok := w.entities[id]
+	if !ok {
+		return Entity{}, errors.New("no entity found with that ID")
 	}
-	return Entity{}, fmt.Errorf("no entity found matching the predicate")
+	return entity, nil
 }
 
 func (w *World) FindEntitiesByComponentPredicate(componentType string, predicate func(interface{}) bool) ([]Entity, error) {
@@ -75,30 +98,17 @@ func (w *World) FindEntitiesByComponentPredicate(componentType string, predicate
 	return entities, nil
 }
 
-func (w *World) FindEntity(id EntityID) (Entity, error) {
-	entity, ok := w.entities[id]
-	if !ok {
-		return Entity{}, errors.New("no entity found with that ID")
+func (w *World) FindEntityByComponentPredicate(componentType string, predicate func(interface{}) bool) (Entity, error) {
+	for entityID, components := range w.components {
+		component, ok := components[componentType]
+		if ok && predicate(component) {
+			if entity, exists := w.entities[entityID]; exists {
+				return entity, nil
+			}
+			return Entity{}, fmt.Errorf("no entity found matching the entity id")
+		}
 	}
-	return entity, nil
-}
-
-func (w *World) RemoveEntity(entityID EntityID) {
-	w.entityMutex.Lock()
-	defer w.entityMutex.Unlock()
-	delete(w.entities, entityID)
-	delete(w.components, entityID)
-}
-
-func (w *World) AddComponent(entity Entity, component Component) {
-	w.entityMutex.Lock()
-	defer w.entityMutex.Unlock()
-	componentName := reflect.TypeOf(component).Elem().Name()
-	w.components[entity.ID][componentName] = component
-}
-
-func (w *World) AddSystem(system System) {
-	w.systems = append(w.systems, system)
+	return Entity{}, fmt.Errorf("no entity found matching the predicate")
 }
 
 func (w *World) GetComponent(entityID EntityID, componentName string) (Component, error) {
@@ -113,6 +123,13 @@ func (w *World) GetComponent(entityID EntityID, componentName string) (Component
 	return nil, errors.New("entity not found")
 }
 
+func (w *World) RemoveEntity(entityID EntityID) {
+	w.entityMutex.Lock()
+	defer w.entityMutex.Unlock()
+	delete(w.entities, entityID)
+	delete(w.components, entityID)
+}
+
 func (w *World) Update() {
 	deltaTime := util.CalculateDeltaTime()
 	for _, system := range w.systems {
@@ -120,25 +137,25 @@ func (w *World) Update() {
 	}
 }
 
-///////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+// Private
+//
 
 type Room struct {
-	ID          string `json:"id"`
-	Description string `json:"description"`
+	ID          string            `json:"id"`
+	Description string            `json:"description"`
+	Exits       map[string]string `json:"exits"`
 }
 
 func loadRoomsFromFile(filename string) []Room {
-	// Read the file
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// Unmarshal the JSON data
 	var rooms []Room
 	if err := json.Unmarshal(data, &rooms); err != nil {
 		log.Fatal(err)
 	}
-
 	return rooms
+
 }
