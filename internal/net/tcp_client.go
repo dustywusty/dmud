@@ -12,26 +12,23 @@ import (
 )
 
 type TCPClient struct {
-	conn     net.Conn   // the network connection to the TCPClient
-	game     *game.Game // reference to the game object
-	id       string     // unique identifier for the TCPClient
+	conn     net.Conn
+	game     *game.Game
+	id       string
 	playerId ecs.EntityID
 }
 
 // Check that TCPClient implements the common.TCPClient interface.
 var _ common.Client = (*TCPClient)(nil)
 
-// ID returns the TCPClient's unique identifier.
 func (c *TCPClient) ID() string {
 	return c.id
 }
 
-// RemoteAddr returns the remote network address of the TCPClient.
 func (c *TCPClient) RemoteAddr() string {
 	return c.conn.RemoteAddr().String()
 }
 
-// SendMessage sends a message to the TCPClient.
 func (c *TCPClient) SendMessage(msg string) {
 	_, err := c.conn.Write([]byte("\b\b" + msg + "\n\n> "))
 	if err != nil {
@@ -40,7 +37,6 @@ func (c *TCPClient) SendMessage(msg string) {
 	}
 }
 
-// CloseConnection closes the network connection to the TCPClient.
 func (c *TCPClient) CloseConnection() error {
 	c.conn.Write([]byte("\nGoodbye!\n\n"))
 	err := c.conn.Close()
@@ -52,14 +48,14 @@ func (c *TCPClient) CloseConnection() error {
 	return nil
 }
 
-// handleRequest reads and handles requests from the TCPClient.
 func (c *TCPClient) handleRequest() {
-	reader := bufio.NewReader(c.conn)
+	g := c.game
+	r := bufio.NewReader(c.conn)
 	for {
-		message, err := reader.ReadString('\n')
+		message, err := r.ReadString('\n')
 		if err != nil {
 			c.conn.Close()
-			c.game.RemovePlayer(c)
+			g.HandleDisconnect(c)
 			return
 		}
 
@@ -75,6 +71,6 @@ func (c *TCPClient) handleRequest() {
 			Args: args,
 		}
 
-		c.game.CommandChan <- game.ClientCommand{Command: command, Client: c}
+		g.CommandChan <- game.ClientCommand{Command: command, Client: c}
 	}
 }

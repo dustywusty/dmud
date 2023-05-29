@@ -9,3 +9,7 @@ type PlayerComponent struct {
 	Name   string
 	Room   *RoomComponent
 }
+
+func (p *PlayerComponent) Say(msg string) {
+	p.Room.MessageAllPlayers(p.Name+" says: "+msg, p)
+}

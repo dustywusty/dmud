@@ -17,7 +17,8 @@ import (
 //
 
 type Game struct {
-	World *ecs.World
+	players []ecs.Component
+	world   *ecs.World
 
 	AddPlayerChan    chan common.Client
 	RemovePlayerChan chan common.Client
@@ -25,8 +26,26 @@ type Game struct {
 	CommandChan chan ClientCommand
 }
 
+func NewGame() *Game {
+	game := &Game{
+		players:          make([]ecs.Component, 0),
+		world:            ecs.NewWorld(),
+		AddPlayerChan:    make(chan common.Client),
+		RemovePlayerChan: make(chan common.Client),
+		CommandChan:      make(chan ClientCommand),
+	}
+
+	go game.loop()
+
+	return game
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+// Public
+//
+
 func (g *Game) AddPlayer(c common.Client) {
-	defaultRoomComponent, err := g.World.GetComponent("Room1", "RoomComponent")
+	defaultRoomComponent, err := g.world.GetComponent("Room1", "RoomComponent")
 	if err != nil {
 		log.Printf("Default room does not have a RoomComponent")
 		return
@@ -43,11 +62,12 @@ func (g *Game) AddPlayer(c common.Client) {
 		Name:   util.GenerateRandomName(),
 		Room:   roomComponent,
 	}
+	g.players = append(g.players, &playerComponent)
 
 	playerEntity := ecs.NewEntity()
 
-	g.World.AddEntity(playerEntity)
-	g.World.AddComponent(playerEntity, &playerComponent)
+	g.world.AddEntity(playerEntity)
+	g.world.AddComponent(playerEntity, &playerComponent)
 
 	g.messageAllPlayers(fmt.Sprintf("%v has joined the game.", playerComponent.Name), c)
 
@@ -57,8 +77,12 @@ func (g *Game) AddPlayer(c common.Client) {
 	log.Printf("Adding player %v", string(playerComponent.Name))
 }
 
+func (g *Game) HandleDisconnect(c common.Client) {
+	g.RemovePlayerChan <- c
+}
+
 func (g *Game) RemovePlayer(c common.Client) {
-	playerEntity, err := g.World.FindEntityByComponentPredicate("PlayerComponent", func(component interface{}) bool {
+	playerEntity, err := g.world.FindEntityByComponentPredicate("PlayerComponent", func(component interface{}) bool {
 		if playerComponent, ok := component.(*components.PlayerComponent); ok {
 			return playerComponent.Client == c
 		}
@@ -68,37 +92,17 @@ func (g *Game) RemovePlayer(c common.Client) {
 		log.Printf("Error removing player: %v", err)
 		return
 	}
-	playerComponent, err := g.World.GetComponent(playerEntity.ID, "PlayerComponent")
+	playerComponent, err := g.world.GetComponent(playerEntity.ID, "PlayerComponent")
 	if err != nil {
 		log.Printf("Error getting player component: %v", err)
 		return
 	}
 	log.Printf("Removing player %v", playerComponent.(*components.PlayerComponent).Name)
-	g.World.RemoveEntity(playerEntity.ID)
+	g.world.RemoveEntity(playerEntity.ID)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
-// Game Loop
-//
-
-func (g *Game) loop() {
-	for {
-		select {
-		case client := <-g.AddPlayerChan:
-			g.AddPlayer(client)
-		case client := <-g.RemovePlayerChan:
-			g.RemovePlayer(client)
-		case clientCommand := <-g.CommandChan:
-			g.handleCommand(clientCommand)
-		default:
-			g.World.Update()
-			time.Sleep(10 * time.Millisecond)
-		}
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-// Helpers
+// Private
 //
 
 func containsClient(clients []common.Client, client common.Client) bool {
@@ -110,92 +114,70 @@ func containsClient(clients []common.Client, client common.Client) bool {
 	return false
 }
 
-func (g *Game) getPlayerComponent(c common.Client) (*components.PlayerComponent, error) {
-	playerEntity, err := g.World.FindEntityByComponentPredicate("PlayerComponent", func(component interface{}) bool {
-		if playerComponent, ok := component.(*components.PlayerComponent); ok {
-			return playerComponent.Client == c
+func (g *Game) getPlayer(c common.Client) (*components.PlayerComponent, error) {
+	for _, player := range g.players {
+		if player.(*components.PlayerComponent).Client == c {
+			return player.(*components.PlayerComponent), nil
 		}
-		return false
-	})
-	if err != nil {
-		return nil, err
 	}
-	playerComponent, err := g.World.GetComponent(playerEntity.ID, "PlayerComponent")
-	if err != nil {
-		return nil, err
-	}
-	return playerComponent.(*components.PlayerComponent), nil
+	return nil, fmt.Errorf("Player not found")
 }
-
-func (g *Game) messageAllPlayers(m string, excludeClients ...common.Client) {
-	players, _ := g.World.FindEntitiesByComponentPredicate("PlayerComponent", func(c interface{}) bool {
-		_, ok := c.(*components.PlayerComponent)
-		return ok
-	})
-
-	for _, player := range players {
-		playerComponent, err := g.World.GetComponent(player.ID, "PlayerComponent")
-		if err != nil {
-			fmt.Println("Error getting PlayerComponent:", err)
-			continue
-		}
-		if playerComp, ok := playerComponent.(*components.PlayerComponent); ok {
-			if playerComp.Client != nil && !containsClient(excludeClients, playerComp.Client) {
-				playerComp.Client.SendMessage(m)
-			}
-		}
-	}
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-// Commands
-//
 
 func (g *Game) handleCommand(c ClientCommand) {
+	command := c.Command
 	client := c.Client
-	player, err := g.getPlayerComponent(client)
+	player, err := g.getPlayer(client)
+
 	if err != nil {
 		fmt.Println("Error getting player component:", err)
 		return
 	}
+
 	switch c.Command.Cmd {
 	case "exit":
-		g.handleExit(&c.Command, player)
-	case "shout":
-		g.handleShout(&c.Command, player)
+		g.handleExit(player, command)
+	case "say":
+		g.handleSay(player, command)
 	default:
-		g.handleUnknownCommand(&c.Command, player)
+		g.handleUnknownCommand(player, command)
 	}
 }
 
-func (g *Game) handleExit(command *Command, player *components.PlayerComponent) {
+func (g *Game) handleExit(player *components.PlayerComponent, command Command) {
 	player.Client.CloseConnection()
 	g.messageAllPlayers(fmt.Sprintf("%s has left the game.", player.Name), player.Client)
 }
 
-func (g *Game) handleShout(command *Command, player *components.PlayerComponent) {
+func (g *Game) handleSay(player *components.PlayerComponent, command Command) {
 	message := fmt.Sprintf("%s shouts %s", player.Name, strings.Join(command.Args, " "))
 	g.messageAllPlayers(message, player.Client)
 	player.Client.SendMessage(fmt.Sprintf("You shout %s", strings.Join(command.Args, " ")))
 }
 
-func (g *Game) handleUnknownCommand(command *Command, player *components.PlayerComponent) {
+func (g *Game) handleUnknownCommand(player *components.PlayerComponent, command Command) {
 	player.Client.SendMessage("What?")
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-// New game helper
-//
-
-func NewGame() *Game {
-	game := &Game{
-		World:            ecs.NewWorld(),
-		AddPlayerChan:    make(chan common.Client),
-		RemovePlayerChan: make(chan common.Client),
-		CommandChan:      make(chan ClientCommand),
+func (g *Game) loop() {
+	for {
+		select {
+		case client := <-g.AddPlayerChan:
+			g.AddPlayer(client)
+		case client := <-g.RemovePlayerChan:
+			g.RemovePlayer(client)
+		case clientCommand := <-g.CommandChan:
+			g.handleCommand(clientCommand)
+		default:
+			g.world.Update()
+			time.Sleep(10 * time.Millisecond)
+		}
 	}
+}
 
-	go game.loop()
-
-	return game
+func (g *Game) messageAllPlayers(m string, excludeClients ...common.Client) {
+	for _, player := range g.players {
+		if !containsClient(excludeClients, player.(*components.PlayerComponent).Client) {
+			player.(*components.PlayerComponent).Client.SendMessage(m)
+		}
+	}
 }
