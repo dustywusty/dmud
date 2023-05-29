@@ -1,7 +1,7 @@
 package util
 
 const (
-	WelcomeBanner = "\033[36m" +
+	WelcomeBanner = "\033[37m" +
 		`
 ▓█████▄  ███▄ ▄███▓ █    ██ ▓█████▄ 
 ▒██▀ ██▌▓██▒▀█▀ ██▒ ██  ▓██▒▒██▀ ██▌

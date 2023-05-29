@@ -15,6 +15,14 @@ type ServerConfig struct {
 	Port string
 }
 
+type Server struct {
+	host        string
+	port        string
+	connections map[string]common.Client
+	game        *game.Game
+	mu          sync.Mutex
+}
+
 func NewServer(config *ServerConfig) *Server {
 	return &Server{
 		host:        config.Host,
@@ -23,13 +31,9 @@ func NewServer(config *ServerConfig) *Server {
 	}
 }
 
-type Server struct {
-	host        string
-	port        string
-	connections map[string]common.Client
-	game        *game.Game
-	mu          sync.Mutex
-}
+///////////////////////////////////////////////////////////////////////////////////////////////
+// Public
+//
 
 func (s *Server) Run() {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%s", s.host, s.port))

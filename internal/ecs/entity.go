@@ -12,10 +12,6 @@ type Entity struct {
 	ID EntityID
 }
 
-func (e Entity) String() string {
-	return string(e.ID)
-}
-
 func NewEntity() Entity {
 	_uuid := uuid.New()
 	log.Printf("Created entity %v", _uuid.String())
@@ -29,4 +25,12 @@ func NewEntityWithID(id string) Entity {
 	return Entity{
 		ID: EntityID(id),
 	}
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+// Public
+//
+
+func (e Entity) String() string {
+	return string(e.ID)
 }
