@@ -2,9 +2,12 @@ package util
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"time"
 	"unicode"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 var lastTime time.Time
@@ -33,6 +36,14 @@ func GenerateRandomName() string {
 	verb1 := AdjectiveVerbs1[rand.Intn(len(AdjectiveVerbs1))]
 	verb2 := AdjectiveVerbs2[rand.Intn(len(AdjectiveVerbs2))]
 	return fmt.Sprintf("%s-%s-%s", verb1, verb2, noun)
+}
+
+func HashAndSalt(pwd string) string {
+	hash, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.MinCost)
+	if err != nil {
+		log.Println(err)
+	}
+	return string(hash)
 }
 
 func IsAlphaNumeric(str string) bool {
