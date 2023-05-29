@@ -1,15 +1,21 @@
 package game
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"dmud/internal/common"
 	"dmud/internal/components"
 	"dmud/internal/ecs"
 	"dmud/internal/util"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -18,8 +24,11 @@ import (
 
 type Game struct {
 	defaultRoom *components.RoomComponent
-	players     []ecs.Component
-	world       *ecs.World
+
+	players   map[string]*components.PlayerComponent
+	playersMu sync.Mutex
+
+	world *ecs.World
 
 	AddPlayerChan    chan common.Client
 	RemovePlayerChan chan common.Client
@@ -33,7 +42,7 @@ func NewGame() *Game {
 
 	game := Game{
 		defaultRoom:      defaultRoom.(*components.RoomComponent),
-		players:          make([]ecs.Component, 0),
+		players:          make(map[string]*components.PlayerComponent),
 		world:            world,
 		AddPlayerChan:    make(chan common.Client),
 		RemovePlayerChan: make(chan common.Client),
@@ -50,21 +59,54 @@ func NewGame() *Game {
 //
 
 func (g *Game) AddPlayer(c common.Client) {
-	playerComponent := components.PlayerComponent{
+	accounts, err := loadAccountsFromFile("./resources/accounts.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	exists := false
+	name, _ := g.queryPlayerName(c)
+
+	var a Account
+	for _, a = range accounts {
+		if a.Name == name {
+			exists = true
+		}
+	}
+
+	password, _ := g.queryPlayerPassword(c, exists)
+
+	if exists {
+		err := bcrypt.CompareHashAndPassword([]byte(a.Password), []byte(password))
+		if err != nil {
+			log.Printf("Error comparing password: %v", err)
+			c.CloseConnection()
+			return
+		}
+	} else {
+		account := Account{
+			Name:     name,
+			Password: password,
+		}
+		accounts = append(accounts, account)
+		saveAccountsToFile("./resources/accounts.json", accounts)
+	}
+
+	playerComponent := &components.PlayerComponent{
 		Client: c,
-		Name:   util.GenerateRandomName(),
+		Name:   name,
 		Room:   g.defaultRoom,
 	}
-	g.players = append(g.players, &playerComponent)
-
 	playerEntity := ecs.NewEntity()
 
+	g.players[name] = playerComponent
+
 	g.world.AddEntity(playerEntity)
-	g.world.AddComponent(playerEntity, &playerComponent)
+	g.world.AddComponent(playerEntity, playerComponent)
 
-	g.messageAllPlayers(fmt.Sprintf("%v has joined the game.", playerComponent.Name), c)
+	g.messageAllPlayers(fmt.Sprintf("%s has joined the game.", name), c)
 
-	// enter the room
+	playerComponent.Client.SendMessage(fmt.Sprintf(g.defaultRoom.Description))
 
 	log.Printf("Adding player %v", string(playerComponent.Name))
 }
@@ -107,9 +149,12 @@ func containsClient(clients []common.Client, client common.Client) bool {
 }
 
 func (g *Game) getPlayer(c common.Client) (*components.PlayerComponent, error) {
+	g.playersMu.Lock()
+	defer g.playersMu.Unlock()
+
 	for _, player := range g.players {
-		if player.(*components.PlayerComponent).Client == c {
-			return player.(*components.PlayerComponent), nil
+		if player.Client == c {
+			return player, nil
 		}
 	}
 	return nil, fmt.Errorf("Player not found")
@@ -168,9 +213,108 @@ func (g *Game) loop() {
 }
 
 func (g *Game) messageAllPlayers(m string, excludeClients ...common.Client) {
+	g.playersMu.Lock()
+	defer g.playersMu.Unlock()
+
 	for _, player := range g.players {
-		if !containsClient(excludeClients, player.(*components.PlayerComponent).Client) {
-			player.(*components.PlayerComponent).Client.SendMessage(m)
+		if !containsClient(excludeClients, player.Client) {
+			player.Client.SendMessage(m)
 		}
 	}
+}
+
+func (g *Game) queryPlayerName(client common.Client) (string, error) {
+	var name string
+	var err error
+
+	for {
+		client.SendMessage("What do we call you?")
+
+		name, err = client.GetMessage(32)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if len(name) > 32 || !util.IsAlphaNumeric(name) {
+			continue
+		}
+		break
+	}
+	return name, nil
+}
+
+func (g *Game) queryPlayerPassword(c common.Client, exists bool) (string, error) {
+	var password string
+	var err error
+
+	for {
+		c.SendMessage("What is your password?")
+
+		password, err = c.GetMessage(256)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if len(password) <= 0 || len(password) > 256 {
+			continue
+		}
+
+		if !exists {
+			c.SendMessage("Please confirm your password.")
+			confirmPassword, err := c.GetMessage(256)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			if confirmPassword != password {
+				c.SendMessage("Passwords do not match. Please try again.")
+				continue
+			}
+			break
+		}
+		break
+	}
+	return password, nil
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+// ..
+//
+
+type Account struct {
+	Name     string `json:"name"`
+	Password string `json:"password"`
+}
+
+func loadAccountsFromFile(filename string) ([]Account, error) {
+	jsonFile, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer jsonFile.Close()
+
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+
+	var accounts []Account
+
+	err = json.Unmarshal(byteValue, &accounts)
+	if err != nil {
+		return nil, err
+	}
+
+	return accounts, nil
+}
+
+func saveAccountsToFile(filename string, accounts []Account) error {
+	data, err := json.Marshal(accounts)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(filename, data, 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
