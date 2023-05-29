@@ -18,8 +18,22 @@ type TCPClient struct {
 	playerId ecs.EntityID
 }
 
-// Check that TCPClient implements the common.TCPClient interface.
 var _ common.Client = (*TCPClient)(nil)
+
+// /////////////////////////////////////////////////////////////////////////////////////////////
+// Public
+//
+
+func (c *TCPClient) CloseConnection() error {
+	c.conn.Write([]byte("\nGoodbye!\n\n"))
+	err := c.conn.Close()
+	if err != nil {
+		log.Printf("Error closing connection: %v", err)
+		return err
+	}
+	log.Printf("Closed connection to %s", c.RemoteAddr())
+	return nil
+}
 
 func (c *TCPClient) ID() string {
 	return c.id
@@ -37,16 +51,9 @@ func (c *TCPClient) SendMessage(msg string) {
 	}
 }
 
-func (c *TCPClient) CloseConnection() error {
-	c.conn.Write([]byte("\nGoodbye!\n\n"))
-	err := c.conn.Close()
-	if err != nil {
-		log.Printf("Error closing connection: %v", err)
-		return err
-	}
-	log.Printf("Closed connection to %s", c.RemoteAddr())
-	return nil
-}
+// /////////////////////////////////////////////////////////////////////////////////////////////
+// Private
+//
 
 func (c *TCPClient) handleRequest() {
 	g := c.game
