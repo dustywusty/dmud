@@ -2,6 +2,7 @@ package components
 
 type Exit struct {
 	Direction string
+	RoomID    string
 	Room      *RoomComponent
 }
 
@@ -11,19 +12,13 @@ type RoomComponent struct {
 	Players     []*PlayerComponent
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
+// Public
+//
+
 func (r *RoomComponent) AddPlayer(p *PlayerComponent) {
 	r.MessageAllPlayers(p.Name + " enters")
 	r.Players = append(r.Players, p)
-}
-
-func (r *RoomComponent) RemovePlayer(p *PlayerComponent) {
-	for i, player := range r.Players {
-		if player == p {
-			r.Players = append(r.Players[:i], r.Players[i+1:]...)
-			break
-		}
-	}
-	r.MessageAllPlayers(p.Name + " leaves")
 }
 
 func (r *RoomComponent) GetExit(direction string) *Exit {
@@ -46,6 +41,20 @@ func (r *RoomComponent) MessageAllPlayers(msg string, exclude ...*PlayerComponen
 		}
 	}
 }
+
+func (r *RoomComponent) RemovePlayer(p *PlayerComponent) {
+	for i, player := range r.Players {
+		if player == p {
+			r.Players = append(r.Players[:i], r.Players[i+1:]...)
+			break
+		}
+	}
+	r.MessageAllPlayers(p.Name + " leaves")
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+// Private
+//
 
 func contains(players []*PlayerComponent, player *PlayerComponent) bool {
 	for _, p := range players {
