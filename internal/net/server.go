@@ -3,12 +3,13 @@ package net
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"net"
 	"sync"
 
 	"dmud/internal/common"
 	"dmud/internal/game"
+
+	"github.com/rs/zerolog/log"
 )
 
 type ServerConfig struct {
@@ -17,11 +18,11 @@ type ServerConfig struct {
 }
 
 type Server struct {
-	host        string
-	port        string
-	connections map[string]common.Client
-	game        *game.Game
-	mu          sync.Mutex
+	connectionMu sync.Mutex
+	connections  map[string]common.Client
+	game         *game.Game
+	host         string
+	port         string
 }
 
 func NewServer(config *ServerConfig) *Server {
@@ -39,12 +40,12 @@ func NewServer(config *ServerConfig) *Server {
 func (s *Server) Run() {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%s", s.host, s.port))
 	if err != nil {
-		log.Fatal(err)
+		log.Error().Err(err).Msg("")
 	}
 	defer func(listener net.Listener) {
 		err := listener.Close()
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("")
 		}
 	}(listener)
 
@@ -55,7 +56,7 @@ func (s *Server) Run() {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("")
 		}
 
 		remoteAddr := conn.RemoteAddr().String()
@@ -67,12 +68,10 @@ func (s *Server) Run() {
 			reader: bufio.NewReader(conn),
 		}
 
-		s.mu.Lock()
+		s.connectionMu.Lock()
 		s.connections[remoteAddr] = client
-		s.mu.Unlock()
+		s.connectionMu.Unlock()
 
-		s.game.AddPlayer(client)
-
-		go client.handleRequest()
+		s.game.AddPlayerChan <- client
 	}
 }

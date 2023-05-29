@@ -1,9 +1,8 @@
 package ecs
 
 import (
-	"log"
-
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 type EntityID string

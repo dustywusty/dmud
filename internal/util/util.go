@@ -2,11 +2,14 @@ package util
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
+	"runtime"
+	"strconv"
+	"strings"
 	"time"
 	"unicode"
 
+	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -38,10 +41,21 @@ func GenerateRandomName() string {
 	return fmt.Sprintf("%s-%s-%s", verb1, verb2, noun)
 }
 
+func GetGID() string {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	idField := strings.Fields(strings.TrimPrefix(string(buf[:n]), "goroutine "))[0]
+	id, err := strconv.ParseUint(idField, 10, 64)
+	if err != nil {
+		panic(fmt.Sprintf("cannot get goroutine id: %v", err))
+	}
+	return fmt.Sprintf("%d", id)
+}
+
 func HashAndSalt(pwd string) string {
 	hash, err := bcrypt.GenerateFromPassword([]byte(pwd), bcrypt.MinCost)
 	if err != nil {
-		log.Println(err)
+		log.Error().Err(err).Msg("")
 	}
 	return string(hash)
 }

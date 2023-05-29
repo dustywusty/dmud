@@ -4,13 +4,14 @@ import (
 	"bufio"
 	"errors"
 	"io"
-	"log"
 	"net"
 	"strings"
 
 	"dmud/internal/common"
 	"dmud/internal/ecs"
 	"dmud/internal/game"
+
+	"github.com/rs/zerolog/log"
 )
 
 type TCPClient struct {
@@ -76,7 +77,7 @@ func (c *TCPClient) SendMessage(msg string) {
 // Private
 //
 
-func (c *TCPClient) handleRequest() {
+func (c *TCPClient) HandleRequest() {
 	g := c.game
 	r := bufio.NewReader(c.conn)
 	for {
@@ -86,6 +87,8 @@ func (c *TCPClient) handleRequest() {
 			g.HandleDisconnect(c)
 			return
 		}
+
+		log.Printf("Received message from %s: %s", c.RemoteAddr(), message)
 
 		parts := strings.SplitN(strings.TrimSpace(message), " ", 2)
 		cmd := parts[0]

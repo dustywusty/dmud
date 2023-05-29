@@ -5,12 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"reflect"
 	"sync"
 
 	"dmud/internal/components"
 	"dmud/internal/util"
+
+	"github.com/rs/zerolog/log"
 )
 
 type World struct {
@@ -150,11 +151,11 @@ type Room struct {
 func loadRoomsFromFile(filename string) []Room {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
-		log.Fatal(err)
+		log.Error().Err(err).Msg("")
 	}
 	var rooms []Room
 	if err := json.Unmarshal(data, &rooms); err != nil {
-		log.Fatal(err)
+		log.Error().Err(err).Msg("")
 	}
 	return rooms
 

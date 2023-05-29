@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
 	"sync"
@@ -15,6 +14,7 @@ import (
 	"dmud/internal/ecs"
 	"dmud/internal/util"
 
+	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -58,10 +58,12 @@ func NewGame() *Game {
 // Public
 //
 
-func (g *Game) AddPlayer(c common.Client) {
+func (g *Game) HandleConnect(c common.Client) {
+	log.Printf("[%d] New connection from %s", util.GetGID(), c.ID())
+
 	accounts, err := loadAccountsFromFile("./resources/accounts.json")
 	if err != nil {
-		log.Fatal(err)
+		log.Error().Err(err).Msg("")
 	}
 
 	exists := false
@@ -77,6 +79,8 @@ func (g *Game) AddPlayer(c common.Client) {
 	password, _ := g.queryPlayerPassword(c, exists)
 
 	if exists {
+		log.Printf("Account %s password %s", name, password)
+
 		err := bcrypt.CompareHashAndPassword([]byte(a.Password), []byte(password))
 		if err != nil {
 			log.Printf("Error comparing password: %v", err)
@@ -86,7 +90,7 @@ func (g *Game) AddPlayer(c common.Client) {
 	} else {
 		account := Account{
 			Name:     name,
-			Password: password,
+			Password: util.HashAndSalt(password),
 		}
 		accounts = append(accounts, account)
 		saveAccountsToFile("./resources/accounts.json", accounts)
@@ -97,18 +101,7 @@ func (g *Game) AddPlayer(c common.Client) {
 		Name:   name,
 		Room:   g.defaultRoom,
 	}
-	playerEntity := ecs.NewEntity()
-
-	g.players[name] = playerComponent
-
-	g.world.AddEntity(playerEntity)
-	g.world.AddComponent(playerEntity, playerComponent)
-
-	g.messageAllPlayers(fmt.Sprintf("%s has joined the game.", name), c)
-
-	playerComponent.Client.SendMessage(fmt.Sprintf(g.defaultRoom.Description))
-
-	log.Printf("Adding player %v", string(playerComponent.Name))
+	g.addPlayer(playerComponent)
 }
 
 func (g *Game) HandleDisconnect(c common.Client) {
@@ -138,6 +131,23 @@ func (g *Game) RemovePlayer(c common.Client) {
 ///////////////////////////////////////////////////////////////////////////////////////////////
 // Private
 //
+
+func (g *Game) addPlayer(p *components.PlayerComponent) {
+	g.players[p.Name] = p
+
+	playerEntity := ecs.NewEntity()
+	g.world.AddEntity(playerEntity)
+	g.world.AddComponent(playerEntity, p)
+
+	g.messageAllPlayers(fmt.Sprintf("%s has joined the game.", p.Name), p.Client)
+
+	p.Client.SendMessage(util.WelcomeBanner)
+	p.Client.SendMessage(g.defaultRoom.Description)
+
+	go p.Client.HandleRequest()
+
+	log.Printf("Added player %v", p.Name)
+}
 
 func containsClient(clients []common.Client, client common.Client) bool {
 	for _, c := range clients {
@@ -193,21 +203,23 @@ func (g *Game) handleShout(player *components.PlayerComponent, command Command) 
 }
 
 func (g *Game) handleUnknownCommand(player *components.PlayerComponent, command Command) {
-	player.Client.SendMessage("What?")
+	player.Client.SendMessage(fmt.Sprintf("What do you mean, \"%s\"?", command.Cmd))
 }
 
 func (g *Game) loop() {
+	updateTicker := time.NewTicker(10 * time.Millisecond)
+	defer updateTicker.Stop()
+
 	for {
 		select {
 		case client := <-g.AddPlayerChan:
-			g.AddPlayer(client)
+			g.HandleConnect(client)
 		case client := <-g.RemovePlayerChan:
 			g.RemovePlayer(client)
-		case clientCommand := <-g.CommandChan:
-			g.handleCommand(clientCommand)
-		default:
+		case command := <-g.CommandChan:
+			g.handleCommand(command)
+		case <-updateTicker.C:
 			g.world.Update()
-			time.Sleep(10 * time.Millisecond)
 		}
 	}
 }
@@ -228,14 +240,16 @@ func (g *Game) queryPlayerName(client common.Client) (string, error) {
 	var err error
 
 	for {
+		log.Printf("Querying player name")
 		client.SendMessage("What do we call you?")
 
 		name, err = client.GetMessage(32)
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("")
+			return "", err
 		}
 
-		if len(name) > 32 || !util.IsAlphaNumeric(name) {
+		if len(name) > 32 || len(name) <= 0 || !util.IsAlphaNumeric(name) {
 			continue
 		}
 		break
@@ -252,7 +266,8 @@ func (g *Game) queryPlayerPassword(c common.Client, exists bool) (string, error)
 
 		password, err = c.GetMessage(256)
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("")
+			return "", err
 		}
 
 		if len(password) <= 0 || len(password) > 256 {
@@ -263,7 +278,8 @@ func (g *Game) queryPlayerPassword(c common.Client, exists bool) (string, error)
 			c.SendMessage("Please confirm your password.")
 			confirmPassword, err := c.GetMessage(256)
 			if err != nil {
-				log.Fatal(err)
+				log.Error().Err(err).Msg("")
+				return "", err
 			}
 
 			if confirmPassword != password {
