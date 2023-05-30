@@ -17,6 +17,7 @@ func main() {
 	}
 
 	log.Logger = log.Output(output)
+
 	server := net.NewServer(&net.ServerConfig{
 		Host: "localhost",
 		Port: "3333",

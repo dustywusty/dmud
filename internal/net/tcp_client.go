@@ -32,7 +32,7 @@ func (c *TCPClient) CloseConnection() error {
 	c.conn.Write([]byte("\nGoodbye!\n\n"))
 	err := c.conn.Close()
 	if err != nil {
-		log.Printf("Error closing connection: %v", err)
+		log.Error().Err(err).Msg("Error closing connection")
 		return err
 	}
 	log.Printf("Closed connection to %s", c.RemoteAddr())
@@ -57,10 +57,6 @@ func (client *TCPClient) GetMessage(maxLength int) (string, error) {
 	return msg, nil
 }
 
-func (c *TCPClient) ID() string {
-	return c.id
-}
-
 func (c *TCPClient) RemoteAddr() string {
 	return c.conn.RemoteAddr().String()
 }
@@ -68,8 +64,7 @@ func (c *TCPClient) RemoteAddr() string {
 func (c *TCPClient) SendMessage(msg string) {
 	_, err := c.conn.Write([]byte("\b\b" + msg + "\n\n> "))
 	if err != nil {
-		log.Printf("Error sending message to TCPClient: %v", err)
-		return
+		log.Error().Err(err).Msg("Error sending message to TCPClient: %v")
 	}
 }
 
@@ -88,7 +83,7 @@ func (c *TCPClient) HandleRequest() {
 			return
 		}
 
-		log.Printf("Received message from %s: %s", c.RemoteAddr(), message)
+		log.Trace().Msgf("Received message from %s: %s", c.RemoteAddr(), message)
 
 		parts := strings.SplitN(strings.TrimSpace(message), " ", 2)
 		cmd := parts[0]

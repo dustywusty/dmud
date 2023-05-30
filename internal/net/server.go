@@ -49,7 +49,7 @@ func (s *Server) Run() {
 		}
 	}(listener)
 
-	log.Printf("Listening on %s:%s", s.host, s.port)
+	log.Info().Msgf("Listening on %s:%s", s.host, s.port)
 
 	s.game = game.NewGame()
 
@@ -60,7 +60,7 @@ func (s *Server) Run() {
 		}
 
 		remoteAddr := conn.RemoteAddr().String()
-		log.Printf("Accepted connection from %s", remoteAddr)
+		log.Info().Msgf("Accepted connection from %s", remoteAddr)
 
 		client := &TCPClient{
 			conn:   conn,

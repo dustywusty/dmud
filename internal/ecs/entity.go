@@ -13,14 +13,14 @@ type Entity struct {
 
 func NewEntity() Entity {
 	_uuid := uuid.New()
-	log.Printf("Created entity %v", _uuid.String())
+	log.Info().Msgf("Created entity %v", _uuid.String())
 	return Entity{
 		ID: EntityID(_uuid.String()),
 	}
 }
 
 func NewEntityWithID(id string) Entity {
-	log.Printf("Created entity %v", id)
+	log.Info().Msgf("Created entity %v", id)
 	return Entity{
 		ID: EntityID(id),
 	}

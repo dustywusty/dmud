@@ -59,49 +59,51 @@ func NewGame() *Game {
 //
 
 func (g *Game) HandleConnect(c common.Client) {
-	log.Printf("[%d] New connection from %s", util.GetGID(), c.ID())
+	go func() {
+		log.Printf("New connection from %s", c.RemoteAddr())
 
-	accounts, err := loadAccountsFromFile("./resources/accounts.json")
-	if err != nil {
-		log.Error().Err(err).Msg("")
-	}
-
-	exists := false
-	name, _ := g.queryPlayerName(c)
-
-	var a Account
-	for _, a = range accounts {
-		if a.Name == name {
-			exists = true
-		}
-	}
-
-	password, _ := g.queryPlayerPassword(c, exists)
-
-	if exists {
-		log.Printf("Account %s password %s", name, password)
-
-		err := bcrypt.CompareHashAndPassword([]byte(a.Password), []byte(password))
+		accounts, err := loadAccountsFromFile("./resources/accounts.json")
 		if err != nil {
-			log.Printf("Error comparing password: %v", err)
-			c.CloseConnection()
-			return
+			log.Error().Err(err).Msg("")
 		}
-	} else {
-		account := Account{
-			Name:     name,
-			Password: util.HashAndSalt(password),
-		}
-		accounts = append(accounts, account)
-		saveAccountsToFile("./resources/accounts.json", accounts)
-	}
 
-	playerComponent := &components.PlayerComponent{
-		Client: c,
-		Name:   name,
-		Room:   g.defaultRoom,
-	}
-	g.addPlayer(playerComponent)
+		exists := false
+		name, _ := g.queryPlayerName(c)
+
+		var a Account
+		for _, a = range accounts {
+			if a.Name == name {
+				exists = true
+			}
+		}
+
+		password, _ := g.queryPlayerPassword(c, exists)
+
+		if exists {
+			log.Printf("Account %s password %s", name, password)
+
+			err := bcrypt.CompareHashAndPassword([]byte(a.Password), []byte(password))
+			if err != nil {
+				log.Printf("Error comparing password: %v", err)
+				c.CloseConnection()
+				return
+			}
+		} else {
+			account := Account{
+				Name:     name,
+				Password: util.HashAndSalt(password),
+			}
+			accounts = append(accounts, account)
+			saveAccountsToFile("./resources/accounts.json", accounts)
+		}
+
+		playerComponent := &components.PlayerComponent{
+			Client: c,
+			Name:   name,
+			Room:   g.defaultRoom,
+		}
+		g.addPlayer(playerComponent)
+	}()
 }
 
 func (g *Game) HandleDisconnect(c common.Client) {
@@ -133,6 +135,9 @@ func (g *Game) RemovePlayer(c common.Client) {
 //
 
 func (g *Game) addPlayer(p *components.PlayerComponent) {
+	g.playersMu.Lock()
+	defer g.playersMu.Unlock()
+
 	g.players[p.Name] = p
 
 	playerEntity := ecs.NewEntity()
@@ -146,7 +151,7 @@ func (g *Game) addPlayer(p *components.PlayerComponent) {
 
 	go p.Client.HandleRequest()
 
-	log.Printf("Added player %v", p.Name)
+	log.Info().Msg(fmt.Sprintf("Player %s added", p.Name))
 }
 
 func containsClient(clients []common.Client, client common.Client) bool {
