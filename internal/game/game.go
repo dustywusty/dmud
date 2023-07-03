@@ -23,17 +23,13 @@ import (
 //
 
 type Game struct {
-	defaultRoom *components.RoomComponent
-
-	players   map[string]*components.PlayerComponent
-	playersMu sync.Mutex
-
-	world *ecs.World
-
+	defaultRoom      *components.RoomComponent
+	players          map[string]*components.PlayerComponent
+	playersMu        sync.Mutex
+	world            *ecs.World
 	AddPlayerChan    chan common.Client
 	RemovePlayerChan chan common.Client
-
-	CommandChan chan ClientCommand
+	CommandChan      chan ClientCommand
 }
 
 func NewGame() *Game {
@@ -111,23 +107,19 @@ func (g *Game) HandleDisconnect(c common.Client) {
 }
 
 func (g *Game) RemovePlayer(c common.Client) {
-	playerEntity, err := g.world.FindEntityByComponentPredicate("PlayerComponent", func(component interface{}) bool {
-		if playerComponent, ok := component.(*components.PlayerComponent); ok {
-			return playerComponent.Client == c
-		}
-		return false
-	})
+	g.playersMu.Lock()
+	defer g.playersMu.Unlock()
+
+	player, err := g.getPlayer(c)
 	if err != nil {
-		log.Printf("Error removing player: %v", err)
+		log.Error().Err(err).Msg("")
 		return
 	}
-	playerComponent, err := g.world.GetComponent(playerEntity.ID, "PlayerComponent")
-	if err != nil {
-		log.Printf("Error getting player component: %v", err)
-		return
-	}
-	log.Printf("Removing player %v", playerComponent.(*components.PlayerComponent).Name)
-	g.world.RemoveEntity(playerEntity.ID)
+
+	g.world.RemoveEntity(player.EntityID)
+	delete(g.players, player.Name)
+
+	g.messageAllPlayers(fmt.Sprintf("%s has left the game.", player.Name), c)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
