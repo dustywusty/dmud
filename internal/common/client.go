@@ -1,9 +1,16 @@
 package common
 
 type Client interface {
-	RemoteAddr() string
 	CloseConnection() error
-	SendMessage(msg string)
 	GetMessage(maxLength int) (string, error)
 	HandleRequest()
+	SendMessage(msg string)
+	RemoteAddr() string
 }
+
+type ClientType int
+
+const (
+	TCP ClientType = iota
+	WebSocket
+)

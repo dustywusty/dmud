@@ -68,10 +68,6 @@ func (c *TCPClient) SendMessage(msg string) {
 	}
 }
 
-// /////////////////////////////////////////////////////////////////////////////////////////////
-// Private
-//
-
 func (c *TCPClient) HandleRequest() {
 	g := c.game
 	r := bufio.NewReader(c.conn)

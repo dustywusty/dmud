@@ -10,10 +10,6 @@ type PlayerComponent struct {
 	Room   *RoomComponent
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-// Public
-//
-
 func (p *PlayerComponent) Say(msg string) {
 	p.Room.MessageAllPlayers(p.Name+" says: "+msg, p)
 	p.Client.SendMessage("You say: " + msg)
