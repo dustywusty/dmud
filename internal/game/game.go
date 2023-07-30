@@ -1,10 +1,7 @@
 package game
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -37,7 +34,6 @@ type Game struct {
 func NewGame() *Game {
 	world := ecs.NewWorld()
 	defaultRoom, _ := world.GetComponent("1", "RoomComponent")
-
 	game := Game{
 		defaultRoom:      defaultRoom.(*components.RoomComponent),
 		players:          make(map[string]*components.PlayerComponent),
@@ -46,9 +42,7 @@ func NewGame() *Game {
 		RemovePlayerChan: make(chan common.Client),
 		CommandChan:      make(chan ClientCommand),
 	}
-
 	go game.loop()
-
 	return &game
 }
 
@@ -180,104 +174,4 @@ func (g *Game) messageAllPlayers(m string, excludeClients ...common.Client) {
 			player.Client.SendMessage(m)
 		}
 	}
-}
-
-func (g *Game) queryPlayerName(client common.Client) (string, error) {
-	var name string
-	var err error
-
-	for {
-		log.Printf("Querying player name")
-		client.SendMessage("What do we call you?")
-
-		name, err = client.GetMessage(32)
-		if err != nil {
-			log.Error().Err(err).Msg("")
-			return "", err
-		}
-
-		if len(name) > 32 || len(name) <= 0 || !util.IsAlphaNumeric(name) {
-			continue
-		}
-		break
-	}
-	return name, nil
-}
-
-func (g *Game) queryPlayerPassword(c common.Client, exists bool) (string, error) {
-	var password string
-	var err error
-
-	for {
-		c.SendMessage("What is your password?")
-
-		password, err = c.GetMessage(256)
-		if err != nil {
-			log.Error().Err(err).Msg("")
-			return "", err
-		}
-
-		if len(password) <= 0 || len(password) > 256 {
-			continue
-		}
-
-		if !exists {
-			c.SendMessage("Please confirm your password.")
-			confirmPassword, err := c.GetMessage(256)
-			if err != nil {
-				log.Error().Err(err).Msg("")
-				return "", err
-			}
-
-			if confirmPassword != password {
-				c.SendMessage("Passwords do not match. Please try again.")
-				continue
-			}
-			break
-		}
-		break
-	}
-	return password, nil
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-// ..
-//
-
-type Account struct {
-	Name     string `json:"name"`
-	Password string `json:"password"`
-}
-
-func loadAccountsFromFile(filename string) ([]Account, error) {
-	jsonFile, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer jsonFile.Close()
-
-	byteValue, _ := ioutil.ReadAll(jsonFile)
-
-	var accounts []Account
-
-	err = json.Unmarshal(byteValue, &accounts)
-	if err != nil {
-		return nil, err
-	}
-
-	return accounts, nil
-}
-
-func saveAccountsToFile(filename string, accounts []Account) error {
-	data, err := json.Marshal(accounts)
-	if err != nil {
-		return err
-	}
-
-	err = ioutil.WriteFile(filename, data, 0644)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
