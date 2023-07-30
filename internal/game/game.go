@@ -15,7 +15,6 @@ import (
 	"dmud/internal/util"
 
 	"github.com/rs/zerolog/log"
-	"golang.org/x/crypto/bcrypt"
 )
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -23,10 +22,13 @@ import (
 //
 
 type Game struct {
-	defaultRoom      *components.RoomComponent
-	players          map[string]*components.PlayerComponent
-	playersMu        sync.Mutex
-	world            *ecs.World
+	defaultRoom *components.RoomComponent
+
+	players   map[string]*components.PlayerComponent
+	playersMu sync.Mutex
+
+	world *ecs.World
+
 	AddPlayerChan    chan common.Client
 	RemovePlayerChan chan common.Client
 	CommandChan      chan ClientCommand
@@ -50,56 +52,8 @@ func NewGame() *Game {
 	return &game
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-// Public
-//
-
 func (g *Game) HandleConnect(c common.Client) {
-	go func() {
-		log.Printf("New connection from %s", c.RemoteAddr())
 
-		accounts, err := loadAccountsFromFile("./resources/accounts.json")
-		if err != nil {
-			log.Error().Err(err).Msg("")
-		}
-
-		exists := false
-		name, _ := g.queryPlayerName(c)
-
-		var a Account
-		for _, a = range accounts {
-			if a.Name == name {
-				exists = true
-			}
-		}
-
-		password, _ := g.queryPlayerPassword(c, exists)
-
-		if exists {
-			log.Printf("Account %s password %s", name, password)
-
-			err := bcrypt.CompareHashAndPassword([]byte(a.Password), []byte(password))
-			if err != nil {
-				log.Printf("Error comparing password: %v", err)
-				c.CloseConnection()
-				return
-			}
-		} else {
-			account := Account{
-				Name:     name,
-				Password: util.HashAndSalt(password),
-			}
-			accounts = append(accounts, account)
-			saveAccountsToFile("./resources/accounts.json", accounts)
-		}
-
-		playerComponent := &components.PlayerComponent{
-			Client: c,
-			Name:   name,
-			Room:   g.defaultRoom,
-		}
-		g.addPlayer(playerComponent)
-	}()
 }
 
 func (g *Game) HandleDisconnect(c common.Client) {
@@ -116,15 +70,29 @@ func (g *Game) RemovePlayer(c common.Client) {
 		return
 	}
 
-	g.world.RemoveEntity(player.)
+	// g.world.RemoveEntity(player.EntityID)
 	delete(g.players, player.Name)
 
 	g.messageAllPlayers(fmt.Sprintf("%s has left the game.", player.Name), c)
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-// Private
-//
+func (g *Game) loop() {
+	updateTicker := time.NewTicker(10 * time.Millisecond)
+	defer updateTicker.Stop()
+
+	for {
+		select {
+		case client := <-g.AddPlayerChan:
+			g.HandleConnect(client)
+		case client := <-g.RemovePlayerChan:
+			g.RemovePlayer(client)
+		case command := <-g.CommandChan:
+			g.handleCommand(command)
+		case <-updateTicker.C:
+			g.world.Update()
+		}
+	}
+}
 
 func (g *Game) addPlayer(p *components.PlayerComponent) {
 	g.playersMu.Lock()
@@ -201,24 +169,6 @@ func (g *Game) handleShout(player *components.PlayerComponent, command Command) 
 
 func (g *Game) handleUnknownCommand(player *components.PlayerComponent, command Command) {
 	player.Client.SendMessage(fmt.Sprintf("What do you mean, \"%s\"?", command.Cmd))
-}
-
-func (g *Game) loop() {
-	updateTicker := time.NewTicker(10 * time.Millisecond)
-	defer updateTicker.Stop()
-
-	for {
-		select {
-		case client := <-g.AddPlayerChan:
-			g.HandleConnect(client)
-		case client := <-g.RemovePlayerChan:
-			g.RemovePlayer(client)
-		case command := <-g.CommandChan:
-			g.handleCommand(command)
-		case <-updateTicker.C:
-			g.world.Update()
-		}
-	}
 }
 
 func (g *Game) messageAllPlayers(m string, excludeClients ...common.Client) {
