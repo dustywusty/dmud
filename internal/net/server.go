@@ -133,7 +133,6 @@ func (s *Server) runTCPListener() {
 		}
 	}()
 
-	// This will block until done is signaled after listener.Accept() fails due to listener being closed
 	<-done
 }
 
@@ -179,6 +178,5 @@ func (s *Server) runWebSocketServer() {
 		done <- true
 	}()
 
-	// This will block until done is signaled after httpServer.ListenAndServe() fails due to httpServer being shut down
 	<-done
 }

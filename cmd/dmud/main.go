@@ -13,9 +13,11 @@ import (
 )
 
 func main() {
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+
 	output := zerolog.ConsoleWriter{Out: os.Stdout}
 	output.FormatMessage = func(i interface{}) string {
-		return fmt.Sprintf("(Thread %s) %s", util.GetGID(), i)
+		return fmt.Sprintf("(%s) %s", util.GetGID(), i)
 	}
 	log.Logger = log.Output(output)
 
@@ -25,6 +27,7 @@ func main() {
 		WSHost:  "127.0.0.1",
 		WSPort:  "8080",
 	})
+
 	go server.Run()
 
 	interrupt := make(chan os.Signal, 1)
@@ -32,6 +35,6 @@ func main() {
 	<-interrupt
 
 	log.Info().Msg("Received interrupt signal, shutting down...")
+
 	server.Shutdown()
-	log.Info().Msg("Server successfully shut down. Exiting.")
 }
