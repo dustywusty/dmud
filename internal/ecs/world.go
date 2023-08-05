@@ -29,7 +29,7 @@ func NewWorld() *World {
 
 	rooms := loadRoomsFromFile("./resources/rooms.json")
 	for _, room := range rooms {
-		roomEntity := NewEntityWithID(room.ID)
+		roomEntity := NewEntity(room.ID)
 
 		var exits []components.Exit
 		for direction, roomID := range room.Exits {
@@ -43,6 +43,7 @@ func NewWorld() *World {
 			Description: room.Description,
 			Exits:       exits,
 		}
+
 		world.AddEntity(roomEntity)
 		world.AddComponent(roomEntity, roomComponent)
 	}
@@ -53,8 +54,17 @@ func NewWorld() *World {
 func (w *World) AddComponent(entity Entity, component Component) {
 	w.entityMutex.Lock()
 	defer w.entityMutex.Unlock()
+
 	componentName := reflect.TypeOf(component).Elem().Name()
-	w.components[entity.ID][componentName] = component
+
+	if _, ok := w.components[entity.ID]; ok {
+		w.components[entity.ID][componentName] = component
+	} else {
+		w.components[entity.ID] = make(map[string]Component)
+		w.components[entity.ID][componentName] = component
+	}
+
+	entity.Components[componentName] = true
 }
 
 func (w *World) AddEntity(entity Entity) {
@@ -71,7 +81,7 @@ func (w *World) AddSystem(system System) {
 func (w *World) FindEntity(id EntityID) (Entity, error) {
 	entity, ok := w.entities[id]
 	if !ok {
-		return Entity{}, errors.New("no entity found with that ID")
+		return Entity{}, nil
 	}
 	return entity, nil
 }

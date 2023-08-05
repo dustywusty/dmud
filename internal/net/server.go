@@ -128,6 +128,8 @@ func (s *Server) runTCPListener() {
 			s.connectionMu.Unlock()
 
 			s.game.AddPlayerChan <- client
+
+			go client.HandleRequest()
 		}
 	}()
 
@@ -160,6 +162,8 @@ func (s *Server) runWebSocketServer() {
 			s.connectionMu.Unlock()
 
 			s.game.AddPlayerChan <- client
+
+			go client.HandleRequest()
 		}),
 	}
 

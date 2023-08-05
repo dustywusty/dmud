@@ -15,7 +15,7 @@ import (
 func main() {
 	output := zerolog.ConsoleWriter{Out: os.Stdout}
 	output.FormatMessage = func(i interface{}) string {
-		return fmt.Sprintf("%s (%s)", i, util.GetGID())
+		return fmt.Sprintf("(Thread %s) %s", util.GetGID(), i)
 	}
 	log.Logger = log.Output(output)
 

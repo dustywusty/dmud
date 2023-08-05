@@ -64,7 +64,7 @@ func (g *Game) RemovePlayer(c common.Client) {
 		return
 	}
 
-	g.world.RemoveEntity(player.ID)
+	// g.world.RemoveEntity(player.ID)
 	delete(g.players, player.Name)
 
 	g.messageAllPlayers(fmt.Sprintf("%s has left the game.", player.Name), c)
