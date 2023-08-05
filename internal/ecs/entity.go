@@ -8,27 +8,27 @@ import (
 type EntityID string
 
 type Entity struct {
-	ID EntityID
+	ID         EntityID
+	Components map[string]bool
 }
 
-func NewEntity() Entity {
-	_uuid := uuid.New()
-	log.Info().Msgf("Created entity %v", _uuid.String())
-	return Entity{
-		ID: EntityID(_uuid.String()),
+func NewEntity(ids ...string) Entity {
+	var id string
+
+	if len(ids) > 0 {
+		id = ids[0]
+	} else {
+		_uuid := uuid.New()
+		id = _uuid.String()
 	}
-}
 
-func NewEntityWithID(id string) Entity {
 	log.Info().Msgf("Created entity %v", id)
+
 	return Entity{
-		ID: EntityID(id),
+		ID:         EntityID(id),
+		Components: make(map[string]bool),
 	}
 }
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-// Public
-//
 
 func (e Entity) String() string {
 	return string(e.ID)

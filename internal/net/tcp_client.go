@@ -2,8 +2,6 @@ package net
 
 import (
 	"bufio"
-	"errors"
-	"io"
 	"net"
 	"strings"
 
@@ -37,24 +35,6 @@ func (c *TCPClient) CloseConnection() error {
 	}
 	log.Printf("Closed connection to %s", c.RemoteAddr())
 	return nil
-}
-
-func (client *TCPClient) GetMessage(maxLength int) (string, error) {
-	msg, err := client.reader.ReadString('\n')
-	if err != nil {
-		if err == io.EOF {
-			return "", errors.New("Client disconnected")
-		}
-		return "", err
-	}
-
-	msg = strings.TrimSpace(msg)
-
-	if len(msg) > maxLength {
-		return "", errors.New("message exceeds maximum length")
-	}
-
-	return msg, nil
 }
 
 func (c *TCPClient) RemoteAddr() string {

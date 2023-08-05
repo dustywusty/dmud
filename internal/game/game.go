@@ -51,7 +51,7 @@ func (g *Game) HandleConnect(c common.Client) {
 }
 
 func (g *Game) HandleDisconnect(c common.Client) {
-	g.RemovePlayerChan <- c
+	g.RemovePlayer(c)
 }
 
 func (g *Game) RemovePlayer(c common.Client) {
@@ -64,7 +64,7 @@ func (g *Game) RemovePlayer(c common.Client) {
 		return
 	}
 
-	// g.world.RemoveEntity(player.EntityID)
+	g.world.RemoveEntity(player.ID)
 	delete(g.players, player.Name)
 
 	g.messageAllPlayers(fmt.Sprintf("%s has left the game.", player.Name), c)

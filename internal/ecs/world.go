@@ -1,10 +1,7 @@
 package ecs
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io/ioutil"
 	"reflect"
 	"sync"
 
@@ -15,10 +12,13 @@ import (
 )
 
 type World struct {
+	components          map[EntityID]map[string]Component
+	componentToEntities map[string]map[EntityID]Entity
+
 	entities    map[EntityID]Entity
-	components  map[EntityID]map[string]Component
-	systems     []System
-	entityMutex sync.Mutex
+	entityMutex sync.RWMutex
+
+	systems []System
 }
 
 func NewWorld() *World {
@@ -31,7 +31,6 @@ func NewWorld() *World {
 	for _, room := range rooms {
 		roomEntity := NewEntityWithID(room.ID)
 
-		// Convert map of exits into slice of Exit
 		var exits []components.Exit
 		for direction, roomID := range room.Exits {
 			exits = append(exits, components.Exit{
@@ -50,10 +49,6 @@ func NewWorld() *World {
 
 	return world
 }
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-// Public
-//
 
 func (w *World) AddComponent(entity Entity, component Component) {
 	w.entityMutex.Lock()
@@ -88,33 +83,18 @@ func (w *World) FindEntitiesByComponentPredicate(componentType string, predicate
 		if ok && predicate(component) {
 			if entity, exists := w.entities[entityID]; exists {
 				entities = append(entities, entity)
-			} else {
-				return nil, fmt.Errorf("no entity found matching the entity ID")
 			}
 		}
 	}
 	if len(entities) == 0 {
-		return nil, fmt.Errorf("no entities found matching the predicate")
+		return nil, nil
 	}
 	return entities, nil
 }
 
-func (w *World) FindEntityByComponentPredicate(componentType string, predicate func(interface{}) bool) (Entity, error) {
-	for entityID, components := range w.components {
-		component, ok := components[componentType]
-		if ok && predicate(component) {
-			if entity, exists := w.entities[entityID]; exists {
-				return entity, nil
-			}
-			return Entity{}, fmt.Errorf("no entity found matching the entity id")
-		}
-	}
-	return Entity{}, fmt.Errorf("no entity found matching the predicate")
-}
-
 func (w *World) GetComponent(entityID EntityID, componentName string) (Component, error) {
-	w.entityMutex.Lock()
-	defer w.entityMutex.Unlock()
+	w.entityMutex.RLock()
+	defer w.entityMutex.RUnlock()
 	if components, ok := w.components[entityID]; ok {
 		if component, ok := components[componentName]; ok {
 			return component, nil
@@ -138,9 +118,7 @@ func (w *World) Update() {
 	}
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-// Private
-//
+// .. Rooms
 
 type Room struct {
 	ID          string            `json:"id"`
@@ -149,14 +127,9 @@ type Room struct {
 }
 
 func loadRoomsFromFile(filename string) []Room {
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		log.Error().Err(err).Msg("")
-	}
 	var rooms []Room
-	if err := json.Unmarshal(data, &rooms); err != nil {
+	if err := util.ParseJSON(filename, &rooms); err != nil {
 		log.Error().Err(err).Msg("")
 	}
 	return rooms
-
 }

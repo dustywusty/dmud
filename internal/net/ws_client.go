@@ -1,7 +1,8 @@
 package net
 
 import (
-	"errors"
+	"net/http"
+	"net/url"
 	"strings"
 
 	"dmud/internal/common"
@@ -12,7 +13,23 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var upgrader = websocket.Upgrader{} // use default options
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		parsedOrigin, err := url.Parse(origin)
+		if err != nil {
+			log.Error().Err(err).Msg("Error parsing Origin header")
+			return false
+		}
+
+		if strings.ToLower(parsedOrigin.Hostname()) != "localhost" {
+			log.Error().Msg("Origin is not localhost")
+			return false
+		}
+
+		return true
+	},
+}
 
 type WSClient struct {
 	conn     *websocket.Conn
@@ -31,26 +48,6 @@ func (c *WSClient) CloseConnection() error {
 	}
 	log.Printf("Closed connection to %s", c.RemoteAddr())
 	return nil
-}
-
-func (c *WSClient) GetMessage(maxLength int) (string, error) {
-	messageType, p, err := c.conn.ReadMessage()
-	if err != nil {
-		log.Error().Err(err).Msg("Error reading message")
-		return "", err
-	}
-
-	if messageType == websocket.TextMessage {
-		msg := strings.TrimSpace(string(p))
-
-		if len(msg) > maxLength {
-			return "", errors.New("message exceeds maximum length")
-		}
-
-		return msg, nil
-	}
-
-	return "", nil
 }
 
 func (c *WSClient) RemoteAddr() string {

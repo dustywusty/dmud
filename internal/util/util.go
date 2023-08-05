@@ -1,7 +1,9 @@
 package util
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"runtime"
 	"strconv"
@@ -68,6 +70,16 @@ func IsAlphaNumeric(str string) bool {
 	}
 	return true
 }
+
+func ParseJSON(filename string, v interface{}) error {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(data, v)
+}
+
+// ..
 
 var AdjectiveVerbs1 = []string{
 	"vacuous",
