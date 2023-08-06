@@ -54,7 +54,7 @@ func (c *TCPClient) HandleRequest() {
 	for {
 		message, err := r.ReadString('\n')
 		if err != nil {
-			c.conn.Close()
+			log.Error().Err(err).Msg("Error reading string from TCPClient")
 			g.HandleDisconnect(c)
 			return
 		}

@@ -21,35 +21,9 @@ type World struct {
 	systems []System
 }
 
-func NewWorld() *World {
-	world := &World{
-		entities:   make(map[EntityID]Entity),
-		components: make(map[EntityID]map[string]Component),
-	}
-
-	rooms := loadRoomsFromFile("./resources/rooms.json")
-	for _, room := range rooms {
-		roomEntity := NewEntity(room.ID)
-
-		var exits []components.Exit
-		for direction, roomID := range room.Exits {
-			exits = append(exits, components.Exit{
-				Direction: direction,
-				RoomID:    roomID,
-			})
-		}
-
-		roomComponent := &components.RoomComponent{
-			Description: room.Description,
-			Exits:       exits,
-		}
-
-		world.AddEntity(roomEntity)
-		world.AddComponent(roomEntity, roomComponent)
-	}
-
-	return world
-}
+///////////////////////////////////////////////////////////////////////////////////////////////
+// ..
+//
 
 func (w *World) AddComponent(entity Entity, component Component) {
 	w.entityMutex.Lock()
@@ -128,7 +102,41 @@ func (w *World) Update() {
 	}
 }
 
-// .. Rooms
+///////////////////////////////////////////////////////////////////////////////////////////////
+// ..
+//
+
+func NewWorld() *World {
+	world := &World{
+		entities:   make(map[EntityID]Entity),
+		components: make(map[EntityID]map[string]Component),
+	}
+
+	rooms := loadRoomsFromFile("./resources/rooms.json")
+	for _, room := range rooms {
+		roomEntity := NewEntity(room.ID)
+
+		var exits []components.Exit
+		for direction, roomID := range room.Exits {
+			exits = append(exits, components.Exit{
+				Direction: direction,
+				RoomID:    roomID,
+			})
+		}
+
+		roomComponent := &components.RoomComponent{
+			Description: room.Description,
+			Exits:       exits,
+		}
+
+		world.AddEntity(roomEntity)
+		world.AddComponent(roomEntity, roomComponent)
+	}
+
+	return world
+}
+
+// ..
 
 type Room struct {
 	ID          string            `json:"id"`

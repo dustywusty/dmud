@@ -32,24 +32,20 @@ type Server struct {
 	tcpHost     string
 	tcpPort     string
 
-	httpServer *http.Server
-	wsHost     string
-	wsPort     string
+	wsServer *http.Server
+	wsHost   string
+	wsPort   string
 }
 
-func NewServer(config *ServerConfig) *Server {
-	return &Server{
-		tcpHost:     config.TCPHost,
-		tcpPort:     config.TCPPort,
-		wsHost:      config.WSHost,
-		wsPort:      config.WSPort,
-		connections: make(map[string]common.Client),
-	}
-}
+///////////////////////////////////////////////////////////////////////////////////////////////
+// ..
+//
 
 func (s *Server) Run() {
 	var wg sync.WaitGroup
 	wg.Add(2)
+
+	s.game = game.NewGame()
 
 	go func() {
 		s.runTCPListener()
@@ -60,8 +56,6 @@ func (s *Server) Run() {
 		s.runWebSocketServer()
 		wg.Done()
 	}()
-
-	s.game = game.NewGame()
 
 	wg.Wait()
 }
@@ -81,14 +75,18 @@ func (s *Server) Shutdown() {
 		}
 	}
 
-	if s.httpServer != nil {
-		if err := s.httpServer.Shutdown(context.Background()); err != nil {
+	if s.wsServer != nil {
+		if err := s.wsServer.Shutdown(context.Background()); err != nil {
 			log.Error().Err(err).Msg("Failed to shutdown HTTP server")
 		} else {
 			log.Info().Msg("WebSocket server successfully shut down")
 		}
 	}
 }
+
+// /////////////////////////////////////////////////////////////////////////////////////////////
+// ..
+//
 
 func (s *Server) runTCPListener() {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%s", s.tcpHost, s.tcpPort))
@@ -128,8 +126,6 @@ func (s *Server) runTCPListener() {
 			s.connectionMu.Unlock()
 
 			s.game.AddPlayerChan <- client
-
-			go client.HandleRequest()
 		}
 	}()
 
@@ -139,7 +135,7 @@ func (s *Server) runTCPListener() {
 func (s *Server) runWebSocketServer() {
 	done := make(chan bool)
 
-	s.httpServer = &http.Server{
+	s.wsServer = &http.Server{
 		Addr: fmt.Sprintf("%s:%s", s.wsHost, s.wsPort),
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			conn, err := upgrader.Upgrade(w, r, nil)
@@ -169,7 +165,7 @@ func (s *Server) runWebSocketServer() {
 	log.Info().Msgf("Listening WebSocket on %s:%s", s.wsHost, s.wsPort)
 
 	go func() {
-		err := s.httpServer.ListenAndServe()
+		err := s.wsServer.ListenAndServe()
 		if err != http.ErrServerClosed {
 			log.Fatal().Err(err).Msg("Failed to start WebSocket server")
 		} else {
@@ -179,4 +175,18 @@ func (s *Server) runWebSocketServer() {
 	}()
 
 	<-done
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+// ..
+//
+
+func NewServer(config *ServerConfig) *Server {
+	return &Server{
+		tcpHost:     config.TCPHost,
+		tcpPort:     config.TCPPort,
+		wsHost:      config.WSHost,
+		wsPort:      config.WSPort,
+		connections: make(map[string]common.Client),
+	}
 }

@@ -17,6 +17,8 @@ clean:
 connect:
 	while true; do nc localhost 3333 || sleep 10; done
 
-
 run: build
 	./$(BINARY_PATH)$(BINARY_NAME)
+
+watch:
+	air -c .air.toml

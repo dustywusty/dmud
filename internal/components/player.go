@@ -10,8 +10,12 @@ type PlayerComponent struct {
 	Room   *RoomComponent
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
+// ..
+//
+
 func (p *PlayerComponent) Say(msg string) {
-	p.Room.MessageAllPlayers(p.Name+" says: "+msg, p)
+	p.Room.Broadcast(p.Name+" says: "+msg, p)
 	p.Client.SendMessage("You say: " + msg)
 }
 
@@ -36,7 +40,7 @@ func (p *PlayerComponent) Shout(msg string, depth int) {
 	}
 
 	for room := range visited {
-		room.MessageAllPlayers(p.Name+" shouts: "+msg, p)
+		room.Broadcast(p.Name+" shouts: "+msg, p)
 	}
 	p.Client.SendMessage("You shout: " + msg)
 }
