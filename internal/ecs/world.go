@@ -52,6 +52,18 @@ func (w *World) AddSystem(system System) {
 	w.systems = append(w.systems, system)
 }
 
+func (w *World) Components() map[EntityID]map[string]Component {
+	w.entityMutex.RLock()
+	defer w.entityMutex.RUnlock()
+	return w.components
+}
+
+func (w *World) Entities() map[EntityID]Entity {
+	w.entityMutex.RLock()
+	defer w.entityMutex.RUnlock()
+	return w.entities
+}
+
 func (w *World) FindEntity(id EntityID) (Entity, error) {
 	entity, ok := w.entities[id]
 	if !ok {

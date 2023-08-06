@@ -9,6 +9,7 @@ import (
 	"dmud/internal/common"
 	"dmud/internal/components"
 	"dmud/internal/ecs"
+	"dmud/internal/systems"
 	"dmud/internal/util"
 
 	"github.com/rs/zerolog/log"
@@ -41,7 +42,10 @@ func (g *Game) HandleConnect(c common.Client) {
 		Name:   util.GenerateRandomName(),
 		Room:   g.defaultRoom,
 	}
-
+	healthComponent := &components.HealthComponent{
+		MaxHealth:     100,
+		CurrentHealth: 100,
+	}
 	g.defaultRoom.AddPlayer(playerComponent)
 
 	g.playersMu.Lock()
@@ -50,7 +54,9 @@ func (g *Game) HandleConnect(c common.Client) {
 
 	playerEntity := ecs.NewEntity()
 	g.world.AddEntity(playerEntity)
+
 	g.world.AddComponent(playerEntity, playerComponent)
+	g.world.AddComponent(playerEntity, healthComponent)
 
 	g.playersMu.Unlock()
 
@@ -119,6 +125,8 @@ func (g *Game) handleCommand(c ClientCommand) {
 	switch c.Command.Cmd {
 	case "exit":
 		g.handleExit(player, command)
+	case "kill":
+		go player.Kill(command.Args[1])
 	case "look":
 		go player.Look()
 	case "n", "s", "e", "w", "u", "d", "north", "south", "east", "west", "up", "down":
@@ -187,6 +195,9 @@ func NewGame() *Game {
 		RemovePlayerChan: make(chan common.Client),
 		CommandChan:      make(chan ClientCommand),
 	}
+
+	combatSytem := &systems.CombatSystem{}
+	world.AddSystem(combatSytem)
 	go game.loop()
 	return &game
 }

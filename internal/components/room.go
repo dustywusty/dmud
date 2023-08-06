@@ -40,6 +40,18 @@ func (r *RoomComponent) GetExit(direction string) *Exit {
 	return nil
 }
 
+func (r *RoomComponent) GetPlayer(name string) *PlayerComponent {
+	r.PlayersMutex.Lock()
+	for _, player := range r.Players {
+		if player.Name == name {
+			r.PlayersMutex.Unlock()
+			return player
+		}
+	}
+	r.PlayersMutex.Unlock()
+	return nil
+}
+
 func (r *RoomComponent) Broadcast(msg string, exclude ...*PlayerComponent) {
 	r.PlayersMutex.Lock()
 	for _, player := range r.Players {
