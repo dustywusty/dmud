@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"sync"
 
+	"dmud/internal/common"
 	"dmud/internal/components"
 	"dmud/internal/util"
 
@@ -12,10 +13,10 @@ import (
 )
 
 type World struct {
-	components          map[EntityID]map[string]Component
-	componentToEntities map[string]map[EntityID]Entity
+	components          map[common.EntityID]map[string]Component
+	componentToEntities map[string]map[common.EntityID]Entity
 
-	entities    map[EntityID]Entity
+	entities    map[common.EntityID]Entity
 	entityMutex sync.RWMutex
 
 	systems []System
@@ -52,19 +53,19 @@ func (w *World) AddSystem(system System) {
 	w.systems = append(w.systems, system)
 }
 
-func (w *World) Components() map[EntityID]map[string]Component {
+func (w *World) Components() map[common.EntityID]map[string]Component {
 	w.entityMutex.RLock()
 	defer w.entityMutex.RUnlock()
 	return w.components
 }
 
-func (w *World) Entities() map[EntityID]Entity {
+func (w *World) Entities() map[common.EntityID]Entity {
 	w.entityMutex.RLock()
 	defer w.entityMutex.RUnlock()
 	return w.entities
 }
 
-func (w *World) FindEntity(id EntityID) (Entity, error) {
+func (w *World) FindEntity(id common.EntityID) (Entity, error) {
 	entity, ok := w.entities[id]
 	if !ok {
 		return Entity{}, nil
@@ -88,7 +89,7 @@ func (w *World) FindEntitiesByComponentPredicate(componentType string, predicate
 	return entities, nil
 }
 
-func (w *World) GetComponent(entityID EntityID, componentName string) (Component, error) {
+func (w *World) GetComponent(entityID common.EntityID, componentName string) (Component, error) {
 	w.entityMutex.RLock()
 	defer w.entityMutex.RUnlock()
 	if components, ok := w.components[entityID]; ok {
@@ -100,7 +101,7 @@ func (w *World) GetComponent(entityID EntityID, componentName string) (Component
 	return nil, errors.New("entity not found")
 }
 
-func (w *World) RemoveEntity(entityID EntityID) {
+func (w *World) RemoveEntity(entityID common.EntityID) {
 	w.entityMutex.Lock()
 	defer w.entityMutex.Unlock()
 	delete(w.entities, entityID)
@@ -120,8 +121,8 @@ func (w *World) Update() {
 
 func NewWorld() *World {
 	world := &World{
-		entities:   make(map[EntityID]Entity),
-		components: make(map[EntityID]map[string]Component),
+		entities:   make(map[common.EntityID]Entity),
+		components: make(map[common.EntityID]map[string]Component),
 	}
 
 	rooms := loadRoomsFromFile("./resources/rooms.json")
@@ -136,7 +137,7 @@ func NewWorld() *World {
 	}
 
 	for _, room := range rooms {
-		component, err := world.GetComponent(EntityID(room.ID), "RoomComponent")
+		component, err := world.GetComponent(common.EntityID(room.ID), "RoomComponent")
 		if err != nil {
 			log.Error().Err(err).Msgf("Could not get RoomComponent for room %s", room.ID)
 			continue
@@ -149,7 +150,7 @@ func NewWorld() *World {
 		}
 
 		for direction, roomID := range room.Exits {
-			exitRoomComponent, err := world.GetComponent(EntityID(roomID), "RoomComponent")
+			exitRoomComponent, err := world.GetComponent(common.EntityID(roomID), "RoomComponent")
 			if err != nil {
 				log.Error().Err(err).Msgf("Could not get RoomComponent for exit room %s", roomID)
 				continue

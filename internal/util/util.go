@@ -26,6 +26,8 @@ func init() {
 // Public
 //
 
+type EntityID string
+
 func CalculateDeltaTime() float64 {
 	if lastTime.IsZero() {
 		lastTime = time.Now()

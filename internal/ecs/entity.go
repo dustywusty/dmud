@@ -1,14 +1,14 @@
 package ecs
 
 import (
+	"dmud/internal/common"
+
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
-type EntityID string
-
 type Entity struct {
-	ID         EntityID
+	ID         common.EntityID
 	Components map[string]bool
 }
 
@@ -29,7 +29,7 @@ func NewEntity(ids ...string) Entity {
 	log.Info().Msgf("Created entity %v", id)
 
 	return Entity{
-		ID:         EntityID(id),
+		ID:         common.EntityID(id),
 		Components: make(map[string]bool),
 	}
 }

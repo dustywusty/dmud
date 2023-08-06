@@ -6,24 +6,20 @@ import (
 	"strings"
 
 	"dmud/internal/common"
-	"dmud/internal/ecs"
 	"dmud/internal/game"
 
 	"github.com/rs/zerolog/log"
 )
 
 type TCPClient struct {
-	conn     net.Conn
-	game     *game.Game
-	id       string
-	playerId ecs.EntityID
-	reader   *bufio.Reader
+	conn net.Conn
+	game *game.Game
 }
 
 var _ common.Client = (*TCPClient)(nil)
 
 // /////////////////////////////////////////////////////////////////////////////////////////////
-// Public
+// ..
 //
 
 func (c *TCPClient) CloseConnection() error {
@@ -35,17 +31,6 @@ func (c *TCPClient) CloseConnection() error {
 	}
 	log.Printf("Closed connection to %s", c.RemoteAddr())
 	return nil
-}
-
-func (c *TCPClient) RemoteAddr() string {
-	return c.conn.RemoteAddr().String()
-}
-
-func (c *TCPClient) SendMessage(msg string) {
-	_, err := c.conn.Write([]byte("\b\b" + msg + "\n\n> "))
-	if err != nil {
-		log.Error().Err(err).Msg("Error sending message to TCPClient: %v")
-	}
 }
 
 func (c *TCPClient) HandleRequest() {
@@ -74,5 +59,16 @@ func (c *TCPClient) HandleRequest() {
 		}
 
 		g.CommandChan <- game.ClientCommand{Command: command, Client: c}
+	}
+}
+
+func (c *TCPClient) RemoteAddr() string {
+	return c.conn.RemoteAddr().String()
+}
+
+func (c *TCPClient) SendMessage(msg string) {
+	_, err := c.conn.Write([]byte("\b\b" + msg + "\n\n> "))
+	if err != nil {
+		log.Error().Err(err).Msg("Error sending message to TCPClient: %v")
 	}
 }

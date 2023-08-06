@@ -1,7 +1,6 @@
 package net
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"net"
@@ -116,9 +115,8 @@ func (s *Server) runTCPListener() {
 			log.Info().Msgf("Accepted TCP connection from %s", remoteAddr)
 
 			client := &TCPClient{
-				conn:   conn,
-				game:   s.game,
-				reader: bufio.NewReader(conn),
+				conn: conn,
+				game: s.game,
 			}
 
 			s.connectionMu.Lock()

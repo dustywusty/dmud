@@ -13,3 +13,5 @@ type Client interface {
 	SendMessage(msg string)
 	RemoteAddr() string
 }
+
+type EntityID string
