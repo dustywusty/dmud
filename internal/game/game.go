@@ -42,14 +42,19 @@ func (g *Game) HandleConnect(c common.Client) {
 		Room:   g.defaultRoom,
 	}
 
+	g.defaultRoom.AddPlayer(playerComponent)
+
 	g.playersMu.Lock()
+
 	g.players[playerComponent.Name] = playerComponent
+
 	playerEntity := ecs.NewEntity()
 	g.world.AddEntity(playerEntity)
 	g.world.AddComponent(playerEntity, playerComponent)
+
 	g.playersMu.Unlock()
 
-	g.messageAllPlayers(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
+	g.Broadcast(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
 
 	c.SendMessage(util.WelcomeBanner)
 	c.SendMessage(g.defaultRoom.Description)
@@ -76,21 +81,12 @@ func (g *Game) HandleDisconnect(c common.Client) {
 		return
 	}
 
-	g.messageAllPlayers(fmt.Sprintf("%s has left the game.", player.Name), c)
+	g.Broadcast(fmt.Sprintf("%s has left the game.", player.Name), c)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 // ..
 //
-
-func containsClient(clients []common.Client, client common.Client) bool {
-	for _, c := range clients {
-		if c == client {
-			return true
-		}
-	}
-	return false
-}
 
 func (g *Game) getPlayer(c common.Client) (*components.PlayerComponent, error) {
 	for _, player := range g.players {
@@ -111,30 +107,40 @@ func (g *Game) handleCommand(c ClientCommand) {
 		return
 	}
 
+	dirMapping := map[string]string{
+		"n": "north",
+		"s": "south",
+		"e": "east",
+		"w": "west",
+		"u": "up",
+		"d": "down",
+	}
+
 	switch c.Command.Cmd {
 	case "exit":
 		g.handleExit(player, command)
+	case "look":
+		go player.Look()
+	case "n", "s", "e", "w", "u", "d", "north", "south", "east", "west", "up", "down":
+		fullDir := c.Command.Cmd
+		if shortDir, ok := dirMapping[c.Command.Cmd]; ok {
+			fullDir = shortDir
+		}
+		go player.Move(fullDir)
+	case "scan":
+		go player.Scan()
+	case "say":
+		go player.Say(strings.Join(command.Args, " "))
 	case "shout":
-		g.handleShout(player, command)
+		go player.Shout(strings.Join(command.Args, " "))
 	default:
-		g.handleUnknownCommand(player, command)
+		client.SendMessage(fmt.Sprintf("What do you mean, \"%s\"?", command.Cmd))
 	}
 }
 
 func (g *Game) handleExit(player *components.PlayerComponent, command Command) {
 	player.Client.CloseConnection()
-
-	g.messageAllPlayers(fmt.Sprintf("%s has left the game.", player.Name), player.Client)
-}
-
-func (g *Game) handleShout(player *components.PlayerComponent, command Command) {
-	message := fmt.Sprintf("%s shouts %s", player.Name, strings.Join(command.Args, " "))
-	g.messageAllPlayers(message, player.Client)
-	player.Client.SendMessage(fmt.Sprintf("You shout %s", strings.Join(command.Args, " ")))
-}
-
-func (g *Game) handleUnknownCommand(player *components.PlayerComponent, command Command) {
-	player.Client.SendMessage(fmt.Sprintf("What do you mean, \"%s\"?", command.Cmd))
+	g.Broadcast(fmt.Sprintf("%s has left the game.", player.Name), player.Client)
 }
 
 func (g *Game) loop() {
@@ -155,12 +161,12 @@ func (g *Game) loop() {
 	}
 }
 
-func (g *Game) messageAllPlayers(m string, excludeClients ...common.Client) {
+func (g *Game) Broadcast(m string, excludeClients ...common.Client) {
 	g.playersMu.Lock()
 	defer g.playersMu.Unlock()
 
 	for _, player := range g.players {
-		if !containsClient(excludeClients, player.Client) {
+		if !util.ContainsClient(excludeClients, player.Client) {
 			player.Client.SendMessage(m)
 		}
 	}
@@ -181,8 +187,6 @@ func NewGame() *Game {
 		RemovePlayerChan: make(chan common.Client),
 		CommandChan:      make(chan ClientCommand),
 	}
-
 	go game.loop()
-
 	return &game
 }

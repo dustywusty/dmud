@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"dmud/internal/common"
-	"dmud/internal/ecs"
 	"dmud/internal/game"
 
 	"github.com/gorilla/websocket"
@@ -32,10 +31,8 @@ var upgrader = websocket.Upgrader{
 }
 
 type WSClient struct {
-	conn     *websocket.Conn
-	game     *game.Game
-	id       string
-	playerId ecs.EntityID
+	conn *websocket.Conn
+	game *game.Game
 }
 
 var _ common.Client = (*WSClient)(nil)

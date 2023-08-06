@@ -1,6 +1,7 @@
 package util
 
 import (
+	"dmud/internal/common"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -34,6 +35,15 @@ func CalculateDeltaTime() float64 {
 	deltaTime := currentTime.Sub(lastTime).Seconds()
 	lastTime = currentTime
 	return deltaTime
+}
+
+func ContainsClient(clients []common.Client, client common.Client) bool {
+	for _, c := range clients {
+		if c == client {
+			return true
+		}
+	}
+	return false
 }
 
 func GenerateRandomName() string {

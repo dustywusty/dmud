@@ -1,6 +1,10 @@
 package components
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/rs/zerolog/log"
+)
 
 type Exit struct {
 	Direction string
@@ -20,17 +24,14 @@ type RoomComponent struct {
 //
 
 func (r *RoomComponent) AddPlayer(p *PlayerComponent) {
-	r.PlayersMutex.Lock()
-	defer r.PlayersMutex.Unlock()
-
 	r.Broadcast(p.Name + " enters")
+	r.PlayersMutex.Lock()
 	r.Players = append(r.Players, p)
+	r.PlayersMutex.Unlock()
+	log.Info().Msgf("Player added to room: %s", p.Name)
 }
 
 func (r *RoomComponent) GetExit(direction string) *Exit {
-	r.PlayersMutex.Lock()
-	defer r.PlayersMutex.Unlock()
-
 	for _, exit := range r.Exits {
 		if exit.Direction == direction {
 			return &exit
@@ -41,25 +42,25 @@ func (r *RoomComponent) GetExit(direction string) *Exit {
 
 func (r *RoomComponent) Broadcast(msg string, exclude ...*PlayerComponent) {
 	r.PlayersMutex.Lock()
-	defer r.PlayersMutex.Unlock()
-
 	for _, player := range r.Players {
 		if !contains(exclude, player) {
 			player.Client.SendMessage(msg)
 		}
 	}
+	r.PlayersMutex.Unlock()
+	log.Info().Msgf("Broadcast: %s", msg)
+
 }
 
 func (r *RoomComponent) RemovePlayer(p *PlayerComponent) {
 	r.PlayersMutex.Lock()
-	defer r.PlayersMutex.Unlock()
-
 	for i, player := range r.Players {
 		if player == p {
 			r.Players = append(r.Players[:i], r.Players[i+1:]...)
 			break
 		}
 	}
+	r.PlayersMutex.Unlock()
 	r.Broadcast(p.Name + " leaves")
 }
 

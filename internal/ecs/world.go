@@ -113,24 +113,48 @@ func NewWorld() *World {
 	}
 
 	rooms := loadRoomsFromFile("./resources/rooms.json")
+
 	for _, room := range rooms {
 		roomEntity := NewEntity(room.ID)
-
-		var exits []components.Exit
-		for direction, roomID := range room.Exits {
-			exits = append(exits, components.Exit{
-				Direction: direction,
-				RoomID:    roomID,
-			})
-		}
-
 		roomComponent := &components.RoomComponent{
 			Description: room.Description,
-			Exits:       exits,
 		}
-
 		world.AddEntity(roomEntity)
 		world.AddComponent(roomEntity, roomComponent)
+	}
+
+	for _, room := range rooms {
+		component, err := world.GetComponent(EntityID(room.ID), "RoomComponent")
+		if err != nil {
+			log.Error().Err(err).Msgf("Could not get RoomComponent for room %s", room.ID)
+			continue
+		}
+
+		roomComponent, ok := component.(*components.RoomComponent)
+		if !ok {
+			log.Error().Msgf("Error type asserting RoomComponent for room %s", room.ID)
+			continue
+		}
+
+		for direction, roomID := range room.Exits {
+			exitRoomComponent, err := world.GetComponent(EntityID(roomID), "RoomComponent")
+			if err != nil {
+				log.Error().Err(err).Msgf("Could not get RoomComponent for exit room %s", roomID)
+				continue
+			}
+
+			exitRoom, ok := exitRoomComponent.(*components.RoomComponent)
+			if !ok {
+				log.Error().Msgf("Error type asserting RoomComponent for exit room %s", roomID)
+				continue
+			}
+
+			roomComponent.Exits = append(roomComponent.Exits, components.Exit{
+				Direction: direction,
+				RoomID:    roomID,
+				Room:      exitRoom,
+			})
+		}
 	}
 
 	return world
