@@ -61,7 +61,6 @@ func (r *RoomComponent) Broadcast(msg string, exclude ...*PlayerComponent) {
 	}
 	r.PlayersMutex.Unlock()
 	log.Info().Msgf("Broadcast: %s", msg)
-
 }
 
 func (r *RoomComponent) RemovePlayer(p *PlayerComponent) {

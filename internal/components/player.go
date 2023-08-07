@@ -19,23 +19,35 @@ type PlayerComponent struct {
 // ..
 //
 
+func (p *PlayerComponent) Broadcast(m string) {
+	p.Client.SendMessage(m)
+}
+
 func (p *PlayerComponent) Look() {
-	p.broadcast(p.Room.Description)
+	p.Broadcast(p.Room.Description)
 }
 
 func (p *PlayerComponent) Kill(target string) {
 	if p.Target != nil {
-		p.broadcast("You are already attacking " + p.Target.Name)
+		p.Broadcast("You are already attacking " + p.Target.Name)
 		return
 	}
 
-	p.Target = p.Room.GetPlayer(target)
+	targetPlayer := p.Room.GetPlayer(target)
+	if targetPlayer == nil {
+		p.Broadcast("You don't see that here.")
+		return
+	}
+
+	p.Target = targetPlayer
+
+	log.Info().Msgf("Player %s is attacking %s", p.Name, p.Target.Name)
 }
 
 func (p *PlayerComponent) Move(direction string) {
 	exit := p.Room.GetExit(direction)
 	if exit == nil {
-		p.broadcast("You can't go that way.")
+		p.Broadcast("You can't go that way.")
 		return
 	}
 
@@ -43,7 +55,7 @@ func (p *PlayerComponent) Move(direction string) {
 	p.Room = exit.Room
 	p.Room.AddPlayer(p)
 
-	p.broadcast(p.Room.Description)
+	p.Broadcast(p.Room.Description)
 }
 
 func (p *PlayerComponent) Say(msg string) {
@@ -55,12 +67,12 @@ func (p *PlayerComponent) Scan() {
 	for _, exit := range p.Room.Exits {
 		exits = append(exits, exit.Direction)
 	}
-	p.broadcast("Exits: " + strings.Join(exits, ", "))
+	p.Broadcast("Exits: " + strings.Join(exits, ", "))
 }
 
 func (p *PlayerComponent) Shout(msg string, depths ...int) {
 	if p.Room == nil {
-		p.broadcast("You try to shout but it just comes out muffled.")
+		p.Broadcast("You try to shout but it just comes out muffled.")
 		return
 	}
 	log.Info().Msgf("Shout: %s", msg)
@@ -96,13 +108,9 @@ func (p *PlayerComponent) Shout(msg string, depths ...int) {
 
 func (p *PlayerComponent) Whisper(target *PlayerComponent, msg string) {
 	target.Client.SendMessage(p.Name + " whispers: " + msg)
-	p.broadcast("You whisper: " + msg)
+	p.Broadcast("You whisper: " + msg)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 // ..
 //
-
-func (p *PlayerComponent) broadcast(m string) {
-	p.Client.SendMessage(m)
-}

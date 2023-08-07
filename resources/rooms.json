@@ -4,13 +4,13 @@
         "exits": {
             "down": "2"
         },
-        "description": "You're in a dark, echoing cavern. \nA chilling wind whispers past. \nA small, narrow opening in the floor suggests a path downwards."
+        "description": "You're in a dark, echoing cavern. A chilling wind whispers past.\n\nA small, narrow opening in the floor suggests a path downwards."
     },
     {
         "id": "2",
         "exits": {
             "up": "1"
         },
-        "description": "You crawl into a dimly-lit space. \nThe air is musty and close. \nShadows dance on the rocky walls from the flickering light of a lone torch."
+        "description": "You crawl into a dimly-lit space, the air is musty and close.\n\nShadows dance on the rocky walls from the flickering light of a lone torch."
     }
 ]

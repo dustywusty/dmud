@@ -143,6 +143,7 @@ func (s *Server) runWebSocketServer() {
 			}
 
 			remoteAddr := conn.RemoteAddr().String()
+
 			log.Info().Msgf("Accepted WebSocket connection from %s", remoteAddr)
 
 			client := &WSClient{

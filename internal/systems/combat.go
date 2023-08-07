@@ -27,7 +27,6 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 		}
 
 		attacker := attackingComponent.(*components.AttackingComponent)
-
 		if attacker.TargetID == "" {
 			continue
 		}
@@ -38,20 +37,21 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 		}
 
 		target := targetHealthComponent.(*components.HealthComponent)
+		if target.CurrentHealth <= 0 {
+			attacker.TargetID = ""
+			continue
+		}
 
 		damage := rand.Intn(attacker.MaxDamage-attacker.MinDamage+1) + attacker.MinDamage
 
 		target.CurrentHealth -= damage
 
-		// Send message to attacker
 		attackerPlayerComponent, err := w.GetComponent(attackingEntity.ID, "PlayerComponent")
 		if err != nil {
-			// Handle error
 			continue
 		}
 
 		attackerPlayer := attackerPlayerComponent.(*components.PlayerComponent)
-
-		attackerPlayer.Client.SendMessage(fmt.Sprintf("You attacked %s for %d damage!", attacker.TargetID, damage))
+		attackerPlayer.Broadcast(fmt.Sprintf("You attacked %s for %d damage!", attacker.TargetID, damage))
 	}
 }

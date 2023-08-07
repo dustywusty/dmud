@@ -26,7 +26,7 @@ type World struct {
 // ..
 //
 
-func (w *World) AddComponent(entity Entity, component Component) {
+func (w *World) AddComponent(entity *Entity, component Component) {
 	w.entityMutex.Lock()
 	defer w.entityMutex.Unlock()
 
@@ -133,7 +133,7 @@ func NewWorld() *World {
 			Description: room.Description,
 		}
 		world.AddEntity(roomEntity)
-		world.AddComponent(roomEntity, roomComponent)
+		world.AddComponent(&roomEntity, roomComponent)
 	}
 
 	for _, room := range rooms {

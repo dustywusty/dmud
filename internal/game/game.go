@@ -22,7 +22,7 @@ import (
 type Game struct {
 	defaultRoom *components.RoomComponent
 
-	players   map[string]*components.PlayerComponent
+	players   map[string]*ecs.Entity
 	playersMu sync.Mutex
 
 	world *ecs.World
@@ -46,26 +46,25 @@ func (g *Game) HandleConnect(c common.Client) {
 		MaxHealth:     100,
 		CurrentHealth: 100,
 	}
-	g.defaultRoom.AddPlayer(playerComponent)
-
-	g.playersMu.Lock()
-
-	g.players[playerComponent.Name] = playerComponent
-
-	playerEntity := ecs.NewEntity()
-	g.world.AddEntity(playerEntity)
-
-	g.world.AddComponent(playerEntity, playerComponent)
-	g.world.AddComponent(playerEntity, healthComponent)
-
-	g.playersMu.Unlock()
 
 	g.Broadcast(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
 
-	c.SendMessage(util.WelcomeBanner)
-	c.SendMessage(g.defaultRoom.Description)
+	g.playersMu.Lock() // ---------------------------------------
+
+	playerEntity := ecs.NewEntity()
+	g.world.AddEntity(playerEntity)
+	g.world.AddComponent(&playerEntity, playerComponent)
+	g.world.AddComponent(&playerEntity, healthComponent)
+
+	g.players[playerComponent.Name] = &playerEntity
+	g.defaultRoom.AddPlayer(playerComponent)
+
+	g.playersMu.Unlock() // ---------------------------------------
 
 	log.Info().Msg(fmt.Sprintf("Player %s added", playerComponent.Name))
+
+	c.SendMessage(util.WelcomeBanner)
+	c.SendMessage(g.defaultRoom.Description)
 
 	go c.HandleRequest()
 }
@@ -95,7 +94,17 @@ func (g *Game) HandleDisconnect(c common.Client) {
 //
 
 func (g *Game) getPlayer(c common.Client) (*components.PlayerComponent, error) {
-	for _, player := range g.players {
+	for _, playerEntity := range g.players {
+		playerComponent, err := g.world.GetComponent(playerEntity.ID, "PlayerComponent")
+		if err != nil {
+			return nil, fmt.Errorf("error getting player component for entity id %s, %v", playerEntity.ID, err)
+		}
+
+		player, ok := playerComponent.(*components.PlayerComponent)
+		if !ok {
+			return nil, fmt.Errorf("unable to cast component to PlayerComponent")
+		}
+
 		if player.Client == c {
 			return player, nil
 		}
@@ -113,23 +122,22 @@ func (g *Game) handleCommand(c ClientCommand) {
 		return
 	}
 
-	dirMapping := map[string]string{
-		"n": "north",
-		"s": "south",
-		"e": "east",
-		"w": "west",
-		"u": "up",
-		"d": "down",
-	}
-
 	switch c.Command.Cmd {
 	case "exit":
 		g.handleExit(player, command)
 	case "kill":
-		go player.Kill(command.Args[1])
+		go g.handleKill(player, command)
 	case "look":
 		go player.Look()
 	case "n", "s", "e", "w", "u", "d", "north", "south", "east", "west", "up", "down":
+		dirMapping := map[string]string{
+			"n": "north",
+			"s": "south",
+			"e": "east",
+			"w": "west",
+			"u": "up",
+			"d": "down",
+		}
 		fullDir := c.Command.Cmd
 		if shortDir, ok := dirMapping[c.Command.Cmd]; ok {
 			fullDir = shortDir
@@ -149,6 +157,40 @@ func (g *Game) handleCommand(c ClientCommand) {
 func (g *Game) handleExit(player *components.PlayerComponent, command Command) {
 	player.Client.CloseConnection()
 	g.Broadcast(fmt.Sprintf("%s has left the game.", player.Name), player.Client)
+}
+
+func (g *Game) handleRename(player *components.PlayerComponent, command Command) {
+
+}
+
+func (g *Game) handleKill(player *components.PlayerComponent, command Command) {
+
+	targetEntity := g.players[strings.Join(command.Args, " ")]
+	if targetEntity == nil {
+		player.Broadcast("Kill who?")
+		return
+	}
+
+	playerEntity := g.players[player.Name]
+	if playerEntity == nil {
+		log.Warn().Msg(fmt.Sprintf("Error getting player's own entity for %s", player.Name))
+	}
+
+	playerAttackingComponent := &components.AttackingComponent{
+		TargetID:  targetEntity.ID,
+		MinDamage: 1,
+		MaxDamage: 5,
+	}
+
+	targetAttackingComponent := &components.AttackingComponent{
+		TargetID:  playerEntity.ID,
+		MinDamage: 1,
+		MaxDamage: 5,
+	}
+
+	g.world.AddComponent(targetEntity, targetAttackingComponent)
+	g.world.AddComponent(playerEntity, playerAttackingComponent)
+
 }
 
 func (g *Game) loop() {
@@ -173,9 +215,21 @@ func (g *Game) Broadcast(m string, excludeClients ...common.Client) {
 	g.playersMu.Lock()
 	defer g.playersMu.Unlock()
 
-	for _, player := range g.players {
+	for _, playerEntity := range g.players {
+		playerComponent, err := g.world.GetComponent(playerEntity.ID, "PlayerComponent")
+		if err != nil {
+			log.Error().Msgf("error getting player component for entity id %s, %v", playerEntity.ID, err)
+			return
+		}
+
+		player, ok := playerComponent.(*components.PlayerComponent)
+		if !ok {
+			log.Error().Msgf("unable to cast component to PlayerComponent %v", playerComponent)
+			return
+		}
+
 		if !util.ContainsClient(excludeClients, player.Client) {
-			player.Client.SendMessage(m)
+			player.Broadcast(m)
 		}
 	}
 }
@@ -185,19 +239,23 @@ func (g *Game) Broadcast(m string, excludeClients ...common.Client) {
 //
 
 func NewGame() *Game {
+	combatSytem := &systems.CombatSystem{}
+
 	world := ecs.NewWorld()
+	world.AddSystem(combatSytem)
+
 	defaultRoom, _ := world.GetComponent("1", "RoomComponent")
+
 	game := Game{
 		defaultRoom:      defaultRoom.(*components.RoomComponent),
-		players:          make(map[string]*components.PlayerComponent),
+		players:          make(map[string]*ecs.Entity),
 		world:            world,
 		AddPlayerChan:    make(chan common.Client),
 		RemovePlayerChan: make(chan common.Client),
 		CommandChan:      make(chan ClientCommand),
 	}
 
-	combatSytem := &systems.CombatSystem{}
-	world.AddSystem(combatSytem)
 	go game.loop()
+
 	return &game
 }
