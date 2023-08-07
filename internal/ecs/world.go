@@ -114,7 +114,7 @@ func (w *World) RemoveComponent(entityID common.EntityID, componentName string) 
 			delete(w.components, entityID)
 		}
 	} else {
-		fmt.Printf("Error: Trying to remove component from non-existing entity ID %s\n", entityID)
+		fmt.Printf("Error: trying to remove component from non-existing entity ID %s\n", entityID)
 	}
 	w.componentMutex.Unlock()
 }
@@ -131,7 +131,7 @@ func (w *World) Update() {
 
 	w.elapsedTime += deltaTime
 
-	if w.elapsedTime >= 0.25 {
+	if w.elapsedTime >= 0.1 {
 		for _, system := range w.systems {
 			system.Update(w, deltaTime)
 		}

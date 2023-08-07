@@ -125,7 +125,7 @@ func (g *Game) handleCommand(c ClientCommand) {
 	switch c.Command.Cmd {
 	case "exit":
 		g.handleExit(player, command)
-	case "kill":
+	case "k", "kill":
 		g.handleKill(player, command)
 	case "look":
 		player.Look()
@@ -143,6 +143,8 @@ func (g *Game) handleCommand(c ClientCommand) {
 			fullDir = shortDir
 		}
 		player.Move(fullDir)
+	case "name":
+		g.handleRename(player, command)
 	case "scan":
 		player.Scan()
 	case "say":
@@ -160,7 +162,21 @@ func (g *Game) handleExit(player *components.PlayerComponent, command Command) {
 }
 
 func (g *Game) handleRename(player *components.PlayerComponent, command Command) {
+	if (len(command.Args) == 0) || (len(command.Args) > 1) {
+		player.Broadcast(player.Name)
+		return
+	}
 
+	newName := command.Args[0]
+	oldName := player.Name
+
+	player.Lock()
+	player.Name = newName
+	g.players[newName] = g.players[oldName]
+	delete(g.players, oldName)
+	player.Unlock()
+
+	g.Broadcast(fmt.Sprintf("%s has changed their name to %s", oldName, player.Name), player.Client)
 }
 
 func (g *Game) handleKill(player *components.PlayerComponent, command Command) {
@@ -173,22 +189,16 @@ func (g *Game) handleKill(player *components.PlayerComponent, command Command) {
 	playerEntity := g.players[player.Name]
 	if playerEntity == nil {
 		log.Warn().Msg(fmt.Sprintf("Error getting player's own entity for %s", player.Name))
+		return
 	}
 
-	playerAttackingComponent := components.AttackingComponent{
+	attackingPlayer := components.CombatComponent{
 		TargetID:  targetEntity.ID,
 		MinDamage: 1,
 		MaxDamage: 5,
 	}
 
-	targetAttackingComponent := components.AttackingComponent{
-		TargetID:  playerEntity.ID,
-		MinDamage: 1,
-		MaxDamage: 5,
-	}
-
-	g.world.AddComponent(targetEntity, &targetAttackingComponent)
-	g.world.AddComponent(playerEntity, &playerAttackingComponent)
+	g.world.AddComponent(playerEntity, &attackingPlayer)
 }
 
 func (g *Game) loop() {
