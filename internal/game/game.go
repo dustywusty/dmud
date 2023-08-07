@@ -126,9 +126,9 @@ func (g *Game) handleCommand(c ClientCommand) {
 	case "exit":
 		g.handleExit(player, command)
 	case "kill":
-		go g.handleKill(player, command)
+		g.handleKill(player, command)
 	case "look":
-		go player.Look()
+		player.Look()
 	case "n", "s", "e", "w", "u", "d", "north", "south", "east", "west", "up", "down":
 		dirMapping := map[string]string{
 			"n": "north",
@@ -142,13 +142,13 @@ func (g *Game) handleCommand(c ClientCommand) {
 		if shortDir, ok := dirMapping[c.Command.Cmd]; ok {
 			fullDir = shortDir
 		}
-		go player.Move(fullDir)
+		player.Move(fullDir)
 	case "scan":
-		go player.Scan()
+		player.Scan()
 	case "say":
-		go player.Say(strings.Join(command.Args, " "))
+		player.Say(strings.Join(command.Args, " "))
 	case "shout":
-		go player.Shout(strings.Join(command.Args, " "))
+		player.Shout(strings.Join(command.Args, " "))
 	default:
 		client.SendMessage(fmt.Sprintf("What do you mean, \"%s\"?", command.Cmd))
 	}
@@ -164,7 +164,6 @@ func (g *Game) handleRename(player *components.PlayerComponent, command Command)
 }
 
 func (g *Game) handleKill(player *components.PlayerComponent, command Command) {
-
 	targetEntity := g.players[strings.Join(command.Args, " ")]
 	if targetEntity == nil {
 		player.Broadcast("Kill who?")
@@ -176,21 +175,20 @@ func (g *Game) handleKill(player *components.PlayerComponent, command Command) {
 		log.Warn().Msg(fmt.Sprintf("Error getting player's own entity for %s", player.Name))
 	}
 
-	playerAttackingComponent := &components.AttackingComponent{
+	playerAttackingComponent := components.AttackingComponent{
 		TargetID:  targetEntity.ID,
 		MinDamage: 1,
 		MaxDamage: 5,
 	}
 
-	targetAttackingComponent := &components.AttackingComponent{
+	targetAttackingComponent := components.AttackingComponent{
 		TargetID:  playerEntity.ID,
 		MinDamage: 1,
 		MaxDamage: 5,
 	}
 
-	g.world.AddComponent(targetEntity, targetAttackingComponent)
-	g.world.AddComponent(playerEntity, playerAttackingComponent)
-
+	g.world.AddComponent(targetEntity, &targetAttackingComponent)
+	g.world.AddComponent(playerEntity, &playerAttackingComponent)
 }
 
 func (g *Game) loop() {
