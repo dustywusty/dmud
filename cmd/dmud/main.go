@@ -13,7 +13,7 @@ import (
 )
 
 func main() {
-	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	zerolog.SetGlobalLevel(zerolog.TraceLevel)
 
 	output := zerolog.ConsoleWriter{Out: os.Stdout}
 	output.FormatMessage = func(i interface{}) string {
