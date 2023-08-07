@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-type AttackingComponent struct {
+type CombatComponent struct {
 	sync.RWMutex
 	TargetID  common.EntityID
 	MinDamage int
