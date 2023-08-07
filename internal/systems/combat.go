@@ -16,7 +16,7 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 	s := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(s)
 
-	attackingEntities, err := w.FindEntitiesByComponentPredicate("AttackingComponent", func(i interface{}) bool {
+	attackingEntities, err := w.FindEntitiesByComponentPredicate("CombatComponent", func(i interface{}) bool {
 		return true
 	})
 	if err != nil {
@@ -24,63 +24,65 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 	}
 
 	for _, attackingEntity := range attackingEntities {
-		attackingComponentUntyped, err := w.GetComponent(attackingEntity.ID, "AttackingComponent")
+
+		// .. A lot of things we need
+
+		combatComponentUntyped, err := w.GetComponent(attackingEntity.ID, "CombatComponent")
 		if err != nil {
-			continue
+			log.Error().Msgf("Error getting attacking component: %v", err)
+			return
+		}
+		combatComponent := combatComponentUntyped.(*components.CombatComponent)
+		if combatComponent.TargetID == "" {
+			return
 		}
 
-		attackingComponent := attackingComponentUntyped.(*components.AttackingComponent)
-		if attackingComponent.TargetID == "" {
-			continue
-		}
-
-		targetHealthComponentUntyped, err := w.GetComponent(attackingComponent.TargetID, "HealthComponent")
+		attackingPlayerComponentUntyped, err := w.GetComponent(attackingEntity.ID, "PlayerComponent")
 		if err != nil {
-			continue
+			log.Error().Msgf("Error getting attacking player component: %v", err)
+			return
 		}
+		attackingPlayer := attackingPlayerComponentUntyped.(*components.PlayerComponent)
 
-		targetHealthComponent := targetHealthComponentUntyped.(*components.HealthComponent)
-		if targetHealthComponent.CurrentHealth <= 0 {
-			attackingComponent.TargetID = ""
-
-			w.RemoveComponent(attackingEntity.ID, "AttackingComponent")
-			w.RemoveComponent(attackingComponent.TargetID, "AttackingComponent")
-
-			targetPlayerComponentUntyped, err := w.GetComponent(attackingComponent.TargetID, "PlayerComponent")
-			if err != nil {
-				continue
-			}
-
-			targetPlayerComponent := targetPlayerComponentUntyped.(*components.PlayerComponent)
-			targetPlayerComponent.Broadcast("You have died!")
-
-			attackingPlayerComponentUntyped, err := w.GetComponent(attackingEntity.ID, "PlayerComponent")
-			if err != nil {
-				continue
-			}
-
-			attackingPlayerComponent := attackingPlayerComponentUntyped.(*components.PlayerComponent)
-			attackingPlayerComponent.Broadcast(fmt.Sprintf("You killed %s!", targetPlayerComponent.Name))
-
-			continue
-		}
-
-		attackingComponent.Lock()
-		damage := r.Intn(attackingComponent.MaxDamage-attackingComponent.MinDamage+1) + attackingComponent.MinDamage
-		attackingComponent.Unlock()
-
-		targetHealthComponent.Lock()
-		targetHealthComponent.CurrentHealth -= damage
-		targetHealthComponent.Unlock()
-
-		attackerPlayerComponentUntyped, err := w.GetComponent(attackingEntity.ID, "PlayerComponent")
+		targetPlayerComponentUntyped, err := w.GetComponent(combatComponent.TargetID, "PlayerComponent")
 		if err != nil {
-			continue
+			log.Error().Msgf("Error getting target player component: %v", err)
+			return
+		}
+		targetPlayer := targetPlayerComponentUntyped.(*components.PlayerComponent)
+
+		targetHealthComponentUntyped, err := w.GetComponent(combatComponent.TargetID, "HealthComponent")
+		if err != nil {
+			log.Error().Msgf("Error getting target health component: %v", err)
+			return
+		}
+		targetHealth := targetHealthComponentUntyped.(*components.HealthComponent)
+
+		// .. Are they dead yet?
+
+		if targetHealth.CurrentHealth <= 0 {
+			combatComponent.TargetID = ""
+
+			w.RemoveComponent(attackingEntity.ID, "CombatComponent")
+			w.RemoveComponent(combatComponent.TargetID, "CombatComponent")
+
+			targetPlayer.Broadcast("You have died!")
+			attackingPlayer.Broadcast(fmt.Sprintf("You killed %s!", targetPlayer.Name))
+
+			return
 		}
 
-		attackerPlayerComponent := attackerPlayerComponentUntyped.(*components.PlayerComponent)
-		attackerPlayerComponent.Broadcast(fmt.Sprintf("You attacked %s for %d damage!", attackerPlayerComponent.Name, damage))
+		// .. Attack!
 
-		log.Trace().Msg(fmt.Sprintf("%s attacked %s for %d damage!", attackerPlayerComponent.Name, attackingComponent.TargetID, damage))
+		damage := r.Intn(combatComponent.MaxDamage-combatComponent.MinDamage+1) + combatComponent.MinDamage
+
+		targetHealth.Lock()
+		targetHealth.CurrentHealth -= damage
+		targetHealth.Unlock()
+
+		attackingPlayer.Broadcast(fmt.Sprintf("You attacked %s for %d damage!", targetPlayer.Name, damage))
+		targetPlayer.Broadcast(fmt.Sprintf("%s attacked you for %d damage!", attackingPlayer.Name, damage))
+
+		log.Trace().Msg(fmt.Sprintf("%s attacked %s for %d damage!", attackingPlayer.Name, targetPlayer.Name, damage))
 	}
 }
