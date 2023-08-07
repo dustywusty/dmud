@@ -2,6 +2,7 @@ package ecs
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"sync"
 
@@ -13,11 +14,13 @@ import (
 )
 
 type World struct {
-	components          map[common.EntityID]map[string]Component
-	componentToEntities map[string]map[common.EntityID]Entity
+	components     map[common.EntityID]map[string]Component
+	componentMutex sync.RWMutex
 
 	entities    map[common.EntityID]Entity
 	entityMutex sync.RWMutex
+
+	elapsedTime float64
 
 	systems []System
 }
@@ -27,8 +30,8 @@ type World struct {
 //
 
 func (w *World) AddComponent(entity *Entity, component Component) {
-	w.entityMutex.Lock()
-	defer w.entityMutex.Unlock()
+	w.componentMutex.Lock()
+	defer w.componentMutex.Unlock()
 
 	componentName := reflect.TypeOf(component).Elem().Name()
 
@@ -74,6 +77,7 @@ func (w *World) FindEntity(id common.EntityID) (Entity, error) {
 }
 
 func (w *World) FindEntitiesByComponentPredicate(componentType string, predicate func(interface{}) bool) ([]Entity, error) {
+	w.entityMutex.Lock()
 	entities := make([]Entity, 0)
 	for entityID, components := range w.components {
 		component, ok := components[componentType]
@@ -83,6 +87,7 @@ func (w *World) FindEntitiesByComponentPredicate(componentType string, predicate
 			}
 		}
 	}
+	w.entityMutex.Unlock()
 	if len(entities) == 0 {
 		return nil, nil
 	}
@@ -101,6 +106,19 @@ func (w *World) GetComponent(entityID common.EntityID, componentName string) (Co
 	return nil, errors.New("entity not found")
 }
 
+func (w *World) RemoveComponent(entityID common.EntityID, componentName string) {
+	w.componentMutex.Lock()
+	if _, ok := w.components[entityID]; ok {
+		delete(w.components[entityID], componentName)
+		if len(w.components[entityID]) == 0 {
+			delete(w.components, entityID)
+		}
+	} else {
+		fmt.Printf("Error: Trying to remove component from non-existing entity ID %s\n", entityID)
+	}
+	w.componentMutex.Unlock()
+}
+
 func (w *World) RemoveEntity(entityID common.EntityID) {
 	w.entityMutex.Lock()
 	defer w.entityMutex.Unlock()
@@ -110,8 +128,15 @@ func (w *World) RemoveEntity(entityID common.EntityID) {
 
 func (w *World) Update() {
 	deltaTime := util.CalculateDeltaTime()
-	for _, system := range w.systems {
-		system.Update(w, deltaTime)
+
+	w.elapsedTime += deltaTime
+
+	if w.elapsedTime >= 0.25 {
+		for _, system := range w.systems {
+			system.Update(w, deltaTime)
+		}
+
+		w.elapsedTime = 0
 	}
 }
 
