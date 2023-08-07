@@ -1,6 +1,9 @@
 package components
 
+import "sync"
+
 type HealthComponent struct {
+	sync.RWMutex
 	MaxHealth     int
 	CurrentHealth int
 }

@@ -3,11 +3,13 @@ package components
 import (
 	"dmud/internal/common"
 	"strings"
+	"sync"
 
 	"github.com/rs/zerolog/log"
 )
 
 type PlayerComponent struct {
+	sync.RWMutex
 	Client common.Client
 	Health *HealthComponent
 	Name   string
