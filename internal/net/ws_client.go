@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
 	"dmud/internal/common"
 	"dmud/internal/game"
@@ -31,18 +32,25 @@ var upgrader = websocket.Upgrader{
 }
 
 type WSClient struct {
-	conn *websocket.Conn
-	game *game.Game
+	wsMutex sync.Mutex
+	conn    *websocket.Conn
+	game    *game.Game
 }
 
 var _ common.Client = (*WSClient)(nil)
 
 func (c *WSClient) CloseConnection() error {
 	msg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "Goodbye!")
-	if err := c.conn.WriteMessage(websocket.CloseMessage, msg); err != nil {
+
+	c.wsMutex.Lock()
+	err := c.conn.WriteMessage(websocket.CloseMessage, msg)
+	c.wsMutex.Unlock()
+
+	if err != nil {
 		log.Error().Err(err).Msg("Error closing connection")
 		return err
 	}
+
 	log.Printf("Closed connection to %s", c.RemoteAddr())
 	return nil
 }
@@ -52,16 +60,23 @@ func (c *WSClient) RemoteAddr() string {
 }
 
 func (c *WSClient) SendMessage(msg string) {
+	c.wsMutex.Lock()
 	err := c.conn.WriteMessage(websocket.TextMessage, []byte("\b\b"+msg+"\n\n> "))
+	c.wsMutex.Unlock()
 	if err != nil {
 		log.Error().Err(err).Msg("Error sending message to WSClient")
+	} else {
+		log.Trace().Msgf("Sent message to %s: %s", c.RemoteAddr(), msg)
 	}
 }
 
 func (c *WSClient) HandleRequest() {
 	g := c.game
 	for {
+		c.wsMutex.Lock()
 		messageType, p, err := c.conn.ReadMessage()
+		c.wsMutex.Unlock()
+
 		if err != nil {
 			c.CloseConnection()
 			g.HandleDisconnect(c)
