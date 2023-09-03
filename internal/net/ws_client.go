@@ -32,9 +32,9 @@ var upgrader = websocket.Upgrader{
 }
 
 type WSClient struct {
-	wsMutex sync.Mutex
-	conn    *websocket.Conn
-	game    *game.Game
+	conn      *websocket.Conn
+	connMutex sync.Mutex
+	game      *game.Game
 }
 
 var _ common.Client = (*WSClient)(nil)
@@ -42,9 +42,9 @@ var _ common.Client = (*WSClient)(nil)
 func (c *WSClient) CloseConnection() error {
 	msg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "Goodbye!")
 
-	c.wsMutex.Lock()
+	c.connMutex.Lock()
 	err := c.conn.WriteMessage(websocket.CloseMessage, msg)
-	c.wsMutex.Unlock()
+	c.connMutex.Unlock()
 
 	if err != nil {
 		log.Error().Err(err).Msg("Error closing connection")
@@ -60,9 +60,9 @@ func (c *WSClient) RemoteAddr() string {
 }
 
 func (c *WSClient) SendMessage(msg string) {
-	c.wsMutex.Lock()
-	err := c.conn.WriteMessage(websocket.TextMessage, []byte("\b\b"+msg+"\n\n> "))
-	c.wsMutex.Unlock()
+	c.connMutex.Lock()
+	err := c.conn.WriteMessage(websocket.TextMessage, []byte(msg))
+	c.connMutex.Unlock()
 	if err != nil {
 		log.Error().Err(err).Msg("Error sending message to WSClient")
 	} else {
@@ -73,9 +73,9 @@ func (c *WSClient) SendMessage(msg string) {
 func (c *WSClient) HandleRequest() {
 	g := c.game
 	for {
-		c.wsMutex.Lock()
+		c.connMutex.Lock()
 		messageType, p, err := c.conn.ReadMessage()
-		c.wsMutex.Unlock()
+		c.connMutex.Unlock()
 
 		if err != nil {
 			c.CloseConnection()
