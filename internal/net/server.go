@@ -46,15 +46,19 @@ func (s *Server) Run() {
 
 	s.game = game.NewGame()
 
-	go func() {
-		s.runTCPListener()
-		wg.Done()
-	}()
+	if s.tcpHost != "" && s.tcpPort != "" {
+		go func() {
+			s.runTCPListener()
+			wg.Done()
+		}()
+	}
 
-	go func() {
-		s.runWebSocketServer()
-		wg.Done()
-	}()
+	if s.wsHost != "" && s.wsPort != "" {
+		go func() {
+			s.runWebSocketServer()
+			wg.Done()
+		}()
+	}
 
 	wg.Wait()
 }
@@ -83,7 +87,7 @@ func (s *Server) Shutdown() {
 	}
 }
 
-// /////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
 // ..
 //
 
