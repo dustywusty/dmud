@@ -146,11 +146,11 @@ func (g *Game) handleCommand(c ClientCommand) {
 	case "name":
 		g.handleRename(player, command)
 	case "scan":
-		player.Scan()
+		g.handleScan(player, command)
 	case "say":
-		player.Say(strings.Join(command.Args, " "))
+		g.handleSay(player, command)
 	case "shout":
-		player.Shout(strings.Join(command.Args, " "))
+		g.handleSay(player, command)
 	default:
 		client.SendMessage(fmt.Sprintf("What do you mean, \"%s\"?", command.Cmd))
 	}
@@ -177,6 +177,60 @@ func (g *Game) handleRename(player *components.PlayerComponent, command Command)
 	player.Unlock()
 
 	g.Broadcast(fmt.Sprintf("%s has changed their name to %s", oldName, player.Name), player.Client)
+}
+
+func (g *Game) handleSay(player *components.PlayerComponent, command Command) {
+	msg := strings.Join(command.Args, " ")
+	if msg == "" {
+		player.Broadcast("Say what?")
+		return
+	}
+	player.Broadcast(fmt.Sprintf("You say: %s", msg))
+	player.Room.Broadcast(fmt.Sprintf("%s says: %s", player.Name, msg), player)
+}
+
+func (g *Game) handleScan(player *components.PlayerComponent, command Command) {
+	exits := []string{}
+	for _, exit := range player.Room.Exits {
+		exits = append(exits, exit.Direction)
+	}
+	player.Broadcast("Exits: " + strings.Join(exits, ", "))
+}
+
+func (g *Game) handleShout(p *components.PlayerComponent, msg string, depths ...int) {
+	if p.Room == nil {
+		p.Broadcast("You shout but there is no sound")
+		return
+	}
+	log.Info().Msgf("Shout: %s", msg)
+
+	depth := 10
+	if len(depths) > 0 {
+		depth = depths[0]
+	}
+
+	visited := make(map[*components.RoomComponent]bool)
+	queue := []*components.RoomComponent{p.Room}
+
+	for depth > 0 && len(queue) > 0 {
+		depth--
+		nextQueue := []*components.RoomComponent{}
+
+		for _, room := range queue {
+			visited[room] = true
+			for _, exit := range room.Exits {
+				if !visited[exit.Room] {
+					visited[exit.Room] = true
+					nextQueue = append(nextQueue, exit.Room)
+				}
+			}
+		}
+		queue = nextQueue
+	}
+
+	for room := range visited {
+		room.Broadcast(p.Name+" shouts: "+msg, p)
+	}
 }
 
 func (g *Game) handleKill(player *components.PlayerComponent, command Command) {
