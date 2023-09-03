@@ -18,4 +18,4 @@
 *.vscode/*
 
 *accounts.json
-```
+tmp/*
