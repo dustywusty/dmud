@@ -40,18 +40,16 @@ type WSClient struct {
 var _ common.Client = (*WSClient)(nil)
 
 func (c *WSClient) CloseConnection() error {
-	msg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "Goodbye!")
-
 	c.connMutex.Lock()
-	err := c.conn.WriteMessage(websocket.CloseMessage, msg)
-	c.connMutex.Unlock()
+	defer c.connMutex.Unlock()
 
+	err := c.conn.Close()
 	if err != nil {
 		log.Error().Err(err).Msg("Error closing connection")
 		return err
 	}
 
-	log.Printf("Closed connection to %s", c.RemoteAddr())
+	log.Info().Msgf("Closed connection to %s", c.RemoteAddr())
 	return nil
 }
 
@@ -61,10 +59,12 @@ func (c *WSClient) RemoteAddr() string {
 
 func (c *WSClient) SendMessage(msg string) {
 	c.connMutex.Lock()
+	defer c.connMutex.Unlock()
+
 	err := c.conn.WriteMessage(websocket.TextMessage, []byte(msg))
-	c.connMutex.Unlock()
+
 	if err != nil {
-		log.Error().Err(err).Msg("Error sending message to WSClient")
+		log.Error().Msgf("Error sending message %s to %s: %s", msg, c.RemoteAddr(), err)
 	} else {
 		log.Trace().Msgf("Sent message to %s: %s", c.RemoteAddr(), msg)
 	}
@@ -78,8 +78,7 @@ func (c *WSClient) HandleRequest() {
 		c.connMutex.Unlock()
 
 		if err != nil {
-			c.CloseConnection()
-			g.HandleDisconnect(c)
+			g.RemovePlayerChan <- c
 			return
 		}
 

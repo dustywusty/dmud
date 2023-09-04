@@ -2,7 +2,6 @@ package ecs
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 	"sync"
 
@@ -62,10 +61,26 @@ func (w *World) Components() map[common.EntityID]map[string]Component {
 	return w.components
 }
 
+func (w *World) ComponentLock() {
+	w.componentMutex.Lock()
+}
+
+func (w *World) ComponentUnlock() {
+	w.componentMutex.Unlock()
+}
+
 func (w *World) Entities() map[common.EntityID]Entity {
 	w.entityMutex.RLock()
 	defer w.entityMutex.RUnlock()
 	return w.entities
+}
+
+func (w *World) EntityLock() {
+	w.entityMutex.Lock()
+}
+
+func (w *World) EntityUnlock() {
+	w.entityMutex.Unlock()
 }
 
 func (w *World) FindEntity(id common.EntityID) (Entity, error) {
@@ -114,16 +129,22 @@ func (w *World) RemoveComponent(entityID common.EntityID, componentName string) 
 			delete(w.components, entityID)
 		}
 	} else {
-		fmt.Printf("Error: trying to remove component from non-existing entity ID %s\n", entityID)
+		log.Error().Msgf("Entity %s does not have component %s", entityID, componentName)
 	}
+	log.Trace().Msgf("Removed component %s from entity %s", componentName, entityID)
 	w.componentMutex.Unlock()
 }
 
 func (w *World) RemoveEntity(entityID common.EntityID) {
 	w.entityMutex.Lock()
-	defer w.entityMutex.Unlock()
 	delete(w.entities, entityID)
+	w.entityMutex.Unlock()
+
+	w.componentMutex.Lock()
 	delete(w.components, entityID)
+	w.componentMutex.Unlock()
+
+	log.Trace().Msgf("Removed entity %s", entityID)
 }
 
 func (w *World) Update() {

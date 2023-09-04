@@ -18,7 +18,7 @@ type TCPClient struct {
 
 var _ common.Client = (*TCPClient)(nil)
 
-// /////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
 // ..
 //
 
@@ -36,6 +36,7 @@ func (c *TCPClient) CloseConnection() error {
 func (c *TCPClient) HandleRequest() {
 	g := c.game
 	r := bufio.NewReader(c.conn)
+
 	for {
 		message, err := r.ReadString('\n')
 		if err != nil {

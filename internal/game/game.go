@@ -49,7 +49,9 @@ func (g *Game) HandleConnect(c common.Client) {
 
 	g.Broadcast(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
 
-	g.playersMu.Lock() // ---------------------------------------
+	g.playersMu.Lock()
+	g.world.EntityLock()
+	g.world.ComponentLock()
 
 	playerEntity := ecs.NewEntity()
 	g.world.AddEntity(playerEntity)
@@ -59,9 +61,9 @@ func (g *Game) HandleConnect(c common.Client) {
 	g.players[playerComponent.Name] = &playerEntity
 	g.defaultRoom.AddPlayer(playerComponent)
 
-	g.playersMu.Unlock() // ---------------------------------------
-
-	log.Info().Msg(fmt.Sprintf("Player %s added", playerComponent.Name))
+	g.world.ComponentUnlock()
+	g.world.EntityUnlock()
+	g.playersMu.Unlock()
 
 	c.SendMessage(util.WelcomeBanner)
 	c.SendMessage(g.defaultRoom.Description)
@@ -75,10 +77,18 @@ func (g *Game) HandleDisconnect(c common.Client) {
 	player, err := g.getPlayer(c)
 	if err != nil {
 		log.Error().Err(err).Msg("Error getting disconnected player")
+		g.playersMu.Unlock()
 		return
 	}
 
+	if playerEntity, ok := g.players[player.Name]; ok {
+		g.world.RemoveEntity(playerEntity.ID)
+	}
+
+	log.Info().Msgf("Player count before disconnect: %d", len(g.players))
 	delete(g.players, player.Name)
+	log.Info().Msgf("Player count after disconnect: %d", len(g.players))
+
 	g.playersMu.Unlock()
 
 	if err := c.CloseConnection(); err != nil {
@@ -157,7 +167,7 @@ func (g *Game) handleCommand(c ClientCommand) {
 }
 
 func (g *Game) handleExit(player *components.PlayerComponent, command Command) {
-	player.Client.CloseConnection()
+	g.RemovePlayerChan <- player.Client
 	g.Broadcast(fmt.Sprintf("%s has left the game.", player.Name), player.Client)
 }
 
@@ -277,22 +287,27 @@ func (g *Game) Broadcast(m string, excludeClients ...common.Client) {
 	g.playersMu.Lock()
 	defer g.playersMu.Unlock()
 
+	g.world.ComponentLock()         // Hypothetical locking function; implement as appropriate.
+	defer g.world.ComponentUnlock() // Hypothetical unlocking function; implement as appropriate.
+
 	for _, playerEntity := range g.players {
 		playerComponent, err := g.world.GetComponent(playerEntity.ID, "PlayerComponent")
 		if err != nil {
 			log.Error().Msgf("error getting player component for entity id %s, %v", playerEntity.ID, err)
-			return
+			continue // Skip this player but continue broadcasting to others
 		}
 
 		player, ok := playerComponent.(*components.PlayerComponent)
 		if !ok {
 			log.Error().Msgf("unable to cast component to PlayerComponent %v", playerComponent)
-			return
+			continue // Skip this player but continue broadcasting to others
 		}
 
+		player.ClientLock() // Hypothetical locking function for player; implement as appropriate.
 		if !util.ContainsClient(excludeClients, player.Client) {
 			player.Broadcast(m)
 		}
+		player.ClientUnlock() // Hypothetical unlocking function for player; implement as appropriate.
 	}
 }
 
