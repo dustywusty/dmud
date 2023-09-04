@@ -3,7 +3,6 @@ package main
 import (
 	"dmud/internal/net"
 	"dmud/internal/util"
-	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,13 +12,17 @@ import (
 )
 
 func main() {
-	zerolog.SetGlobalLevel(zerolog.TraceLevel)
+	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05.000"}).
+		Level(zerolog.TraceLevel).
+		With().
+		Timestamp().
+		// Caller().
+		// Int("pid", os.Getpid()).
+		// Str("go_version", runtime.Version()).
+		Str("thread_id", util.GetGID()).
+		Logger()
 
-	output := zerolog.ConsoleWriter{Out: os.Stdout}
-	output.FormatMessage = func(i interface{}) string {
-		return fmt.Sprintf("(%s) %s", util.GetGID(), i)
-	}
-	log.Logger = log.Output(output)
+	log.Logger = logger
 
 	server := net.NewServer(&net.ServerConfig{
 		WSHost: "localhost",

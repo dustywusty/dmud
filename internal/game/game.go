@@ -12,6 +12,7 @@ import (
 	"dmud/internal/systems"
 	"dmud/internal/util"
 
+	"github.com/jedib0t/go-pretty/table"
 	"github.com/rs/zerolog/log"
 )
 
@@ -50,19 +51,16 @@ func (g *Game) HandleConnect(c common.Client) {
 	g.Broadcast(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
 
 	g.playersMu.Lock()
-	g.world.EntityLock()
-	g.world.ComponentLock()
 
 	playerEntity := ecs.NewEntity()
 	g.world.AddEntity(playerEntity)
+
 	g.world.AddComponent(&playerEntity, playerComponent)
 	g.world.AddComponent(&playerEntity, healthComponent)
 
 	g.players[playerComponent.Name] = &playerEntity
 	g.defaultRoom.AddPlayer(playerComponent)
 
-	g.world.ComponentUnlock()
-	g.world.EntityUnlock()
 	g.playersMu.Unlock()
 
 	c.SendMessage(util.WelcomeBanner)
@@ -161,6 +159,8 @@ func (g *Game) handleCommand(c ClientCommand) {
 		g.handleSay(player, command)
 	case "shout":
 		g.handleSay(player, command)
+	case "who":
+		g.handleWho(player, command)
 	default:
 		client.SendMessage(fmt.Sprintf("What do you mean, \"%s\"?", command.Cmd))
 	}
@@ -195,8 +195,8 @@ func (g *Game) handleSay(player *components.PlayerComponent, command Command) {
 		player.Broadcast("Say what?")
 		return
 	}
-	player.Broadcast(fmt.Sprintf("You say: %s", msg))
-	player.Room.Broadcast(fmt.Sprintf("%s says: %s", player.Name, msg), player)
+	// player.Broadcast(fmt.Sprintf("You say: %s", msg))
+	player.Room.Broadcast(fmt.Sprintf("%s says: %s", player.Name, msg))
 }
 
 func (g *Game) handleScan(player *components.PlayerComponent, command Command) {
@@ -243,6 +243,31 @@ func (g *Game) handleShout(p *components.PlayerComponent, msg string, depths ...
 	}
 }
 
+func (g *Game) handleWho(player *components.PlayerComponent, command Command) {
+	tw := table.NewWriter()
+	tw.AppendHeader(table.Row{"ID", "Name"})
+
+	players := []string{}
+	for _, playerEntity := range g.players {
+		playerComponent, err := g.world.GetComponent(playerEntity.ID, "PlayerComponent")
+		if err != nil {
+			log.Error().Err(err).Msgf("Could not get PlayerComponent for player %s", playerEntity.ID)
+			continue
+		}
+
+		player, ok := playerComponent.(*components.PlayerComponent)
+		if !ok {
+			log.Error().Msgf("Error type asserting PlayerComponent for player %s", playerEntity.ID)
+			continue
+		}
+
+		tw.AppendRow(table.Row{playerEntity.ID, player.Name})
+	}
+
+	player.Broadcast(tw.Render())
+	log.Trace().Msgf("Players: %s", strings.Join(players, ", "))
+}
+
 func (g *Game) handleKill(player *components.PlayerComponent, command Command) {
 	targetEntity := g.players[strings.Join(command.Args, " ")]
 	if targetEntity == nil {
@@ -287,28 +312,27 @@ func (g *Game) Broadcast(m string, excludeClients ...common.Client) {
 	g.playersMu.Lock()
 	defer g.playersMu.Unlock()
 
-	g.world.ComponentLock()         // Hypothetical locking function; implement as appropriate.
-	defer g.world.ComponentUnlock() // Hypothetical unlocking function; implement as appropriate.
-
 	for _, playerEntity := range g.players {
 		playerComponent, err := g.world.GetComponent(playerEntity.ID, "PlayerComponent")
 		if err != nil {
 			log.Error().Msgf("error getting player component for entity id %s, %v", playerEntity.ID, err)
-			continue // Skip this player but continue broadcasting to others
+			continue
 		}
 
 		player, ok := playerComponent.(*components.PlayerComponent)
 		if !ok {
 			log.Error().Msgf("unable to cast component to PlayerComponent %v", playerComponent)
-			continue // Skip this player but continue broadcasting to others
+			continue
 		}
 
-		player.ClientLock() // Hypothetical locking function for player; implement as appropriate.
+		player.RWMutex.RLock()
 		if !util.ContainsClient(excludeClients, player.Client) {
 			player.Broadcast(m)
 		}
-		player.ClientUnlock() // Hypothetical unlocking function for player; implement as appropriate.
+		player.RWMutex.RUnlock()
 	}
+
+	log.Trace().Msgf("Broadcast: %s", m)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////

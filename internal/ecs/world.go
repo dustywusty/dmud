@@ -110,8 +110,8 @@ func (w *World) FindEntitiesByComponentPredicate(componentType string, predicate
 }
 
 func (w *World) GetComponent(entityID common.EntityID, componentName string) (Component, error) {
-	w.entityMutex.RLock()
-	defer w.entityMutex.RUnlock()
+	w.componentMutex.RLock()
+	defer w.componentMutex.RUnlock()
 	if components, ok := w.components[entityID]; ok {
 		if component, ok := components[componentName]; ok {
 			return component, nil
