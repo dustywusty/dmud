@@ -70,7 +70,6 @@ func (g *Game) HandleConnect(c common.Client) {
 func (g *Game) HandleDisconnect(c common.Client) {
 	player, err := g.getPlayer(c)
 	if err != nil {
-		log.Error().Err(err).Msg("Error getting disconnected player")
 		return
 	}
 
@@ -167,7 +166,7 @@ func (g *Game) handleExit(player *components.PlayerComponent, command Command) {
 	player.RWMutex.RLock()
 	defer player.RWMutex.RUnlock()
 
-	player.Client.CloseConnection()
+	g.HandleDisconnect(player.Client)
 }
 
 // -----------------------------------------------------------------------------

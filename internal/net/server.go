@@ -151,8 +151,9 @@ func (s *Server) runWebSocketServer() {
 			log.Info().Msgf("Accepted WebSocket connection from %s", remoteAddr)
 
 			client := &WSClient{
-				conn: conn,
-				game: s.game,
+				conn:   conn,
+				status: common.Connected,
+				game:   s.game,
 			}
 
 			s.connectionMu.Lock()

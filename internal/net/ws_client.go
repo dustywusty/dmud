@@ -36,9 +36,10 @@ var upgrader = websocket.Upgrader{
 // -----------------------------------------------------------------------------
 
 type WSClient struct {
-	conn *websocket.Conn
-	game *game.Game
-	mu   sync.Mutex
+	status common.ConnectionStatus
+	conn   *websocket.Conn
+	game   *game.Game
+	mu     sync.Mutex
 }
 
 var _ common.Client = (*WSClient)(nil)
@@ -48,6 +49,8 @@ var _ common.Client = (*WSClient)(nil)
 func (c *WSClient) CloseConnection() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	c.status = common.Disconnecting
 
 	log.Info().Msgf("Trying to close connection to %s", c.RemoteAddr())
 
@@ -60,6 +63,9 @@ func (c *WSClient) CloseConnection() error {
 		log.Error().Err(err).Msg("Error closing connection")
 		return err
 	}
+
+	c.status = common.Disconnected
+
 	log.Info().Msgf("Closed connection to %s", c.RemoteAddr())
 	return nil
 }
@@ -88,6 +94,12 @@ func (c *WSClient) HandleRequest() {
 	for {
 		messageType, p, err := c.conn.ReadMessage()
 		if err != nil {
+			c.mu.Lock()
+			if c.status == common.Disconnected {
+				c.mu.Unlock()
+				return
+			}
+			c.mu.Unlock()
 			log.Error().Err(err).Msgf("Error reading message from %s", c.RemoteAddr())
 			g.RemovePlayerChan <- c
 			return

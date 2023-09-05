@@ -13,11 +13,13 @@ import (
 )
 
 func main() {
+
 	// Useful options when debugging
 	//
 	// Caller().
 	// Int("pid", os.Getpid()).
 	// Str("go_version", runtime.Version()).
+
 	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05.000"}).
 		Level(zerolog.DebugLevel).
 		With().

@@ -53,15 +53,18 @@ func (r *RoomComponent) GetPlayer(name string) *PlayerComponent {
 }
 
 func (r *RoomComponent) Broadcast(msg string, exclude ...*PlayerComponent) {
-	log.Info().Msgf("Room broadcast: %s", msg)
-	log.Info().Msgf("Room players: %v", r.Players)
 	r.PlayersMutex.Lock()
+	defer r.PlayersMutex.Unlock()
+
+	if len(r.Players) == 0 {
+		return
+	}
+
 	for _, player := range r.Players {
 		if !contains(exclude, player) {
 			player.Broadcast(msg)
 		}
 	}
-	r.PlayersMutex.Unlock()
 }
 
 func (r *RoomComponent) RemovePlayer(p *PlayerComponent) {
