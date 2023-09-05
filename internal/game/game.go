@@ -16,9 +16,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-// Game
-//
+// -----------------------------------------------------------------------------
 
 type Game struct {
 	defaultRoom *components.RoomComponent
@@ -33,9 +31,7 @@ type Game struct {
 	CommandChan      chan ClientCommand
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-// ..
-//
+// -----------------------------------------------------------------------------
 
 func (g *Game) HandleConnect(c common.Client) {
 	playerComponent := &components.PlayerComponent{
@@ -48,60 +44,59 @@ func (g *Game) HandleConnect(c common.Client) {
 		CurrentHealth: 100,
 	}
 
-	g.Broadcast(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
-
-	g.playersMu.Lock()
-
 	playerEntity := ecs.NewEntity()
 	g.world.AddEntity(playerEntity)
 
 	g.world.AddComponent(&playerEntity, playerComponent)
 	g.world.AddComponent(&playerEntity, healthComponent)
 
+	g.playersMu.Lock()
+
 	g.players[playerComponent.Name] = &playerEntity
 	g.defaultRoom.AddPlayer(playerComponent)
 
 	g.playersMu.Unlock()
 
-	c.SendMessage(util.WelcomeBanner)
-	c.SendMessage(g.defaultRoom.Description)
+	playerComponent.Broadcast(util.WelcomeBanner)
+	playerComponent.Broadcast(g.defaultRoom.Description)
+
+	g.Broadcast(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
 
 	go c.HandleRequest()
 }
 
-func (g *Game) HandleDisconnect(c common.Client) {
-	g.playersMu.Lock()
+// -----------------------------------------------------------------------------
 
+func (g *Game) HandleDisconnect(c common.Client) {
 	player, err := g.getPlayer(c)
 	if err != nil {
 		log.Error().Err(err).Msg("Error getting disconnected player")
-		g.playersMu.Unlock()
 		return
 	}
 
-	if playerEntity, ok := g.players[player.Name]; ok {
-		g.world.RemoveEntity(playerEntity.ID)
+	g.playersMu.Lock()
+
+	var playerEntity = g.players[player.Name]
+	if playerEntity == nil {
+		log.Error().Msg("Player entity was nil")
+		return
 	}
 
-	log.Info().Msgf("Player count before disconnect: %d", len(g.players))
+	g.world.RemoveEntity(playerEntity.ID)
+
 	delete(g.players, player.Name)
-	log.Info().Msgf("Player count after disconnect: %d", len(g.players))
 
 	g.playersMu.Unlock()
-
-	if err := c.CloseConnection(); err != nil {
-		log.Error().Err(err).Msg("Error closing client connection")
-		return
-	}
+	c.CloseConnection()
 
 	g.Broadcast(fmt.Sprintf("%s has left the game.", player.Name), c)
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-// ..
-//
+// -----------------------------------------------------------------------------
 
 func (g *Game) getPlayer(c common.Client) (*components.PlayerComponent, error) {
+	g.playersMu.Lock()
+	defer g.playersMu.Unlock()
 	for _, playerEntity := range g.players {
 		playerComponent, err := g.world.GetComponent(playerEntity.ID, "PlayerComponent")
 		if err != nil {
@@ -153,23 +148,29 @@ func (g *Game) handleCommand(c ClientCommand) {
 		player.Move(fullDir)
 	case "name":
 		g.handleRename(player, command)
-	case "scan":
-		g.handleScan(player, command)
 	case "say":
 		g.handleSay(player, command)
+	case "scan":
+		g.handleScan(player, command)
 	case "shout":
-		g.handleSay(player, command)
+		g.handleShout(player, strings.Join(command.Args, " "))
 	case "who":
 		g.handleWho(player, command)
 	default:
-		client.SendMessage(fmt.Sprintf("What do you mean, \"%s\"?", command.Cmd))
+		player.Broadcast(fmt.Sprintf("What do you mean, \"%s\"?", command.Cmd))
 	}
 }
 
+// -----------------------------------------------------------------------------
+
 func (g *Game) handleExit(player *components.PlayerComponent, command Command) {
-	g.RemovePlayerChan <- player.Client
-	g.Broadcast(fmt.Sprintf("%s has left the game.", player.Name), player.Client)
+	player.RWMutex.RLock()
+	defer player.RWMutex.RUnlock()
+
+	player.Client.CloseConnection()
 }
+
+// -----------------------------------------------------------------------------
 
 func (g *Game) handleRename(player *components.PlayerComponent, command Command) {
 	if (len(command.Args) == 0) || (len(command.Args) > 1) {
@@ -189,27 +190,43 @@ func (g *Game) handleRename(player *components.PlayerComponent, command Command)
 	g.Broadcast(fmt.Sprintf("%s has changed their name to %s", oldName, player.Name), player.Client)
 }
 
+// -----------------------------------------------------------------------------
+
 func (g *Game) handleSay(player *components.PlayerComponent, command Command) {
+	player.RWMutex.RLock()
+	defer player.RWMutex.RUnlock()
+
 	msg := strings.Join(command.Args, " ")
 	if msg == "" {
 		player.Broadcast("Say what?")
 		return
 	}
-	// player.Broadcast(fmt.Sprintf("You say: %s", msg))
+
 	player.Room.Broadcast(fmt.Sprintf("%s says: %s", player.Name, msg))
 }
 
+// -----------------------------------------------------------------------------
+
 func (g *Game) handleScan(player *components.PlayerComponent, command Command) {
+	player.RWMutex.RLock()
+	defer player.RWMutex.RUnlock()
+
 	exits := []string{}
 	for _, exit := range player.Room.Exits {
 		exits = append(exits, exit.Direction)
 	}
+
 	player.Broadcast("Exits: " + strings.Join(exits, ", "))
 }
 
-func (g *Game) handleShout(p *components.PlayerComponent, msg string, depths ...int) {
-	if p.Room == nil {
-		p.Broadcast("You shout but there is no sound")
+// -----------------------------------------------------------------------------
+
+func (g *Game) handleShout(player *components.PlayerComponent, msg string, depths ...int) {
+	player.RWMutex.RLock()
+	defer player.RWMutex.RUnlock()
+
+	if player.Room == nil {
+		player.Broadcast("You shout but there is no sound")
 		return
 	}
 	log.Info().Msgf("Shout: %s", msg)
@@ -220,7 +237,7 @@ func (g *Game) handleShout(p *components.PlayerComponent, msg string, depths ...
 	}
 
 	visited := make(map[*components.RoomComponent]bool)
-	queue := []*components.RoomComponent{p.Room}
+	queue := []*components.RoomComponent{player.Room}
 
 	for depth > 0 && len(queue) > 0 {
 		depth--
@@ -239,36 +256,43 @@ func (g *Game) handleShout(p *components.PlayerComponent, msg string, depths ...
 	}
 
 	for room := range visited {
-		room.Broadcast(p.Name+" shouts: "+msg, p)
+		room.Broadcast(player.Name+" shouts: "+msg, player)
 	}
 }
 
+// -----------------------------------------------------------------------------
+
 func (g *Game) handleWho(player *components.PlayerComponent, command Command) {
+	g.playersMu.Lock()
+	defer g.playersMu.Unlock()
+
 	tw := table.NewWriter()
+	tw.SetStyle(table.StyleLight)
 	tw.AppendHeader(table.Row{"ID", "Name"})
 
-	players := []string{}
 	for _, playerEntity := range g.players {
 		playerComponent, err := g.world.GetComponent(playerEntity.ID, "PlayerComponent")
 		if err != nil {
 			log.Error().Err(err).Msgf("Could not get PlayerComponent for player %s", playerEntity.ID)
 			continue
 		}
-
 		player, ok := playerComponent.(*components.PlayerComponent)
 		if !ok {
 			log.Error().Msgf("Error type asserting PlayerComponent for player %s", playerEntity.ID)
 			continue
 		}
-
 		tw.AppendRow(table.Row{playerEntity.ID, player.Name})
 	}
 
 	player.Broadcast(tw.Render())
-	log.Trace().Msgf("Players: %s", strings.Join(players, ", "))
 }
 
+// -----------------------------------------------------------------------------
+
 func (g *Game) handleKill(player *components.PlayerComponent, command Command) {
+	g.playersMu.Lock()
+	defer g.playersMu.Unlock()
+
 	targetEntity := g.players[strings.Join(command.Args, " ")]
 	if targetEntity == nil {
 		player.Broadcast("Kill who?")
@@ -290,6 +314,8 @@ func (g *Game) handleKill(player *components.PlayerComponent, command Command) {
 	g.world.AddComponent(playerEntity, &attackingPlayer)
 }
 
+// -----------------------------------------------------------------------------
+
 func (g *Game) loop() {
 	updateTicker := time.NewTicker(10 * time.Millisecond)
 	defer updateTicker.Stop()
@@ -308,9 +334,10 @@ func (g *Game) loop() {
 	}
 }
 
+// -----------------------------------------------------------------------------
+
 func (g *Game) Broadcast(m string, excludeClients ...common.Client) {
-	g.playersMu.Lock()
-	defer g.playersMu.Unlock()
+	log.Info().Msgf("Broadcasting: %s", m)
 
 	for _, playerEntity := range g.players {
 		playerComponent, err := g.world.GetComponent(playerEntity.ID, "PlayerComponent")
@@ -325,19 +352,13 @@ func (g *Game) Broadcast(m string, excludeClients ...common.Client) {
 			continue
 		}
 
-		player.RWMutex.RLock()
 		if !util.ContainsClient(excludeClients, player.Client) {
 			player.Broadcast(m)
 		}
-		player.RWMutex.RUnlock()
 	}
-
-	log.Trace().Msgf("Broadcast: %s", m)
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-// ..
-//
+// -----------------------------------------------------------------------------
 
 func NewGame() *Game {
 	combatSytem := &systems.CombatSystem{}

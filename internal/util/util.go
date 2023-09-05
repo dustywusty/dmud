@@ -1,7 +1,6 @@
 package util
 
 import (
-	"dmud/internal/common"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"dmud/internal/common"
 
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"

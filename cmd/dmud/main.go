@@ -1,27 +1,29 @@
 package main
 
 import (
-	"dmud/internal/net"
-	"dmud/internal/util"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"dmud/internal/net"
+	"dmud/internal/util"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
 func main() {
+	// Useful options when debugging
+	//
+	// Caller().
+	// Int("pid", os.Getpid()).
+	// Str("go_version", runtime.Version()).
 	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05.000"}).
-		Level(zerolog.TraceLevel).
+		Level(zerolog.DebugLevel).
 		With().
 		Timestamp().
-		// Caller().
-		// Int("pid", os.Getpid()).
-		// Str("go_version", runtime.Version()).
 		Str("thread_id", util.GetGID()).
 		Logger()
-
 	log.Logger = logger
 
 	server := net.NewServer(&net.ServerConfig{

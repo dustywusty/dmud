@@ -24,11 +24,11 @@ type RoomComponent struct {
 //
 
 func (r *RoomComponent) AddPlayer(p *PlayerComponent) {
+	log.Info().Msgf("Player added to room: %s", p.Name)
 	r.Broadcast(p.Name + " enters")
 	r.PlayersMutex.Lock()
 	r.Players = append(r.Players, p)
 	r.PlayersMutex.Unlock()
-	log.Info().Msgf("Player added to room: %s", p.Name)
 }
 
 func (r *RoomComponent) GetExit(direction string) *Exit {
@@ -53,14 +53,15 @@ func (r *RoomComponent) GetPlayer(name string) *PlayerComponent {
 }
 
 func (r *RoomComponent) Broadcast(msg string, exclude ...*PlayerComponent) {
+	log.Info().Msgf("Room broadcast: %s", msg)
+	log.Info().Msgf("Room players: %v", r.Players)
 	r.PlayersMutex.Lock()
 	for _, player := range r.Players {
 		if !contains(exclude, player) {
-			player.Client.SendMessage(msg)
+			player.Broadcast(msg)
 		}
 	}
 	r.PlayersMutex.Unlock()
-	log.Info().Msgf("Broadcast: %s", msg)
 }
 
 func (r *RoomComponent) RemovePlayer(p *PlayerComponent) {

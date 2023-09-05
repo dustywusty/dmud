@@ -3,8 +3,6 @@ package components
 import (
 	"dmud/internal/common"
 	"sync"
-
-	"github.com/rs/zerolog/log"
 )
 
 type PlayerComponent struct {
@@ -27,22 +25,22 @@ func (p *PlayerComponent) Look() {
 	p.Broadcast(p.Room.Description)
 }
 
-func (p *PlayerComponent) Kill(target string) {
-	if p.Target != nil {
-		p.Broadcast("You are already attacking " + p.Target.Name)
-		return
-	}
+// func (p *PlayerComponent) Kill(target string) {
+// 	if p.Target != nil {
+// 		p.Broadcast("You are already attacking " + p.Target.Name)
+// 		return
+// 	}
 
-	targetPlayer := p.Room.GetPlayer(target)
-	if targetPlayer == nil {
-		p.Broadcast("You don't see that here.")
-		return
-	}
+// 	targetPlayer := p.Room.GetPlayer(target)
+// 	if targetPlayer == nil {
+// 		p.Broadcast("You don't see that here.")
+// 		return
+// 	}
 
-	p.Target = targetPlayer
+// 	p.Target = targetPlayer
 
-	log.Info().Msgf("Player %s is attacking %s", p.Name, p.Target.Name)
-}
+// 	log.Info().Msgf("Player %s is attacking %s", p.Name, p.Target.Name)
+// }
 
 func (p *PlayerComponent) Move(direction string) {
 	exit := p.Room.GetExit(direction)
@@ -58,11 +56,11 @@ func (p *PlayerComponent) Move(direction string) {
 	p.Broadcast(p.Room.Description)
 }
 
-func (p *PlayerComponent) Whisper(target *PlayerComponent, msg string) {
-	target.Client.SendMessage(p.Name + " whispers: " + msg)
-	p.Broadcast("You whisper: " + msg)
-}
+// func (p *PlayerComponent) Whisper(target *PlayerComponent, msg string) {
+// 	target.Client.SendMessage(p.Name + " whispers: " + msg)
+// 	p.Broadcast("You whisper: " + msg)
+// }
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-// ..
-//
+// ///////////////////////////////////////////////////////////////////////////////////////////////
+// // ..
+// //
