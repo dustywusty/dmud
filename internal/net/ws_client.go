@@ -116,7 +116,6 @@ func (c *WSClient) HandleRequest() {
 				continue
 			}
 
-			// If it appears as a word in the input, disconnect the player
 			if re.MatchString(inputLower) {
 				log.Warn().Msgf("Slur detected in message from %s. Message rejected.", c.RemoteAddr())
 				g.RemovePlayerChan <- c

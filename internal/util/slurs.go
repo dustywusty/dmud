@@ -1,5 +1,6 @@
 package util
 
+// List of slur words from Bluesky - https://github.com/bluesky-social/atproto
 var Slurs = []string{
 	"bluegum",
 	"chink",
