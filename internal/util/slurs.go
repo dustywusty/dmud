@@ -1,7 +1,6 @@
 package util
 
 var Slurs = []string{
-	"dusty",
 	"bluegum",
 	"chink",
 	"chinks",
