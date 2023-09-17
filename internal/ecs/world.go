@@ -1,7 +1,7 @@
 package ecs
 
 import (
-	"errors"
+	"fmt"
 	"reflect"
 	"sync"
 
@@ -158,14 +158,15 @@ func (w *World) GetComponent(entityID common.EntityID, componentName string) (Co
 
 	if components, ok := w.components[entityID]; ok {
 		if component, ok := components[componentName]; ok {
-			log.Trace().Msgf("Found component %s for entity %s", componentName, entityID)
 			return component, nil
 		}
-		return nil, errors.New("component not found")
+		return nil, fmt.Errorf("component %s not found for entity %s", componentName, entityID)
 	}
 
-	return nil, errors.New("entity not found")
+	return nil, fmt.Errorf("entity %s not found", entityID)
 }
+
+// -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
 

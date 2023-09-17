@@ -172,6 +172,9 @@ func (g *Game) handleExit(player *components.PlayerComponent, command Command) {
 // -----------------------------------------------------------------------------
 
 func (g *Game) handleRename(player *components.PlayerComponent, command Command) {
+	player.Lock()
+	defer player.Unlock()
+
 	if (len(command.Args) == 0) || (len(command.Args) > 1) {
 		player.Broadcast(player.Name)
 		return
@@ -180,13 +183,11 @@ func (g *Game) handleRename(player *components.PlayerComponent, command Command)
 	newName := command.Args[0]
 	oldName := player.Name
 
-	player.Lock()
 	player.Name = newName
 	g.players[newName] = g.players[oldName]
 	delete(g.players, oldName)
-	player.Unlock()
 
-	g.Broadcast(fmt.Sprintf("%s has changed their name to %s", oldName, player.Name), player.Client)
+	g.Broadcast(fmt.Sprintf("%s has changed their name to %s", oldName, player.Name))
 }
 
 // -----------------------------------------------------------------------------

@@ -13,9 +13,7 @@ type PlayerComponent struct {
 	Target *PlayerComponent
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-// ..
-//
+// -----------------------------------------------------------------------------
 
 func (p *PlayerComponent) Broadcast(m string) {
 	p.Client.SendMessage(m)
@@ -60,7 +58,3 @@ func (p *PlayerComponent) Move(direction string) {
 // 	target.Client.SendMessage(p.Name + " whispers: " + msg)
 // 	p.Broadcast("You whisper: " + msg)
 // }
-
-// ///////////////////////////////////////////////////////////////////////////////////////////////
-// // ..
-// //
