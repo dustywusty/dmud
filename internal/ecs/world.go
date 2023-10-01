@@ -168,8 +168,6 @@ func (w *World) GetComponent(entityID common.EntityID, componentName string) (Co
 
 // -----------------------------------------------------------------------------
 
-// -----------------------------------------------------------------------------
-
 func (w *World) RemoveComponent(entityID common.EntityID, componentName string) {
 	w.componentMutex.Lock()
 	defer w.componentMutex.Unlock()
