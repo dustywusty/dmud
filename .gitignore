@@ -16,3 +16,4 @@
 
 *.json
 *.log
+tmp/build-errors.log
