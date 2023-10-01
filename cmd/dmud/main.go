@@ -21,7 +21,7 @@ func main() {
 	// Str("go_version", runtime.Version()).
 
 	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05.000"}).
-		Level(zerolog.DebugLevel).
+		Level(zerolog.TraceLevel).
 		With().
 		Timestamp().
 		Str("thread_id", util.GetGID()).
