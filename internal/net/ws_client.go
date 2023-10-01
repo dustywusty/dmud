@@ -83,7 +83,7 @@ func (c *WSClient) SendMessage(msg string) {
 	if err != nil {
 		log.Error().Msgf("Error sending message %s to %s: %s", msg, c.RemoteAddr(), err)
 	} else {
-		log.Trace().Msgf("Sent message to %s: %s", c.RemoteAddr(), msg)
+		log.Trace().Msgf("Sent message to %s:\n%s", c.RemoteAddr(), msg)
 	}
 }
 
