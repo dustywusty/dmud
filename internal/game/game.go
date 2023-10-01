@@ -83,7 +83,9 @@ func (g *Game) HandleDisconnect(c common.Client) {
 
 	g.world.RemoveEntity(playerEntity.ID)
 
+	log.Trace().Msgf("Number of players: %d", len(g.players))
 	delete(g.players, player.Name)
+	log.Trace().Msgf("Number of players: %d", len(g.players))
 
 	g.playersMu.Unlock()
 	c.CloseConnection()
@@ -268,7 +270,7 @@ func (g *Game) handleWho(player *components.PlayerComponent, command Command) {
 
 	tw := table.NewWriter()
 	tw.SetStyle(table.StyleLight)
-	tw.AppendHeader(table.Row{"ID", "Name"})
+	tw.AppendHeader(table.Row{"Online Since", "Player"})
 
 	for _, playerEntity := range g.players {
 		playerComponent, err := g.world.GetComponent(playerEntity.ID, "PlayerComponent")
@@ -281,7 +283,7 @@ func (g *Game) handleWho(player *components.PlayerComponent, command Command) {
 			log.Error().Msgf("Error type asserting PlayerComponent for player %s", playerEntity.ID)
 			continue
 		}
-		tw.AppendRow(table.Row{playerEntity.ID, player.Name})
+		tw.AppendRow(table.Row{playerEntity.CreatedAt().DiffForHumans(), player.Name})
 	}
 
 	player.Broadcast(tw.Render())
