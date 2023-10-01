@@ -3,13 +3,16 @@ package ecs
 import (
 	"dmud/internal/common"
 
+	"github.com/golang-module/carbon/v2"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
 type Entity struct {
-	ID         common.EntityID
 	Components map[string]bool
+	CreatedAt  carbon.Carbon
+	ID         common.EntityID
+	UpdatedAt  carbon.Carbon
 }
 
 func NewEntity(ids ...string) Entity {
@@ -27,6 +30,8 @@ func NewEntity(ids ...string) Entity {
 	return Entity{
 		ID:         common.EntityID(id),
 		Components: make(map[string]bool),
+		CreatedAt:  carbon.Now(),
+		UpdatedAt:  carbon.Now(),
 	}
 }
 
