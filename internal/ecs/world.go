@@ -152,7 +152,7 @@ func (w *World) FindEntitiesByComponentPredicate(componentType string, predicate
 
 // -----------------------------------------------------------------------------
 
-func (w *World) GetComponent(entityID common.EntityID, componentName string) (Component, error) {
+func (w *World) GetComponent(entityID common.EntityID, componentName string) (interface{}, error) {
 	w.componentMutex.RLock()
 	defer w.componentMutex.RUnlock()
 

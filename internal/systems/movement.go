@@ -3,6 +3,7 @@ package systems
 import (
 	"dmud/internal/components"
 	"dmud/internal/ecs"
+	"dmud/internal/util"
 
 	"github.com/rs/zerolog/log"
 )
@@ -21,23 +22,21 @@ func (ms *MovementSystem) Update(w *ecs.World, deltaTime float64) {
 	}
 
 	for _, movingEntity := range movingEntities {
-		movingUntyped, err := w.GetComponent(movingEntity.ID, "Movement")
+		moving, err := util.GetTypedComponent[components.Movement](w, movingEntity.ID, "Movement")
 		if err != nil {
 			log.Error().Msgf("Error getting moving component: %v", err)
 			return
 		}
-		moving := movingUntyped.(*components.Movement)
 
 		if moving.Status == components.Standing {
 			continue
 		}
 
-		movingPlayerUntyped, err := w.GetComponent(movingEntity.ID, "Player")
+		movingPlayer, err := util.GetTypedComponent[components.Player](w, movingEntity.ID, "Player")
 		if err != nil {
 			log.Error().Msgf("Error getting moving player component: %v", err)
 			return
 		}
-		movingPlayer := movingPlayerUntyped.(*components.Player)
 
 		room := movingPlayer.Room
 		if room == nil {
