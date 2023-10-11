@@ -19,7 +19,7 @@ import (
 // -----------------------------------------------------------------------------
 
 type Game struct {
-	defaultRoom *components.RoomComponent
+	defaultRoom *components.Room
 
 	players   map[string]*ecs.Entity
 	playersMu sync.Mutex
@@ -34,12 +34,12 @@ type Game struct {
 // -----------------------------------------------------------------------------
 
 func (g *Game) HandleConnect(c common.Client) {
-	playerComponent := &components.PlayerComponent{
+	playerComponent := &components.Player{
 		Client: c,
 		Name:   util.GenerateRandomName(),
 		Room:   g.defaultRoom,
 	}
-	healthComponent := &components.HealthComponent{
+	healthComponent := &components.Health{
 		MaxHealth:     100,
 		CurrentHealth: 100,
 	}
@@ -95,18 +95,18 @@ func (g *Game) HandleDisconnect(c common.Client) {
 
 // -----------------------------------------------------------------------------
 
-func (g *Game) getPlayer(c common.Client) (*components.PlayerComponent, error) {
+func (g *Game) getPlayer(c common.Client) (*components.Player, error) {
 	g.playersMu.Lock()
 	defer g.playersMu.Unlock()
 	for _, playerEntity := range g.players {
-		playerComponent, err := g.world.GetComponent(playerEntity.ID, "PlayerComponent")
+		playerComponent, err := g.world.GetComponent(playerEntity.ID, "Player")
 		if err != nil {
 			return nil, fmt.Errorf("error getting player component for entity id %s, %v", playerEntity.ID, err)
 		}
 
-		player, ok := playerComponent.(*components.PlayerComponent)
+		player, ok := playerComponent.(*components.Player)
 		if !ok {
-			return nil, fmt.Errorf("unable to cast component to PlayerComponent")
+			return nil, fmt.Errorf("unable to cast component to Player")
 		}
 
 		if player.Client == c {
@@ -134,19 +134,7 @@ func (g *Game) handleCommand(c ClientCommand) {
 	case "look":
 		player.Look()
 	case "n", "s", "e", "w", "u", "d", "north", "south", "east", "west", "up", "down":
-		dirMapping := map[string]string{
-			"n": "north",
-			"s": "south",
-			"e": "east",
-			"w": "west",
-			"u": "up",
-			"d": "down",
-		}
-		fullDir := c.Command.Cmd
-		if shortDir, ok := dirMapping[c.Command.Cmd]; ok {
-			fullDir = shortDir
-		}
-		player.Move(fullDir)
+		g.handleMove(player, command)
 	case "name":
 		g.handleRename(player, command)
 	case "say":
@@ -164,7 +152,7 @@ func (g *Game) handleCommand(c ClientCommand) {
 
 // -----------------------------------------------------------------------------
 
-func (g *Game) handleExit(player *components.PlayerComponent, command Command) {
+func (g *Game) handleExit(player *components.Player, command Command) {
 	player.RWMutex.RLock()
 	defer player.RWMutex.RUnlock()
 
@@ -173,7 +161,66 @@ func (g *Game) handleExit(player *components.PlayerComponent, command Command) {
 
 // -----------------------------------------------------------------------------
 
-func (g *Game) handleRename(player *components.PlayerComponent, command Command) {
+func (g *Game) handleLook(player *components.Player, command Command) {
+	player.RWMutex.RLock()
+	defer player.RWMutex.RUnlock()
+
+	player.Look()
+}
+
+// -----------------------------------------------------------------------------
+
+func (g *Game) handleMove(player *components.Player, command Command) {
+	player.RWMutex.RLock()
+	defer player.RWMutex.RUnlock()
+
+	dirMapping := map[string]string{
+		"n": "north",
+		"s": "south",
+		"e": "east",
+		"w": "west",
+		"u": "up",
+		"d": "down",
+	}
+	fullDir := command.Cmd
+	if shortDir, ok := dirMapping[command.Cmd]; ok {
+		fullDir = shortDir
+	}
+
+	log.Trace().Msgf("Moving %s", fullDir)
+
+	playerEntity := g.players[player.Name]
+	if playerEntity == nil {
+		log.Warn().Msg(fmt.Sprintf("Error getting player's own entity for %s", player.Name))
+		return
+	}
+
+	var movingPlayer *components.Movement
+
+	untypedMovingPlayer, err := g.world.GetComponent(playerEntity.ID, "Movement")
+	if err != nil {
+		movingPlayer = &components.Movement{
+			Direction: fullDir,
+			Status:    components.Walking,
+		}
+		g.world.AddComponent(playerEntity, movingPlayer)
+		return
+	} else {
+		movingPlayer = untypedMovingPlayer.(*components.Movement)
+	}
+
+	if movingPlayer.Status != components.Standing {
+		player.Broadcast("You are already moving.")
+		return
+	} else {
+		movingPlayer.Direction = fullDir
+		movingPlayer.Status = components.Walking
+	}
+}
+
+// -----------------------------------------------------------------------------
+
+func (g *Game) handleRename(player *components.Player, command Command) {
 	player.Lock()
 	defer player.Unlock()
 
@@ -194,7 +241,7 @@ func (g *Game) handleRename(player *components.PlayerComponent, command Command)
 
 // -----------------------------------------------------------------------------
 
-func (g *Game) handleSay(player *components.PlayerComponent, command Command) {
+func (g *Game) handleSay(player *components.Player, command Command) {
 	player.RWMutex.RLock()
 	defer player.RWMutex.RUnlock()
 
@@ -209,7 +256,7 @@ func (g *Game) handleSay(player *components.PlayerComponent, command Command) {
 
 // -----------------------------------------------------------------------------
 
-func (g *Game) handleScan(player *components.PlayerComponent, command Command) {
+func (g *Game) handleScan(player *components.Player, command Command) {
 	player.RWMutex.RLock()
 	defer player.RWMutex.RUnlock()
 
@@ -223,7 +270,7 @@ func (g *Game) handleScan(player *components.PlayerComponent, command Command) {
 
 // -----------------------------------------------------------------------------
 
-func (g *Game) handleShout(player *components.PlayerComponent, msg string, depths ...int) {
+func (g *Game) handleShout(player *components.Player, msg string, depths ...int) {
 	player.RWMutex.RLock()
 	defer player.RWMutex.RUnlock()
 
@@ -238,12 +285,12 @@ func (g *Game) handleShout(player *components.PlayerComponent, msg string, depth
 		depth = depths[0]
 	}
 
-	visited := make(map[*components.RoomComponent]bool)
-	queue := []*components.RoomComponent{player.Room}
+	visited := make(map[*components.Room]bool)
+	queue := []*components.Room{player.Room}
 
 	for depth > 0 && len(queue) > 0 {
 		depth--
-		nextQueue := []*components.RoomComponent{}
+		nextQueue := []*components.Room{}
 
 		for _, room := range queue {
 			visited[room] = true
@@ -264,26 +311,26 @@ func (g *Game) handleShout(player *components.PlayerComponent, msg string, depth
 
 // -----------------------------------------------------------------------------
 
-func (g *Game) handleWho(player *components.PlayerComponent, command Command) {
+func (g *Game) handleWho(player *components.Player, command Command) {
 	g.playersMu.Lock()
 	defer g.playersMu.Unlock()
 
 	tw := table.NewWriter()
 	tw.SetStyle(table.StyleLight)
-	tw.AppendHeader(table.Row{"Online Since", "Player"})
+	tw.AppendHeader(table.Row{"Player", "Race", "Class", "Online Since"})
 
 	for _, playerEntity := range g.players {
-		playerComponent, err := g.world.GetComponent(playerEntity.ID, "PlayerComponent")
+		playerComponent, err := g.world.GetComponent(playerEntity.ID, "Player")
 		if err != nil {
-			log.Error().Err(err).Msgf("Could not get PlayerComponent for player %s", playerEntity.ID)
+			log.Error().Err(err).Msgf("Could not get component for player %s", playerEntity.ID)
 			continue
 		}
-		player, ok := playerComponent.(*components.PlayerComponent)
+		player, ok := playerComponent.(*components.Player)
 		if !ok {
-			log.Error().Msgf("Error type asserting PlayerComponent for player %s", playerEntity.ID)
+			log.Error().Msgf("Error type asserting component for player %s", playerEntity.ID)
 			continue
 		}
-		tw.AppendRow(table.Row{playerEntity.CreatedAt().DiffForHumans(), player.Name})
+		tw.AppendRow(table.Row{player.Name, "??", "??", playerEntity.CreatedAt.DiffForHumans()})
 	}
 
 	player.Broadcast(tw.Render())
@@ -291,7 +338,7 @@ func (g *Game) handleWho(player *components.PlayerComponent, command Command) {
 
 // -----------------------------------------------------------------------------
 
-func (g *Game) handleKill(player *components.PlayerComponent, command Command) {
+func (g *Game) handleKill(player *components.Player, command Command) {
 	g.playersMu.Lock()
 	defer g.playersMu.Unlock()
 
@@ -307,7 +354,7 @@ func (g *Game) handleKill(player *components.PlayerComponent, command Command) {
 		return
 	}
 
-	attackingPlayer := components.CombatComponent{
+	attackingPlayer := components.Combat{
 		TargetID:  targetEntity.ID,
 		MinDamage: 1,
 		MaxDamage: 5,
@@ -342,15 +389,15 @@ func (g *Game) Broadcast(m string, excludeClients ...common.Client) {
 	log.Info().Msgf("Broadcasting: %s", m)
 
 	for _, playerEntity := range g.players {
-		playerComponent, err := g.world.GetComponent(playerEntity.ID, "PlayerComponent")
+		playerComponent, err := g.world.GetComponent(playerEntity.ID, "Player")
 		if err != nil {
-			log.Error().Msgf("error getting player component for entity id %s, %v", playerEntity.ID, err)
+			log.Error().Msgf("error getting player for entity id %s, %v", playerEntity.ID, err)
 			continue
 		}
 
-		player, ok := playerComponent.(*components.PlayerComponent)
+		player, ok := playerComponent.(*components.Player)
 		if !ok {
-			log.Error().Msgf("unable to cast component to PlayerComponent %v", playerComponent)
+			log.Error().Msgf("unable to cast component to Player %v", playerComponent)
 			continue
 		}
 
@@ -364,14 +411,16 @@ func (g *Game) Broadcast(m string, excludeClients ...common.Client) {
 
 func NewGame() *Game {
 	combatSytem := &systems.CombatSystem{}
+	movementSystem := &systems.MovementSystem{}
 
 	world := ecs.NewWorld()
 	world.AddSystem(combatSytem)
+	world.AddSystem(movementSystem)
 
-	defaultRoom, _ := world.GetComponent("1", "RoomComponent")
+	defaultRoom, _ := world.GetComponent("1", "Room")
 
 	game := Game{
-		defaultRoom:      defaultRoom.(*components.RoomComponent),
+		defaultRoom:      defaultRoom.(*components.Room),
 		players:          make(map[string]*ecs.Entity),
 		world:            world,
 		AddPlayerChan:    make(chan common.Client),

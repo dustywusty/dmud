@@ -187,10 +187,10 @@ func (w *World) RemoveComponent(entityID common.EntityID, componentName string) 
 // -----------------------------------------------------------------------------
 
 func (w *World) RemoveEntity(entityID common.EntityID) {
-	if playerComponent, err := w.GetComponent(entityID, "PlayerComponent"); err == nil {
-		player, ok := playerComponent.(*components.PlayerComponent)
+	if playerComponent, err := w.GetComponent(entityID, "Player"); err == nil {
+		player, ok := playerComponent.(*components.Player)
 		if !ok {
-			log.Error().Msgf("Error type asserting PlayerComponent for player %s", entityID)
+			log.Error().Msgf("Error type asserting Player for player %s", entityID)
 		} else {
 			if player.Room != nil {
 				player.Room.RemovePlayer(player)
@@ -237,7 +237,7 @@ func NewWorld() *World {
 
 	for _, room := range rooms {
 		roomEntity := NewEntity(room.ID)
-		roomComponent := &components.RoomComponent{
+		roomComponent := &components.Room{
 			Description: room.Description,
 		}
 		world.AddEntity(roomEntity)
@@ -245,28 +245,28 @@ func NewWorld() *World {
 	}
 
 	for _, room := range rooms {
-		component, err := world.GetComponent(common.EntityID(room.ID), "RoomComponent")
+		component, err := world.GetComponent(common.EntityID(room.ID), "Room")
 		if err != nil {
-			log.Error().Err(err).Msgf("Could not get RoomComponent for room %s", room.ID)
+			log.Error().Err(err).Msgf("Could not get Room for room %s", room.ID)
 			continue
 		}
 
-		roomComponent, ok := component.(*components.RoomComponent)
+		roomComponent, ok := component.(*components.Room)
 		if !ok {
-			log.Error().Msgf("Error type asserting RoomComponent for room %s", room.ID)
+			log.Error().Msgf("Error type asserting Room for room %s", room.ID)
 			continue
 		}
 
 		for direction, roomID := range room.Exits {
-			exitRoomComponent, err := world.GetComponent(common.EntityID(roomID), "RoomComponent")
+			exitRoomUntyped, err := world.GetComponent(common.EntityID(roomID), "Room")
 			if err != nil {
-				log.Error().Err(err).Msgf("Could not get RoomComponent for exit room %s", roomID)
+				log.Error().Err(err).Msgf("Could not get Room for exit room %s", roomID)
 				continue
 			}
 
-			exitRoom, ok := exitRoomComponent.(*components.RoomComponent)
+			exitRoom, ok := exitRoomUntyped.(*components.Room)
 			if !ok {
-				log.Error().Msgf("Error type asserting RoomComponent for exit room %s", roomID)
+				log.Error().Msgf("Error type asserting Room for exit room %s", roomID)
 				continue
 			}
 

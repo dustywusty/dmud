@@ -9,21 +9,17 @@ import (
 type Exit struct {
 	Direction string
 	RoomID    string
-	Room      *RoomComponent
+	Room      *Room
 }
 
-type RoomComponent struct {
+type Room struct {
 	Description  string
 	Exits        []Exit
-	Players      []*PlayerComponent
+	Players      []*Player
 	PlayersMutex sync.RWMutex
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-// ..
-//
-
-func (r *RoomComponent) AddPlayer(p *PlayerComponent) {
+func (r *Room) AddPlayer(p *Player) {
 	log.Info().Msgf("Player added to room: %s", p.Name)
 	r.Broadcast(p.Name + " enters")
 	r.PlayersMutex.Lock()
@@ -31,7 +27,7 @@ func (r *RoomComponent) AddPlayer(p *PlayerComponent) {
 	r.PlayersMutex.Unlock()
 }
 
-func (r *RoomComponent) GetExit(direction string) *Exit {
+func (r *Room) GetExit(direction string) *Exit {
 	for _, exit := range r.Exits {
 		if exit.Direction == direction {
 			return &exit
@@ -40,7 +36,7 @@ func (r *RoomComponent) GetExit(direction string) *Exit {
 	return nil
 }
 
-func (r *RoomComponent) GetPlayer(name string) *PlayerComponent {
+func (r *Room) GetPlayer(name string) *Player {
 	r.PlayersMutex.Lock()
 	for _, player := range r.Players {
 		if player.Name == name {
@@ -52,7 +48,7 @@ func (r *RoomComponent) GetPlayer(name string) *PlayerComponent {
 	return nil
 }
 
-func (r *RoomComponent) Broadcast(msg string, exclude ...*PlayerComponent) {
+func (r *Room) Broadcast(msg string, exclude ...*Player) {
 	r.PlayersMutex.Lock()
 	defer r.PlayersMutex.Unlock()
 
@@ -67,7 +63,7 @@ func (r *RoomComponent) Broadcast(msg string, exclude ...*PlayerComponent) {
 	}
 }
 
-func (r *RoomComponent) RemovePlayer(p *PlayerComponent) {
+func (r *Room) RemovePlayer(p *Player) {
 	r.PlayersMutex.Lock()
 	for i, player := range r.Players {
 		if player == p {
@@ -79,11 +75,9 @@ func (r *RoomComponent) RemovePlayer(p *PlayerComponent) {
 	r.Broadcast(p.Name + " leaves")
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////////
 // ..
-//
 
-func contains(players []*PlayerComponent, player *PlayerComponent) bool {
+func contains(players []*Player, player *Player) bool {
 	for _, p := range players {
 		if p == player {
 			return true

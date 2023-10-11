@@ -16,7 +16,7 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 	s := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(s)
 
-	attackingEntities, err := w.FindEntitiesByComponentPredicate("CombatComponent", func(i interface{}) bool {
+	attackingEntities, err := w.FindEntitiesByComponentPredicate("Combat", func(i interface{}) bool {
 		return true
 	})
 	if err != nil {
@@ -27,44 +27,44 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 
 		// .. A lot of things we need
 
-		combatComponentUntyped, err := w.GetComponent(attackingEntity.ID, "CombatComponent")
+		combatComponentUntyped, err := w.GetComponent(attackingEntity.ID, "Combat")
 		if err != nil {
 			log.Error().Msgf("Error getting attacking component: %v", err)
 			return
 		}
-		combatComponent := combatComponentUntyped.(*components.CombatComponent)
+		combatComponent := combatComponentUntyped.(*components.Combat)
 		if combatComponent.TargetID == "" {
 			return
 		}
 
-		attackingPlayerComponentUntyped, err := w.GetComponent(attackingEntity.ID, "PlayerComponent")
+		attackingPlayerUntyped, err := w.GetComponent(attackingEntity.ID, "Player")
 		if err != nil {
 			log.Error().Msgf("Error getting attacking player component: %v", err)
 			return
 		}
-		attackingPlayer := attackingPlayerComponentUntyped.(*components.PlayerComponent)
+		attackingPlayer := attackingPlayerUntyped.(*components.Player)
 
-		targetPlayerComponentUntyped, err := w.GetComponent(combatComponent.TargetID, "PlayerComponent")
+		targetPlayerUntyped, err := w.GetComponent(combatComponent.TargetID, "Player")
 		if err != nil {
 			log.Error().Msgf("Error getting target player component: %v", err)
 			return
 		}
-		targetPlayer := targetPlayerComponentUntyped.(*components.PlayerComponent)
+		targetPlayer := targetPlayerUntyped.(*components.Player)
 
-		targetHealthComponentUntyped, err := w.GetComponent(combatComponent.TargetID, "HealthComponent")
+		targetHealthUntyped, err := w.GetComponent(combatComponent.TargetID, "Health")
 		if err != nil {
 			log.Error().Msgf("Error getting target health component: %v", err)
 			return
 		}
-		targetHealth := targetHealthComponentUntyped.(*components.HealthComponent)
+		targetHealth := targetHealthUntyped.(*components.Health)
 
 		// .. Are they dead yet?
 
 		if targetHealth.CurrentHealth <= 0 {
 			combatComponent.TargetID = ""
 
-			w.RemoveComponent(attackingEntity.ID, "CombatComponent")
-			w.RemoveComponent(combatComponent.TargetID, "CombatComponent")
+			w.RemoveComponent(attackingEntity.ID, "Combat")
+			w.RemoveComponent(combatComponent.TargetID, "Combat")
 
 			targetPlayer.Broadcast("You have died!")
 			attackingPlayer.Broadcast(fmt.Sprintf("You killed %s!", targetPlayer.Name))
