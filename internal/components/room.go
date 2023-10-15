@@ -13,15 +13,24 @@ type Exit struct {
 }
 
 type Room struct {
-	Description  string
-	Exits        []Exit
-	Players      []*Player
+	sync.RWMutex
+
+	X int
+	Y int
+	Z int
+
+	Description string
+	Exits       []Exit
+	Players     []*Player
+
 	PlayersMutex sync.RWMutex
 }
 
 func (r *Room) AddPlayer(p *Player) {
 	log.Info().Msgf("Player added to room: %s", p.Name)
+
 	r.Broadcast(p.Name + " enters")
+
 	r.PlayersMutex.Lock()
 	r.Players = append(r.Players, p)
 	r.PlayersMutex.Unlock()

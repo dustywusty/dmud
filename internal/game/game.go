@@ -171,9 +171,6 @@ func (g *Game) handleLook(player *components.Player, command Command) {
 // -----------------------------------------------------------------------------
 
 func (g *Game) handleMove(player *components.Player, command Command) {
-	player.RWMutex.RLock()
-	defer player.RWMutex.RUnlock()
-
 	dirMapping := map[string]string{
 		"n": "north",
 		"s": "south",
@@ -182,40 +179,26 @@ func (g *Game) handleMove(player *components.Player, command Command) {
 		"u": "up",
 		"d": "down",
 	}
+
 	fullDir := command.Cmd
 	if shortDir, ok := dirMapping[command.Cmd]; ok {
 		fullDir = shortDir
 	}
 
-	log.Trace().Msgf("Moving %s", fullDir)
-
+	player.RWMutex.RLock()
 	playerEntity := g.players[player.Name]
+	player.RWMutex.RUnlock()
+
 	if playerEntity == nil {
 		log.Warn().Msg(fmt.Sprintf("Error getting player's own entity for %s", player.Name))
 		return
 	}
 
-	var movingPlayer *components.Movement
-
-	untypedMovingPlayer, err := g.world.GetComponent(playerEntity.ID, "Movement")
-	if err != nil {
-		movingPlayer = &components.Movement{
-			Direction: fullDir,
-			Status:    components.Walking,
-		}
-		g.world.AddComponent(playerEntity, movingPlayer)
-		return
-	} else {
-		movingPlayer = untypedMovingPlayer.(*components.Movement)
+	movement := components.Movement{
+		Direction: fullDir,
+		Status:    components.Walking,
 	}
-
-	if movingPlayer.Status != components.Standing {
-		player.Broadcast("You are already moving.")
-		return
-	} else {
-		movingPlayer.Direction = fullDir
-		movingPlayer.Status = components.Walking
-	}
+	g.world.AddComponent(playerEntity, &movement)
 }
 
 // -----------------------------------------------------------------------------
@@ -339,8 +322,7 @@ func (g *Game) handleWho(player *components.Player, command Command) {
 // -----------------------------------------------------------------------------
 
 func (g *Game) handleKill(player *components.Player, command Command) {
-	g.playersMu.Lock()
-	defer g.playersMu.Unlock()
+	log.Trace().Msgf("Kill: %s", command.Args)
 
 	targetEntity := g.players[strings.Join(command.Args, " ")]
 	if targetEntity == nil {
@@ -348,7 +330,10 @@ func (g *Game) handleKill(player *components.Player, command Command) {
 		return
 	}
 
+	g.playersMu.Lock()
 	playerEntity := g.players[player.Name]
+	g.playersMu.Unlock()
+
 	if playerEntity == nil {
 		log.Warn().Msg(fmt.Sprintf("Error getting player's own entity for %s", player.Name))
 		return
@@ -356,8 +341,8 @@ func (g *Game) handleKill(player *components.Player, command Command) {
 
 	attackingPlayer := components.Combat{
 		TargetID:  targetEntity.ID,
-		MinDamage: 1,
-		MaxDamage: 5,
+		MinDamage: 10,
+		MaxDamage: 50,
 	}
 
 	g.world.AddComponent(playerEntity, &attackingPlayer)

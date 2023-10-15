@@ -3,6 +3,7 @@ package systems
 import (
 	"dmud/internal/components"
 	"dmud/internal/ecs"
+	"dmud/internal/util"
 	"fmt"
 	"math/rand"
 	"time"
@@ -20,61 +21,56 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 		return true
 	})
 	if err != nil {
+		log.Error().Msgf("Error finding attacking entities: %v", err)
 		return
 	}
 
 	for _, attackingEntity := range attackingEntities {
-
-		// .. A lot of things we need
-
-		combatComponentUntyped, err := w.GetComponent(attackingEntity.ID, "Combat")
+		combat, err := util.GetTypedComponent[components.Combat](w, attackingEntity.ID, "Combat")
 		if err != nil {
-			log.Error().Msgf("Error getting attacking component: %v", err)
-			return
-		}
-		combatComponent := combatComponentUntyped.(*components.Combat)
-		if combatComponent.TargetID == "" {
+			log.Error().Msgf("Error getting attacker combat component: %v", err)
 			return
 		}
 
-		attackingPlayerUntyped, err := w.GetComponent(attackingEntity.ID, "Player")
+		if combat.TargetID == "" {
+			return
+		}
+
+		attackingPlayer, err := util.GetTypedComponent[components.Player](w, attackingEntity.ID, "Player")
 		if err != nil {
-			log.Error().Msgf("Error getting attacking player component: %v", err)
+			log.Error().Msgf("Error getting attacker player component: %v", err)
 			return
 		}
-		attackingPlayer := attackingPlayerUntyped.(*components.Player)
 
-		targetPlayerUntyped, err := w.GetComponent(combatComponent.TargetID, "Player")
+		targetPlayer, err := util.GetTypedComponent[components.Player](w, combat.TargetID, "Player")
 		if err != nil {
 			log.Error().Msgf("Error getting target player component: %v", err)
 			return
 		}
-		targetPlayer := targetPlayerUntyped.(*components.Player)
 
-		targetHealthUntyped, err := w.GetComponent(combatComponent.TargetID, "Health")
+		targetHealth, err := util.GetTypedComponent[components.Health](w, combat.TargetID, "Health")
 		if err != nil {
 			log.Error().Msgf("Error getting target health component: %v", err)
 			return
 		}
-		targetHealth := targetHealthUntyped.(*components.Health)
 
 		// .. Are they dead yet?
 
 		if targetHealth.CurrentHealth <= 0 {
-			combatComponent.TargetID = ""
+			combat.TargetID = ""
 
 			w.RemoveComponent(attackingEntity.ID, "Combat")
-			w.RemoveComponent(combatComponent.TargetID, "Combat")
+			w.RemoveComponent(combat.TargetID, "Combat")
 
-			targetPlayer.Broadcast("You have died!")
 			attackingPlayer.Broadcast(fmt.Sprintf("You killed %s!", targetPlayer.Name))
+			targetPlayer.Broadcast("You have died!")
 
 			return
 		}
 
 		// .. Attack!
 
-		damage := r.Intn(combatComponent.MaxDamage-combatComponent.MinDamage+1) + combatComponent.MinDamage
+		damage := r.Intn(combat.MaxDamage-combat.MinDamage+1) + combat.MinDamage
 
 		targetHealth.Lock()
 		targetHealth.CurrentHealth -= damage

@@ -78,35 +78,11 @@ func (w *World) Components() map[common.EntityID]map[string]Component {
 
 // -----------------------------------------------------------------------------
 
-func (w *World) ComponentLock() {
-	w.componentMutex.Lock()
-}
-
-// -----------------------------------------------------------------------------
-
-func (w *World) ComponentUnlock() {
-	w.componentMutex.Unlock()
-}
-
-// -----------------------------------------------------------------------------
-
 func (w *World) Entities() map[common.EntityID]Entity {
 	w.entityMutex.RLock()
 	defer w.entityMutex.RUnlock()
 
 	return w.entities
-}
-
-// -----------------------------------------------------------------------------
-
-func (w *World) EntityLock() {
-	w.entityMutex.Lock()
-}
-
-// -----------------------------------------------------------------------------
-
-func (w *World) EntityUnlock() {
-	w.entityMutex.Unlock()
 }
 
 // -----------------------------------------------------------------------------

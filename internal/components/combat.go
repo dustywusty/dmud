@@ -7,6 +7,7 @@ import (
 
 type Combat struct {
 	sync.RWMutex
+
 	TargetID  common.EntityID
 	MinDamage int
 	MaxDamage int

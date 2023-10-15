@@ -7,10 +7,11 @@ import (
 
 type Player struct {
 	sync.RWMutex
+
 	Client common.Client
-	Name   string
-	Room   *Room
-	Target *Player
+
+	Name string
+	Room *Room
 }
 
 func (p *Player) Broadcast(m string) {
