@@ -1,6 +1,7 @@
 package net
 
 import (
+	"dmud/internal/util"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -9,8 +10,6 @@ import (
 
 	"dmud/internal/common"
 	"dmud/internal/game"
-	"dmud/internal/util"
-
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 )
@@ -81,59 +80,92 @@ func (c *WSClient) SendMessage(msg string) {
 
 func (c *WSClient) HandleRequest() {
 	g := c.game
-	for {
-		messageType, p, err := c.conn.ReadMessage()
-		if err != nil {
-			c.mu.Lock()
-			if c.status == common.Disconnected {
-				c.mu.Unlock()
-				return
-			}
-			c.mu.Unlock()
+	slurRegexes := compileSlurRegexes() // compile all slur regexes once
 
-			log.Error().Err(err).Msgf("Error reading message from %s", c.RemoteAddr())
+	for {
+		messageType, p, err := c.readMessage()
+		if err != nil {
+			handleReadError(err, c, g)
+			return
+		}
+
+		if containsSlur(slurRegexes, p) {
+			log.Warn().Msgf("Slur detected in message from %s. Message rejected.", c.RemoteAddr())
 			g.RemovePlayerChan <- c
 			return
 		}
 
-		// Check for slurs on all player input
-		// For now just disconnect them immediately
-		inputLower := strings.ToLower(strings.TrimSpace(string(p)))
-		for _, slur := range util.Slurs {
-			re, err := regexp.Compile(`\b` + regexp.QuoteMeta(slur) + `\b`)
-			if err != nil {
-				log.Error().Msgf("Error compiling regex: %s", err)
-				continue
-			}
-
-			if re.MatchString(inputLower) {
-				log.Warn().Msgf("Slur detected in message from %s. Message rejected.", c.RemoteAddr())
-				g.RemovePlayerChan <- c
-				return
-			}
-		}
-
 		if messageType == websocket.TextMessage {
-			log.Trace().Msgf("Received message from %s: %s", c.RemoteAddr(), p)
-
-			parts := strings.SplitN(strings.TrimSpace(string(p)), " ", 2)
-			cmd := parts[0]
-			var args []string
-			if len(parts) > 1 {
-				args = strings.Split(parts[1], " ")
-			}
-
-			command := game.Command{
-				Cmd:  cmd,
-				Args: args,
-			}
-
-			clientCommand := game.ClientCommand{
-				Command: command,
-				Client:  c,
-			}
-
-			g.CommandChan <- clientCommand
+			processTextMessage(p, c, g)
 		}
 	}
+}
+
+func (c *WSClient) readMessage() (messageType int, p []byte, err error) {
+	messageType, p, err = c.conn.ReadMessage()
+	if err != nil {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if c.status == common.Disconnected {
+			return
+		}
+		log.Error().Err(err).Msgf("Error reading message from %s", c.RemoteAddr())
+	}
+	return
+}
+
+func compileSlurRegexes() []*regexp.Regexp {
+	var slurRegexes []*regexp.Regexp
+	for _, slur := range util.Slurs {
+		re, err := regexp.Compile(`\b` + regexp.QuoteMeta(slur) + `\b`)
+		if err != nil {
+			log.Error().Msgf("Error compiling regex: %s", err)
+			continue
+		}
+		slurRegexes = append(slurRegexes, re)
+	}
+	return slurRegexes
+}
+
+func containsSlur(slurRegexes []*regexp.Regexp, message []byte) bool {
+	inputLower := strings.ToLower(strings.TrimSpace(string(message)))
+	for _, re := range slurRegexes {
+		if re.MatchString(inputLower) {
+			return true
+		}
+	}
+	return false
+}
+
+func processTextMessage(p []byte, c *WSClient, g *Game) {
+	log.Trace().Msgf("Received message from %s: %s", c.RemoteAddr(), p)
+	parts := strings.SplitN(strings.TrimSpace(string(p)), " ", 2)
+	cmd := parts[0]
+	var args []string
+	if len(parts) > 1 {
+		args = strings.Split(parts[1], " ")
+	}
+
+	command := game.Command{
+		Cmd:  cmd,
+		Args: args,
+	}
+
+	clientCommand := game.ClientCommand{
+		Command: command,
+		Client:  c,
+	}
+
+	g.CommandChan <- clientCommand
+}
+
+func handleReadError(err error, c *WSClient, g *Game) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.status == common.Disconnected {
+		return
+	}
+	c.status = common.Disconnected
+	log.Error().Err(err).Msgf("Error reading message from %s", c.RemoteAddr())
+	g.RemovePlayerChan <- c
 }
