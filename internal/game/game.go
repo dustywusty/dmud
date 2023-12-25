@@ -16,8 +16,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// -----------------------------------------------------------------------------
-
 type Game struct {
 	defaultRoom *components.Room
 
@@ -30,8 +28,6 @@ type Game struct {
 	RemovePlayerChan chan common.Client
 	CommandChan      chan ClientCommand
 }
-
-// -----------------------------------------------------------------------------
 
 func (g *Game) HandleConnect(c common.Client) {
 	playerComponent := &components.Player{
@@ -65,8 +61,6 @@ func (g *Game) HandleConnect(c common.Client) {
 	go c.HandleRequest()
 }
 
-// -----------------------------------------------------------------------------
-
 func (g *Game) HandleDisconnect(c common.Client) {
 	player, err := g.getPlayer(c)
 	if err != nil {
@@ -92,8 +86,6 @@ func (g *Game) HandleDisconnect(c common.Client) {
 
 	g.Broadcast(fmt.Sprintf("%s has left the game.", player.Name), c)
 }
-
-// -----------------------------------------------------------------------------
 
 func (g *Game) getPlayer(c common.Client) (*components.Player, error) {
 	g.playersMu.Lock()
@@ -150,8 +142,6 @@ func (g *Game) handleCommand(c ClientCommand) {
 	}
 }
 
-// -----------------------------------------------------------------------------
-
 func (g *Game) handleExit(player *components.Player, command Command) {
 	player.RWMutex.RLock()
 	defer player.RWMutex.RUnlock()
@@ -159,16 +149,12 @@ func (g *Game) handleExit(player *components.Player, command Command) {
 	g.HandleDisconnect(player.Client)
 }
 
-// -----------------------------------------------------------------------------
-
 func (g *Game) handleLook(player *components.Player, command Command) {
 	player.RWMutex.RLock()
 	defer player.RWMutex.RUnlock()
 
 	player.Look()
 }
-
-// -----------------------------------------------------------------------------
 
 func (g *Game) handleMove(player *components.Player, command Command) {
 	dirMapping := map[string]string{
@@ -201,8 +187,6 @@ func (g *Game) handleMove(player *components.Player, command Command) {
 	g.world.AddComponent(playerEntity, &movement)
 }
 
-// -----------------------------------------------------------------------------
-
 func (g *Game) handleRename(player *components.Player, command Command) {
 	player.Lock()
 	defer player.Unlock()
@@ -222,8 +206,6 @@ func (g *Game) handleRename(player *components.Player, command Command) {
 	g.Broadcast(fmt.Sprintf("%s has changed their name to %s", oldName, player.Name))
 }
 
-// -----------------------------------------------------------------------------
-
 func (g *Game) handleSay(player *components.Player, command Command) {
 	player.RWMutex.RLock()
 	defer player.RWMutex.RUnlock()
@@ -237,8 +219,6 @@ func (g *Game) handleSay(player *components.Player, command Command) {
 	player.Room.Broadcast(fmt.Sprintf("%s says: %s", player.Name, msg))
 }
 
-// -----------------------------------------------------------------------------
-
 func (g *Game) handleScan(player *components.Player, command Command) {
 	player.RWMutex.RLock()
 	defer player.RWMutex.RUnlock()
@@ -250,8 +230,6 @@ func (g *Game) handleScan(player *components.Player, command Command) {
 
 	player.Broadcast("Exits: " + strings.Join(exits, ", "))
 }
-
-// -----------------------------------------------------------------------------
 
 func (g *Game) handleShout(player *components.Player, msg string, depths ...int) {
 	player.RWMutex.RLock()
@@ -292,8 +270,6 @@ func (g *Game) handleShout(player *components.Player, msg string, depths ...int)
 	}
 }
 
-// -----------------------------------------------------------------------------
-
 func (g *Game) handleWho(player *components.Player, command Command) {
 	g.playersMu.Lock()
 	defer g.playersMu.Unlock()
@@ -318,8 +294,6 @@ func (g *Game) handleWho(player *components.Player, command Command) {
 
 	player.Broadcast(tw.Render())
 }
-
-// -----------------------------------------------------------------------------
 
 func (g *Game) handleKill(player *components.Player, command Command) {
 	log.Trace().Msgf("Kill: %s", command.Args)
@@ -348,8 +322,6 @@ func (g *Game) handleKill(player *components.Player, command Command) {
 	g.world.AddComponent(playerEntity, &attackingPlayer)
 }
 
-// -----------------------------------------------------------------------------
-
 func (g *Game) loop() {
 	updateTicker := time.NewTicker(10 * time.Millisecond)
 	defer updateTicker.Stop()
@@ -367,8 +339,6 @@ func (g *Game) loop() {
 		}
 	}
 }
-
-// -----------------------------------------------------------------------------
 
 func (g *Game) Broadcast(m string, excludeClients ...common.Client) {
 	log.Info().Msgf("Broadcasting: %s", m)
@@ -391,8 +361,6 @@ func (g *Game) Broadcast(m string, excludeClients ...common.Client) {
 		}
 	}
 }
-
-// -----------------------------------------------------------------------------
 
 func NewGame() *Game {
 	combatSytem := &systems.CombatSystem{}

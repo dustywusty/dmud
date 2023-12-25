@@ -23,8 +23,6 @@ func (ms *MovementSystem) Update(w *ecs.World, deltaTime float64) {
 	}
 }
 
-// -----------------------------------------------------------------------------
-
 func HandleMovement(w *ecs.World, movingEntity ecs.Entity) {
 	defer func() {
 		w.RemoveComponent(movingEntity.ID, "Movement")

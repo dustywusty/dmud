@@ -33,8 +33,6 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-// -----------------------------------------------------------------------------
-
 type WSClient struct {
 	status common.ConnectionStatus
 	conn   *websocket.Conn
@@ -43,8 +41,6 @@ type WSClient struct {
 }
 
 var _ common.Client = (*WSClient)(nil)
-
-// -----------------------------------------------------------------------------
 
 func (c *WSClient) CloseConnection() error {
 	c.mu.Lock()
@@ -70,13 +66,9 @@ func (c *WSClient) CloseConnection() error {
 	return nil
 }
 
-// -----------------------------------------------------------------------------
-
 func (c *WSClient) RemoteAddr() string {
 	return c.conn.RemoteAddr().String()
 }
-
-// -----------------------------------------------------------------------------
 
 func (c *WSClient) SendMessage(msg string) {
 	err := c.conn.WriteMessage(websocket.TextMessage, []byte(msg))
@@ -86,8 +78,6 @@ func (c *WSClient) SendMessage(msg string) {
 		log.Trace().Msgf("Sent message to %s:\n%s", c.RemoteAddr(), msg)
 	}
 }
-
-// -----------------------------------------------------------------------------
 
 func (c *WSClient) HandleRequest() {
 	g := c.game

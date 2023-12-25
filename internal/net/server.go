@@ -36,8 +36,6 @@ type Server struct {
 	wsPort   string
 }
 
-// -----------------------------------------------------------------------------
-
 func (s *Server) Run() {
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -60,8 +58,6 @@ func (s *Server) Run() {
 
 	wg.Wait()
 }
-
-// -----------------------------------------------------------------------------
 
 func (s *Server) Shutdown() {
 	s.connectionMu.Lock()
@@ -86,8 +82,6 @@ func (s *Server) Shutdown() {
 		}
 	}
 }
-
-// -----------------------------------------------------------------------------
 
 func (s *Server) runTCPListener() {
 	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%s", s.tcpHost, s.tcpPort))
@@ -131,8 +125,6 @@ func (s *Server) runTCPListener() {
 
 	<-done
 }
-
-// -----------------------------------------------------------------------------
 
 func (s *Server) runWebSocketServer() {
 	done := make(chan bool)
@@ -178,8 +170,6 @@ func (s *Server) runWebSocketServer() {
 
 	<-done
 }
-
-// -----------------------------------------------------------------------------
 
 func NewServer(config *ServerConfig) *Server {
 	return &Server{

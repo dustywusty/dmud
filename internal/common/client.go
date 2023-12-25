@@ -1,15 +1,11 @@
 package common
 
-// -----------------------------------------------------------------------------
-
 type ClientType int
 
 const (
 	TCP ClientType = iota
 	WebSocket
 )
-
-// -----------------------------------------------------------------------------
 
 type ConnectionStatus string
 
@@ -19,8 +15,6 @@ const (
 	Disconnecting ConnectionStatus = "disconnecting"
 	Disconnected  ConnectionStatus = "disconnected"
 )
-
-// -----------------------------------------------------------------------------
 
 type Client interface {
 	CloseConnection() error

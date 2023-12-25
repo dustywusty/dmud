@@ -24,8 +24,6 @@ type World struct {
 	systems []System
 }
 
-// -----------------------------------------------------------------------------
-
 func (w *World) AddComponent(entity *Entity, component Component) {
 	w.componentMutex.Lock()
 	defer w.componentMutex.Unlock()
@@ -46,8 +44,6 @@ func (w *World) AddComponent(entity *Entity, component Component) {
 	log.Info().Msgf("Added component %s to entity %s", componentName, entity.ID)
 }
 
-// -----------------------------------------------------------------------------
-
 func (w *World) AddEntity(entity Entity) {
 	w.entityMutex.Lock()
 	defer w.entityMutex.Unlock()
@@ -61,13 +57,9 @@ func (w *World) AddEntity(entity Entity) {
 	log.Info().Msgf("Added entity %s", entity.ID)
 }
 
-// -----------------------------------------------------------------------------
-
 func (w *World) AddSystem(system System) {
 	w.systems = append(w.systems, system)
 }
-
-// -----------------------------------------------------------------------------
 
 func (w *World) Components() map[common.EntityID]map[string]Component {
 	w.entityMutex.RLock()
@@ -76,16 +68,12 @@ func (w *World) Components() map[common.EntityID]map[string]Component {
 	return w.components
 }
 
-// -----------------------------------------------------------------------------
-
 func (w *World) Entities() map[common.EntityID]Entity {
 	w.entityMutex.RLock()
 	defer w.entityMutex.RUnlock()
 
 	return w.entities
 }
-
-// -----------------------------------------------------------------------------
 
 func (w *World) FindEntity(id common.EntityID) (Entity, error) {
 	w.entityMutex.RLock()
@@ -99,8 +87,6 @@ func (w *World) FindEntity(id common.EntityID) (Entity, error) {
 
 	return entity, nil
 }
-
-// -----------------------------------------------------------------------------
 
 func (w *World) FindEntitiesByComponentPredicate(componentType string, predicate func(interface{}) bool) ([]Entity, error) {
 	w.componentMutex.RLock()
@@ -126,8 +112,6 @@ func (w *World) FindEntitiesByComponentPredicate(componentType string, predicate
 	return entities, nil
 }
 
-// -----------------------------------------------------------------------------
-
 func (w *World) GetComponent(entityID common.EntityID, componentName string) (interface{}, error) {
 	w.componentMutex.RLock()
 	defer w.componentMutex.RUnlock()
@@ -141,8 +125,6 @@ func (w *World) GetComponent(entityID common.EntityID, componentName string) (in
 
 	return nil, fmt.Errorf("entity %s not found", entityID)
 }
-
-// -----------------------------------------------------------------------------
 
 func (w *World) RemoveComponent(entityID common.EntityID, componentName string) {
 	w.componentMutex.Lock()
@@ -159,8 +141,6 @@ func (w *World) RemoveComponent(entityID common.EntityID, componentName string) 
 
 	log.Info().Msgf("Removed component %s from entity %s", componentName, entityID)
 }
-
-// -----------------------------------------------------------------------------
 
 func (w *World) RemoveEntity(entityID common.EntityID) {
 	if playerComponent, err := w.GetComponent(entityID, "Player"); err == nil {
@@ -185,8 +165,6 @@ func (w *World) RemoveEntity(entityID common.EntityID) {
 	log.Info().Msgf("Removed entity %s", entityID)
 }
 
-// -----------------------------------------------------------------------------
-
 func (w *World) Update() {
 	deltaTime := util.CalculateDeltaTime()
 
@@ -200,8 +178,6 @@ func (w *World) Update() {
 		w.elapsedTime = 0
 	}
 }
-
-// -----------------------------------------------------------------------------
 
 func NewWorld() *World {
 	world := &World{
@@ -257,15 +233,11 @@ func NewWorld() *World {
 	return world
 }
 
-// -----------------------------------------------------------------------------
-
 type Room struct {
 	ID          string            `json:"id"`
 	Description string            `json:"description"`
 	Exits       map[string]string `json:"exits"`
 }
-
-// -----------------------------------------------------------------------------
 
 func loadRoomsFromFile(filename string) []Room {
 	var rooms []Room
