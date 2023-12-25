@@ -1,7 +1,6 @@
 package net
 
 import (
-	"dmud/internal/util"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -10,6 +9,8 @@ import (
 
 	"dmud/internal/common"
 	"dmud/internal/game"
+	"dmud/internal/util"
+
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 )
@@ -85,7 +86,7 @@ func (c *WSClient) HandleRequest() {
 	for {
 		messageType, p, err := c.readMessage()
 		if err != nil {
-			handleReadError(err, c, g)
+			handleReadError(err, c)
 			return
 		}
 
@@ -96,7 +97,7 @@ func (c *WSClient) HandleRequest() {
 		}
 
 		if messageType == websocket.TextMessage {
-			processTextMessage(p, c, g)
+			processTextMessage(p, c)
 		}
 	}
 }
@@ -137,7 +138,8 @@ func containsSlur(slurRegexes []*regexp.Regexp, message []byte) bool {
 	return false
 }
 
-func processTextMessage(p []byte, c *WSClient, g *Game) {
+func processTextMessage(p []byte, c *WSClient) {
+	g := c.game
 	log.Trace().Msgf("Received message from %s: %s", c.RemoteAddr(), p)
 	parts := strings.SplitN(strings.TrimSpace(string(p)), " ", 2)
 	cmd := parts[0]
@@ -145,21 +147,19 @@ func processTextMessage(p []byte, c *WSClient, g *Game) {
 	if len(parts) > 1 {
 		args = strings.Split(parts[1], " ")
 	}
-
 	command := game.Command{
 		Cmd:  cmd,
 		Args: args,
 	}
-
 	clientCommand := game.ClientCommand{
 		Command: command,
 		Client:  c,
 	}
-
 	g.CommandChan <- clientCommand
 }
 
-func handleReadError(err error, c *WSClient, g *Game) {
+func handleReadError(err error, c *WSClient) {
+	g := c.game
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.status == common.Disconnected {
