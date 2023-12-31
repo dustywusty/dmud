@@ -18,10 +18,6 @@ type TCPClient struct {
 
 var _ common.Client = (*TCPClient)(nil)
 
-///////////////////////////////////////////////////////////////////////////////////////////////
-// ..
-//
-
 func (c *TCPClient) CloseConnection() error {
 	c.conn.Write([]byte("\nGoodbye!\n\n"))
 	err := c.conn.Close()
@@ -59,7 +55,7 @@ func (c *TCPClient) HandleRequest() {
 			Args: args,
 		}
 
-		g.CommandChan <- game.ClientCommand{Command: command, Client: c}
+		g.ExecuteCommandChan <- game.ClientCommand{Command: command, Client: c}
 	}
 }
 

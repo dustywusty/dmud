@@ -20,5 +20,6 @@ connect:
 run: build
 	./$(BINARY_PATH)$(BINARY_NAME)
 
+# go install github.com/cosmtrek/air@latest
 watch:
-	air -c .air.toml
+	@$(shell go env GOPATH)/bin/air -c .air.toml

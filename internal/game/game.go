@@ -24,9 +24,9 @@ type Game struct {
 
 	world *ecs.World
 
-	AddPlayerChan    chan common.Client
-	RemovePlayerChan chan common.Client
-	CommandChan      chan ClientCommand
+	AddPlayerChan      chan common.Client
+	RemovePlayerChan   chan common.Client
+	ExecuteCommandChan chan ClientCommand
 }
 
 func (g *Game) HandleConnect(c common.Client) {
@@ -36,8 +36,8 @@ func (g *Game) HandleConnect(c common.Client) {
 		Room:   g.defaultRoom,
 	}
 	healthComponent := &components.Health{
-		MaxHealth:     100,
-		CurrentHealth: 100,
+		Max:     100,
+		Current: 100,
 	}
 
 	playerEntity := ecs.NewEntity()
@@ -90,6 +90,7 @@ func (g *Game) HandleDisconnect(c common.Client) {
 func (g *Game) getPlayer(c common.Client) (*components.Player, error) {
 	g.playersMu.Lock()
 	defer g.playersMu.Unlock()
+
 	for _, playerEntity := range g.players {
 		playerComponent, err := g.world.GetComponent(playerEntity.ID, "Player")
 		if err != nil {
@@ -332,7 +333,7 @@ func (g *Game) loop() {
 			g.HandleConnect(client)
 		case client := <-g.RemovePlayerChan:
 			g.HandleDisconnect(client)
-		case command := <-g.CommandChan:
+		case command := <-g.ExecuteCommandChan:
 			g.handleCommand(command)
 		case <-updateTicker.C:
 			g.world.Update()
@@ -363,22 +364,22 @@ func (g *Game) Broadcast(m string, excludeClients ...common.Client) {
 }
 
 func NewGame() *Game {
-	combatSytem := &systems.CombatSystem{}
+	combatSystem := &systems.CombatSystem{}
 	movementSystem := &systems.MovementSystem{}
 
 	world := ecs.NewWorld()
-	world.AddSystem(combatSytem)
+	world.AddSystem(combatSystem)
 	world.AddSystem(movementSystem)
 
 	defaultRoom, _ := world.GetComponent("1", "Room")
 
 	game := Game{
-		defaultRoom:      defaultRoom.(*components.Room),
-		players:          make(map[string]*ecs.Entity),
-		world:            world,
-		AddPlayerChan:    make(chan common.Client),
-		RemovePlayerChan: make(chan common.Client),
-		CommandChan:      make(chan ClientCommand),
+		defaultRoom:        defaultRoom.(*components.Room),
+		players:            make(map[string]*ecs.Entity),
+		world:              world,
+		AddPlayerChan:      make(chan common.Client),
+		RemovePlayerChan:   make(chan common.Client),
+		ExecuteCommandChan: make(chan ClientCommand),
 	}
 
 	go game.loop()

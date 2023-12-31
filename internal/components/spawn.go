@@ -10,7 +10,7 @@ const (
 type SpawnTable interface {
 	MaxCount() int
 	MinCount() int
-	SpawnType() SpawnType
+	SpawnType()
 }
 
 type Spawn interface {

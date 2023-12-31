@@ -66,22 +66,9 @@ func (c *WSClient) CloseConnection() error {
 	return nil
 }
 
-func (c *WSClient) RemoteAddr() string {
-	return c.conn.RemoteAddr().String()
-}
-
-func (c *WSClient) SendMessage(msg string) {
-	err := c.conn.WriteMessage(websocket.TextMessage, []byte(msg))
-	if err != nil {
-		log.Error().Msgf("Error sending message %s to %s: %s", msg, c.RemoteAddr(), err)
-	} else {
-		log.Trace().Msgf("Sent message to %s:\n%s", c.RemoteAddr(), msg)
-	}
-}
-
 func (c *WSClient) HandleRequest() {
 	g := c.game
-	slurRegexes := compileSlurRegexes() // compile all slur regexes once
+	slurRegexes := compileSlurRegexes()
 
 	for {
 		messageType, p, err := c.readMessage()
@@ -98,21 +85,33 @@ func (c *WSClient) HandleRequest() {
 
 		if messageType == websocket.TextMessage {
 			processTextMessage(p, c)
+		} else {
+			log.Warn().Msgf("Unknown message type %d from %s", messageType, c.RemoteAddr())
 		}
 	}
 }
 
-func (c *WSClient) readMessage() (messageType int, p []byte, err error) {
-	messageType, p, err = c.conn.ReadMessage()
+func (c *WSClient) RemoteAddr() string {
+	return c.conn.RemoteAddr().String()
+}
+
+func (c *WSClient) SendMessage(msg string) {
+	err := c.conn.WriteMessage(websocket.TextMessage, []byte(msg))
 	if err != nil {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		if c.status == common.Disconnected {
-			return
-		}
-		log.Error().Err(err).Msgf("Error reading message from %s", c.RemoteAddr())
+		log.Error().Msgf("Error sending message %s to %s: %s", msg, c.RemoteAddr(), err)
+	} else {
+		log.Trace().Msgf("Sent message to %s:\n%s", c.RemoteAddr(), msg)
 	}
-	return
+}
+
+func containsSlur(slurRegexes []*regexp.Regexp, message []byte) bool {
+	inputLower := strings.ToLower(strings.TrimSpace(string(message)))
+	for _, re := range slurRegexes {
+		if re.MatchString(inputLower) {
+			return true
+		}
+	}
+	return false
 }
 
 func compileSlurRegexes() []*regexp.Regexp {
@@ -128,14 +127,16 @@ func compileSlurRegexes() []*regexp.Regexp {
 	return slurRegexes
 }
 
-func containsSlur(slurRegexes []*regexp.Regexp, message []byte) bool {
-	inputLower := strings.ToLower(strings.TrimSpace(string(message)))
-	for _, re := range slurRegexes {
-		if re.MatchString(inputLower) {
-			return true
-		}
+func handleReadError(err error, c *WSClient) {
+	g := c.game
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.status == common.Disconnected {
+		return
 	}
-	return false
+	c.status = common.Disconnected
+	log.Error().Err(err).Msgf("Error reading message from %s", c.RemoteAddr())
+	g.RemovePlayerChan <- c
 }
 
 func processTextMessage(p []byte, c *WSClient) {
@@ -155,17 +156,18 @@ func processTextMessage(p []byte, c *WSClient) {
 		Command: command,
 		Client:  c,
 	}
-	g.CommandChan <- clientCommand
+	g.ExecuteCommandChan <- clientCommand
 }
 
-func handleReadError(err error, c *WSClient) {
-	g := c.game
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.status == common.Disconnected {
-		return
+func (c *WSClient) readMessage() (messageType int, p []byte, err error) {
+	messageType, p, err = c.conn.ReadMessage()
+	if err != nil {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if c.status == common.Disconnected {
+			return
+		}
+		log.Error().Err(err).Msgf("Error reading message from %s", c.RemoteAddr())
 	}
-	c.status = common.Disconnected
-	log.Error().Err(err).Msgf("Error reading message from %s", c.RemoteAddr())
-	g.RemovePlayerChan <- c
+	return
 }
