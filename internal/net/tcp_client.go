@@ -41,9 +41,11 @@ func (c *TCPClient) HandleRequest() {
 			return
 		}
 
+		message = strings.TrimSpace(message)
+
 		log.Trace().Msgf("Received message from %s: %s", c.RemoteAddr(), message)
 
-		parts := strings.SplitN(strings.TrimSpace(message), " ", 2)
+		parts := strings.SplitN(message, " ", 2)
 		cmd := parts[0]
 		var args []string
 		if len(parts) > 1 {
@@ -64,7 +66,7 @@ func (c *TCPClient) RemoteAddr() string {
 }
 
 func (c *TCPClient) SendMessage(msg string) {
-	_, err := c.conn.Write([]byte("\b\b" + msg + "\n\n> "))
+	_, err := c.conn.Write([]byte("\n" + msg + "\n\n"))
 	if err != nil {
 		log.Error().Err(err).Msg("Error sending message to TCPClient: %v")
 	}

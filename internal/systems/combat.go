@@ -1,6 +1,7 @@
 package systems
 
 import (
+	"dmud/internal/common"
 	"dmud/internal/components"
 	"dmud/internal/ecs"
 	"dmud/internal/util"
@@ -64,15 +65,15 @@ func findAttackingEntities(w *ecs.World) ([]ecs.Entity, error) {
 	})
 }
 
-func getCombatComponent(w *ecs.World, entityID string) (*components.Combat, error) {
+func getCombatComponent(w *ecs.World, entityID common.EntityID) (*components.Combat, error) {
 	return util.GetTypedComponent[components.Combat](w, entityID, "Combat")
 }
 
-func getPlayerComponent(w *ecs.World, entityID string) (*components.Player, error) {
+func getPlayerComponent(w *ecs.World, entityID common.EntityID) (*components.Player, error) {
 	return util.GetTypedComponent[components.Player](w, entityID, "Player")
 }
 
-func getHealthComponent(w *ecs.World, entityID string) (*components.Health, error) {
+func getHealthComponent(w *ecs.World, entityID common.EntityID) (*components.Health, error) {
 	return util.GetTypedComponent[components.Health](w, entityID, "Health")
 }
 
@@ -80,7 +81,7 @@ func isTargetDead(health *components.Health) bool {
 	return health.Current <= 0
 }
 
-func handleTargetDeath(w *ecs.World, attackerID, targetID string, attackerPlayer, targetPlayer *components.Player) {
+func handleTargetDeath(w *ecs.World, attackerID common.EntityID, targetID common.EntityID, attackerPlayer, targetPlayer *components.Player) {
 	combat := &components.Combat{}
 	combat.TargetID = ""
 
