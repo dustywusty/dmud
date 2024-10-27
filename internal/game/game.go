@@ -20,10 +20,8 @@ type ClientCommand struct {
 	Args   []string
 }
 
-// CommandHandler is a function type for handling commands.
 type CommandHandler func(player *components.Player, args []string, game *Game)
 
-// Command represents a game command with its handler and metadata.
 type Command struct {
 	Name        string
 	Aliases     []string
@@ -31,10 +29,8 @@ type Command struct {
 	Description string
 }
 
-// commandRegistry maps command names to Command structs.
 var commandRegistry = make(map[string]*Command)
 
-// Game represents the game state and contains all game-related methods.
 type Game struct {
 	defaultRoom *components.Room
 
@@ -48,7 +44,6 @@ type Game struct {
 	ExecuteCommandChan chan ClientCommand
 }
 
-// NewGame initializes a new Game instance.
 func NewGame() *Game {
 	combatSystem := &systems.CombatSystem{}
 	movementSystem := &systems.MovementSystem{}
@@ -83,7 +78,6 @@ func NewGame() *Game {
 	return game
 }
 
-// initCommands registers all game commands.
 func (g *Game) initCommands() {
 	g.RegisterCommand(&Command{
 		Name:        "look",
@@ -122,7 +116,6 @@ func (g *Game) initCommands() {
 		Description: "Attack another player or NPC.",
 	})
 
-	// Movement commands
 	directions := map[string]string{
 		"north": "n",
 		"south": "s",
@@ -142,7 +135,6 @@ func (g *Game) initCommands() {
 	}
 }
 
-// RegisterCommand adds a command and its aliases to the registry.
 func (g *Game) RegisterCommand(cmd *Command) {
 	commandRegistry[cmd.Name] = cmd
 	for _, alias := range cmd.Aliases {
@@ -150,7 +142,6 @@ func (g *Game) RegisterCommand(cmd *Command) {
 	}
 }
 
-// handleCommand processes a command issued by a client.
 func (g *Game) handleCommand(c ClientCommand) {
 	client := c.Client
 
@@ -171,7 +162,6 @@ func (g *Game) handleCommand(c ClientCommand) {
 	}
 }
 
-// HandleConnect is called when a new client connects to the game.
 func (g *Game) HandleConnect(c common.Client) {
 	playerComponent := &components.Player{
 		Client: c,

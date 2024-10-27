@@ -8,12 +8,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// handleLook processes the look command.
 func handleLook(player *components.Player, args []string, game *Game) {
 	player.Look()
 }
 
-// handleWho processes the who command.
 func handleWho(player *components.Player, args []string, game *Game) {
 	game.playersMu.Lock()
 	defer game.playersMu.Unlock()
@@ -39,7 +37,6 @@ func handleWho(player *components.Player, args []string, game *Game) {
 	player.Broadcast(tw.Render())
 }
 
-// handleExit processes the exit command.
 func handleExit(player *components.Player, args []string, game *Game) {
 	player.RWMutex.RLock()
 	defer player.RWMutex.RUnlock()
@@ -47,7 +44,6 @@ func handleExit(player *components.Player, args []string, game *Game) {
 	game.HandleDisconnect(player.Client)
 }
 
-// handleName processes the name command.
 func handleName(player *components.Player, args []string, game *Game) {
 	if len(args) == 0 {
 		player.Broadcast("Usage: name <new_name>")
@@ -57,7 +53,6 @@ func handleName(player *components.Player, args []string, game *Game) {
 	game.HandleRename(player, newName)
 }
 
-// HandleRename changes the player's name.
 func (g *Game) HandleRename(player *components.Player, newName string) {
 	player.Lock()
 	defer player.Unlock()

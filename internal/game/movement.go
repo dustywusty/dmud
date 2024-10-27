@@ -6,14 +6,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// createMoveHandler returns a CommandHandler for moving in the given direction.
 func (g *Game) createMoveHandler(direction string) CommandHandler {
 	return func(player *components.Player, args []string, game *Game) {
 		game.HandleMove(player, direction)
 	}
 }
 
-// HandleMove processes movement commands for a player.
 func (g *Game) HandleMove(player *components.Player, direction string) {
 	player.RWMutex.RLock()
 	playerEntity := g.players[player.Name]

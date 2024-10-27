@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// handleSay processes the say command.
 func handleSay(player *components.Player, args []string, game *Game) {
 	msg := strings.Join(args, " ")
 	if msg == "" {
@@ -18,7 +17,6 @@ func handleSay(player *components.Player, args []string, game *Game) {
 	player.Room.Broadcast(fmt.Sprintf("%s says: %s", player.Name, msg), player)
 }
 
-// handleShout processes the shout command.
 func handleShout(player *components.Player, args []string, game *Game) {
 	msg := strings.Join(args, " ")
 	if msg == "" {
@@ -28,7 +26,6 @@ func handleShout(player *components.Player, args []string, game *Game) {
 	game.HandleShout(player, msg)
 }
 
-// HandleShout broadcasts a message to nearby rooms.
 func (g *Game) HandleShout(player *components.Player, msg string) {
 	player.RWMutex.RLock()
 	defer player.RWMutex.RUnlock()
