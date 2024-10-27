@@ -140,22 +140,24 @@ func handleReadError(err error, c *WSClient) {
 }
 
 func processTextMessage(p []byte, c *WSClient) {
-	g := c.game
 	log.Trace().Msgf("Received message from %s: %s", c.RemoteAddr(), p)
+
+	g := c.game
+
 	parts := strings.SplitN(strings.TrimSpace(string(p)), " ", 2)
 	cmd := parts[0]
+
 	var args []string
 	if len(parts) > 1 {
 		args = strings.Split(parts[1], " ")
 	}
-	command := game.Command{
-		Cmd:  cmd,
-		Args: args,
-	}
+
 	clientCommand := game.ClientCommand{
-		Command: command,
-		Client:  c,
+		Cmd:    cmd,
+		Args:   args,
+		Client: c,
 	}
+
 	g.ExecuteCommandChan <- clientCommand
 }
 

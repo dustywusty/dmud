@@ -28,13 +28,13 @@ func HandleMovement(w *ecs.World, movingEntity ecs.Entity) {
 		w.RemoveComponent(movingEntity.ID, "Movement")
 	}()
 
-	movingPlayer, err := util.GetTypedComponent[components.Player](w, movingEntity.ID, "Player")
+	movingPlayer, err := util.GetTypedComponent[*components.Player](w, movingEntity.ID, "Player")
 	if err != nil {
 		log.Error().Msgf("Error getting moving player component: %v", err)
 		return
 	}
 
-	playerHealth, err := util.GetTypedComponent[components.Health](w, movingEntity.ID, "Health")
+	playerHealth, err := util.GetTypedComponent[*components.Health](w, movingEntity.ID, "Health")
 	if err != nil {
 		log.Error().Msgf("Error getting player health component: %v", err)
 		return
@@ -45,7 +45,7 @@ func HandleMovement(w *ecs.World, movingEntity ecs.Entity) {
 		return
 	}
 
-	moving, err := util.GetTypedComponent[components.Movement](w, movingEntity.ID, "Movement")
+	moving, err := util.GetTypedComponent[*components.Movement](w, movingEntity.ID, "Movement")
 	if err != nil {
 		log.Error().Msgf("Error getting moving component: %v", err)
 		return

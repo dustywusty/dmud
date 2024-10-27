@@ -2,7 +2,6 @@ package game
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -12,10 +11,30 @@ import (
 	"dmud/internal/systems"
 	"dmud/internal/util"
 
-	"github.com/jedib0t/go-pretty/table"
 	"github.com/rs/zerolog/log"
 )
 
+type ClientCommand struct {
+	Client common.Client
+	Cmd    string
+	Args   []string
+}
+
+// CommandHandler is a function type for handling commands.
+type CommandHandler func(player *components.Player, args []string, game *Game)
+
+// Command represents a game command with its handler and metadata.
+type Command struct {
+	Name        string
+	Aliases     []string
+	Handler     CommandHandler
+	Description string
+}
+
+// commandRegistry maps command names to Command structs.
+var commandRegistry = make(map[string]*Command)
+
+// Game represents the game state and contains all game-related methods.
 type Game struct {
 	defaultRoom *components.Room
 
@@ -29,6 +48,130 @@ type Game struct {
 	ExecuteCommandChan chan ClientCommand
 }
 
+// NewGame initializes a new Game instance.
+func NewGame() *Game {
+	combatSystem := &systems.CombatSystem{}
+	movementSystem := &systems.MovementSystem{}
+
+	world := ecs.NewWorld()
+	world.AddSystem(combatSystem)
+	world.AddSystem(movementSystem)
+
+	defaultRoomUntyped, err := world.GetComponent("1", "Room")
+	if err != nil {
+		log.Fatal().Err(err).Msg("Failed to get default room")
+	}
+
+	defaultRoom, ok := defaultRoomUntyped.(*components.Room)
+	if !ok {
+		log.Fatal().Msg("Failed to cast default room to *components.Room")
+	}
+
+	game := &Game{
+		defaultRoom:        defaultRoom,
+		players:            make(map[string]*ecs.Entity),
+		world:              world,
+		AddPlayerChan:      make(chan common.Client),
+		RemovePlayerChan:   make(chan common.Client),
+		ExecuteCommandChan: make(chan ClientCommand),
+	}
+
+	game.initCommands()
+
+	go game.loop()
+
+	return game
+}
+
+// initCommands registers all game commands.
+func (g *Game) initCommands() {
+	g.RegisterCommand(&Command{
+		Name:        "look",
+		Handler:     handleLook,
+		Description: "Look around your current location.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "who",
+		Handler:     handleWho,
+		Description: "List online players.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "exit",
+		Handler:     handleExit,
+		Description: "Exit the game.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "name",
+		Handler:     handleName,
+		Description: "Change your player name.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "say",
+		Handler:     handleSay,
+		Description: "Say something to players in the same room.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "shout",
+		Handler:     handleShout,
+		Description: "Shout a message to nearby players.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "kill",
+		Aliases:     []string{"k"},
+		Handler:     handleKill,
+		Description: "Attack another player or NPC.",
+	})
+
+	// Movement commands
+	directions := map[string]string{
+		"north": "n",
+		"south": "s",
+		"east":  "e",
+		"west":  "w",
+		"up":    "u",
+		"down":  "d",
+	}
+
+	for dir, alias := range directions {
+		g.RegisterCommand(&Command{
+			Name:        dir,
+			Aliases:     []string{alias},
+			Handler:     g.createMoveHandler(dir),
+			Description: "Move " + dir,
+		})
+	}
+}
+
+// RegisterCommand adds a command and its aliases to the registry.
+func (g *Game) RegisterCommand(cmd *Command) {
+	commandRegistry[cmd.Name] = cmd
+	for _, alias := range cmd.Aliases {
+		commandRegistry[alias] = cmd
+	}
+}
+
+// handleCommand processes a command issued by a client.
+func (g *Game) handleCommand(c ClientCommand) {
+	client := c.Client
+
+	cmdInput := c.Cmd
+	cmdArgs := c.Args
+
+	player, err := g.getPlayer(client)
+	if err != nil {
+		log.Warn().Msgf("Error getting player component: %s", err)
+		return
+	}
+
+	cmd, exists := commandRegistry[cmdInput]
+	if exists {
+		cmd.Handler(player, cmdArgs, g)
+	} else {
+		player.Broadcast(fmt.Sprintf("What do you mean, \"%s\"?", cmdInput))
+	}
+}
+
+// HandleConnect is called when a new client connects to the game.
 func (g *Game) HandleConnect(c common.Client) {
 	playerComponent := &components.Player{
 		Client: c,
@@ -47,11 +190,10 @@ func (g *Game) HandleConnect(c common.Client) {
 	g.world.AddComponent(&playerEntity, healthComponent)
 
 	g.playersMu.Lock()
-
 	g.players[playerComponent.Name] = &playerEntity
-	g.defaultRoom.AddPlayer(playerComponent)
-
 	g.playersMu.Unlock()
+
+	g.defaultRoom.AddPlayer(playerComponent)
 
 	playerComponent.Broadcast(util.WelcomeBanner)
 	playerComponent.Broadcast(g.defaultRoom.Description)
@@ -61,6 +203,7 @@ func (g *Game) HandleConnect(c common.Client) {
 	go c.HandleRequest()
 }
 
+// HandleDisconnect is called when a client disconnects from the game.
 func (g *Game) HandleDisconnect(c common.Client) {
 	player, err := g.getPlayer(c)
 	if err != nil {
@@ -68,25 +211,23 @@ func (g *Game) HandleDisconnect(c common.Client) {
 	}
 
 	g.playersMu.Lock()
-
-	var playerEntity = g.players[player.Name]
+	playerEntity := g.players[player.Name]
 	if playerEntity == nil {
 		log.Error().Msg("Player entity was nil")
+		g.playersMu.Unlock()
 		return
 	}
 
 	g.world.RemoveEntity(playerEntity.ID)
-
-	log.Trace().Msgf("Number of players: %d", len(g.players))
 	delete(g.players, player.Name)
-	log.Trace().Msgf("Number of players: %d", len(g.players))
-
 	g.playersMu.Unlock()
+
 	c.CloseConnection()
 
 	g.Broadcast(fmt.Sprintf("%s has left the game.", player.Name), c)
 }
 
+// getPlayer retrieves the Player component associated with a client.
 func (g *Game) getPlayer(c common.Client) (*components.Player, error) {
 	g.playersMu.Lock()
 	defer g.playersMu.Unlock()
@@ -109,220 +250,30 @@ func (g *Game) getPlayer(c common.Client) (*components.Player, error) {
 	return nil, fmt.Errorf("player not found")
 }
 
-func (g *Game) handleCommand(c ClientCommand) {
-	command := c.Command
-	client := c.Client
-
-	player, err := g.getPlayer(client)
-	if err != nil {
-		log.Warn().Msg(fmt.Sprintf("Error getting player component: %s", err))
-		return
-	}
-
-	switch c.Command.Cmd {
-	case "exit":
-		g.handleExit(player, command)
-	case "k", "kill":
-		g.handleKill(player, command)
-	case "look":
-		player.Look()
-	case "n", "s", "e", "w", "u", "d", "north", "south", "east", "west", "up", "down":
-		g.handleMove(player, command)
-	case "name":
-		g.handleRename(player, command)
-	case "say":
-		g.handleSay(player, command)
-	case "scan":
-		g.handleScan(player, command)
-	case "shout":
-		g.handleShout(player, strings.Join(command.Args, " "))
-	case "who":
-		g.handleWho(player, command)
-	default:
-		player.Broadcast(fmt.Sprintf("What do you mean, \"%s\"?", command.Cmd))
-	}
-}
-
-func (g *Game) handleExit(player *components.Player, command Command) {
-	player.RWMutex.RLock()
-	defer player.RWMutex.RUnlock()
-
-	g.HandleDisconnect(player.Client)
-}
-
-func (g *Game) handleLook(player *components.Player, command Command) {
-	player.RWMutex.RLock()
-	defer player.RWMutex.RUnlock()
-
-	player.Look()
-}
-
-func (g *Game) handleMove(player *components.Player, command Command) {
-	dirMapping := map[string]string{
-		"n": "north",
-		"s": "south",
-		"e": "east",
-		"w": "west",
-		"u": "up",
-		"d": "down",
-	}
-
-	fullDir := command.Cmd
-	if shortDir, ok := dirMapping[command.Cmd]; ok {
-		fullDir = shortDir
-	}
-
-	player.RWMutex.RLock()
-	playerEntity := g.players[player.Name]
-	player.RWMutex.RUnlock()
-
-	if playerEntity == nil {
-		log.Warn().Msg(fmt.Sprintf("Error getting player's own entity for %s", player.Name))
-		return
-	}
-
-	movement := components.Movement{
-		Direction: fullDir,
-		Status:    components.Walking,
-	}
-	g.world.AddComponent(playerEntity, &movement)
-}
-
-func (g *Game) handleRename(player *components.Player, command Command) {
-	player.Lock()
-	defer player.Unlock()
-
-	if (len(command.Args) == 0) || (len(command.Args) > 1) {
-		player.Broadcast(player.Name)
-		return
-	}
-
-	newName := command.Args[0]
-	oldName := player.Name
-
-	player.Name = newName
-	g.players[newName] = g.players[oldName]
-	delete(g.players, oldName)
-
-	g.Broadcast(fmt.Sprintf("%s has changed their name to %s", oldName, player.Name))
-}
-
-func (g *Game) handleSay(player *components.Player, command Command) {
-	player.RWMutex.RLock()
-	defer player.RWMutex.RUnlock()
-
-	msg := strings.Join(command.Args, " ")
-	if msg == "" {
-		player.Broadcast("Say what?")
-		return
-	}
-
-	player.Room.Broadcast(fmt.Sprintf("%s says: %s", player.Name, msg))
-}
-
-func (g *Game) handleScan(player *components.Player, command Command) {
-	player.RWMutex.RLock()
-	defer player.RWMutex.RUnlock()
-
-	exits := []string{}
-	for _, exit := range player.Room.Exits {
-		exits = append(exits, exit.Direction)
-	}
-
-	player.Broadcast("Exits: " + strings.Join(exits, ", "))
-}
-
-func (g *Game) handleShout(player *components.Player, msg string, depths ...int) {
-	player.RWMutex.RLock()
-	defer player.RWMutex.RUnlock()
-
-	if player.Room == nil {
-		player.Broadcast("You shout but there is no sound")
-		return
-	}
-	log.Info().Msgf("Shout: %s", msg)
-
-	depth := 10
-	if len(depths) > 0 {
-		depth = depths[0]
-	}
-
-	visited := make(map[*components.Room]bool)
-	queue := []*components.Room{player.Room}
-
-	for depth > 0 && len(queue) > 0 {
-		depth--
-		nextQueue := []*components.Room{}
-
-		for _, room := range queue {
-			visited[room] = true
-			for _, exit := range room.Exits {
-				if !visited[exit.Room] {
-					visited[exit.Room] = true
-					nextQueue = append(nextQueue, exit.Room)
-				}
-			}
-		}
-		queue = nextQueue
-	}
-
-	for room := range visited {
-		room.Broadcast(player.Name+" shouts: "+msg, player)
-	}
-}
-
-func (g *Game) handleWho(player *components.Player, command Command) {
-	g.playersMu.Lock()
-	defer g.playersMu.Unlock()
-
-	tw := table.NewWriter()
-	tw.SetStyle(table.StyleLight)
-	tw.AppendHeader(table.Row{"Player", "Race", "Class", "Online Since"})
+// Broadcast sends a message to all players, excluding specified clients.
+func (g *Game) Broadcast(m string, excludeClients ...common.Client) {
+	log.Info().Msgf("Broadcasting: %s", m)
 
 	for _, playerEntity := range g.players {
 		playerComponent, err := g.world.GetComponent(playerEntity.ID, "Player")
 		if err != nil {
-			log.Error().Err(err).Msgf("Could not get component for player %s", playerEntity.ID)
+			log.Error().Msgf("Error getting player for entity id %s, %v", playerEntity.ID, err)
 			continue
 		}
+
 		player, ok := playerComponent.(*components.Player)
 		if !ok {
-			log.Error().Msgf("Error type asserting component for player %s", playerEntity.ID)
+			log.Error().Msgf("Unable to cast component to Player %v", playerComponent)
 			continue
 		}
-		tw.AppendRow(table.Row{player.Name, "??", "??", playerEntity.CreatedAt.DiffForHumans()})
-	}
 
-	player.Broadcast(tw.Render())
+		if !util.ContainsClient(excludeClients, player.Client) {
+			player.Broadcast(m)
+		}
+	}
 }
 
-func (g *Game) handleKill(player *components.Player, command Command) {
-	log.Trace().Msgf("Kill: %s", command.Args)
-
-	targetEntity := g.players[strings.Join(command.Args, " ")]
-	if targetEntity == nil {
-		player.Broadcast("Kill who?")
-		return
-	}
-
-	g.playersMu.Lock()
-	playerEntity := g.players[player.Name]
-	g.playersMu.Unlock()
-
-	if playerEntity == nil {
-		log.Warn().Msg(fmt.Sprintf("Error getting player's own entity for %s", player.Name))
-		return
-	}
-
-	attackingPlayer := components.Combat{
-		TargetID:  targetEntity.ID,
-		MinDamage: 10,
-		MaxDamage: 50,
-	}
-
-	g.world.AddComponent(playerEntity, &attackingPlayer)
-}
-
+// loop is the main game loop that processes player connections and updates the world.
 func (g *Game) loop() {
 	updateTicker := time.NewTicker(10 * time.Millisecond)
 	defer updateTicker.Stop()
@@ -339,50 +290,4 @@ func (g *Game) loop() {
 			g.world.Update()
 		}
 	}
-}
-
-func (g *Game) Broadcast(m string, excludeClients ...common.Client) {
-	log.Info().Msgf("Broadcasting: %s", m)
-
-	for _, playerEntity := range g.players {
-		playerComponent, err := g.world.GetComponent(playerEntity.ID, "Player")
-		if err != nil {
-			log.Error().Msgf("error getting player for entity id %s, %v", playerEntity.ID, err)
-			continue
-		}
-
-		player, ok := playerComponent.(*components.Player)
-		if !ok {
-			log.Error().Msgf("unable to cast component to Player %v", playerComponent)
-			continue
-		}
-
-		if !util.ContainsClient(excludeClients, player.Client) {
-			player.Broadcast(m)
-		}
-	}
-}
-
-func NewGame() *Game {
-	combatSystem := &systems.CombatSystem{}
-	movementSystem := &systems.MovementSystem{}
-
-	world := ecs.NewWorld()
-	world.AddSystem(combatSystem)
-	world.AddSystem(movementSystem)
-
-	defaultRoom, _ := world.GetComponent("1", "Room")
-
-	game := Game{
-		defaultRoom:        defaultRoom.(*components.Room),
-		players:            make(map[string]*ecs.Entity),
-		world:              world,
-		AddPlayerChan:      make(chan common.Client),
-		RemovePlayerChan:   make(chan common.Client),
-		ExecuteCommandChan: make(chan ClientCommand),
-	}
-
-	go game.loop()
-
-	return &game
 }

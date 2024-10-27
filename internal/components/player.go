@@ -15,7 +15,7 @@ type Player struct {
 }
 
 func (p *Player) Broadcast(m string) {
-	p.Client.SendMessage(m)
+	p.Client.SendMessage(m + "\n\n")
 }
 
 func (p *Player) Look() {

@@ -66,15 +66,15 @@ func findAttackingEntities(w *ecs.World) ([]ecs.Entity, error) {
 }
 
 func getCombatComponent(w *ecs.World, entityID common.EntityID) (*components.Combat, error) {
-	return util.GetTypedComponent[components.Combat](w, entityID, "Combat")
+	return util.GetTypedComponent[*components.Combat](w, entityID, "Combat")
 }
 
 func getPlayerComponent(w *ecs.World, entityID common.EntityID) (*components.Player, error) {
-	return util.GetTypedComponent[components.Player](w, entityID, "Player")
+	return util.GetTypedComponent[*components.Player](w, entityID, "Player")
 }
 
 func getHealthComponent(w *ecs.World, entityID common.EntityID) (*components.Health, error) {
-	return util.GetTypedComponent[components.Health](w, entityID, "Health")
+	return util.GetTypedComponent[*components.Health](w, entityID, "Health")
 }
 
 func isTargetDead(health *components.Health) bool {

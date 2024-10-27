@@ -52,12 +52,13 @@ func (c *TCPClient) HandleRequest() {
 			args = strings.Split(parts[1], " ")
 		}
 
-		command := game.Command{
-			Cmd:  cmd,
-			Args: args,
-		}
+		c.SendMessage("\n")
 
-		g.ExecuteCommandChan <- game.ClientCommand{Command: command, Client: c}
+		g.ExecuteCommandChan <- game.ClientCommand{
+			Client: c,
+			Cmd:    cmd,
+			Args:   args,
+		}
 	}
 }
 
@@ -66,7 +67,7 @@ func (c *TCPClient) RemoteAddr() string {
 }
 
 func (c *TCPClient) SendMessage(msg string) {
-	_, err := c.conn.Write([]byte("\n" + msg + "\n\n"))
+	_, err := c.conn.Write([]byte(msg))
 	if err != nil {
 		log.Error().Err(err).Msg("Error sending message to TCPClient: %v")
 	}
