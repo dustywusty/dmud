@@ -2342,7 +2342,7 @@ func (w *World) FindEntity(id common.EntityID) (Entity, error) {
 	return entity, nil
 }
 
-func (w *World) FindEntitiesByComponentPredicate(componentType string, predicate func(interface{}) bool) ([]Entity, error) {
+func (w *World) FindEntitiesByComponentPredicate(componentType string, predicate func(interface{}) bool) ([]util.EntityLike, error) {
 	w.componentMutex.RLock()
 	defer w.componentMutex.RUnlock()
 

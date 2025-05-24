@@ -47,10 +47,14 @@ type Game struct {
 func NewGame() *Game {
 	combatSystem := &systems.CombatSystem{}
 	movementSystem := &systems.MovementSystem{}
+	spawnSystem := systems.NewSpawnSystem()
+	aiSystem := systems.NewAISystem()
 
 	world := ecs.NewWorld()
 	world.AddSystem(combatSystem)
 	world.AddSystem(movementSystem)
+	world.AddSystem(spawnSystem)
+	world.AddSystem(aiSystem)
 
 	defaultRoomUntyped, err := world.GetComponent("1", "Room")
 	if err != nil {
@@ -72,10 +76,74 @@ func NewGame() *Game {
 	}
 
 	game.initCommands()
+	game.initializeSpawns()
 
 	go game.loop()
 
 	return game
+}
+
+func (g *Game) initializeSpawns() {
+    // Add spawns to specific rooms
+    spawns := map[string][]components.SpawnConfig{
+        "1": { // Starting room
+            {
+                Type:        components.SpawnTypeNPC,
+                TemplateID:  "rat",
+                MinCount:    1,
+                MaxCount:    3,
+                RespawnTime: 30 * time.Second,
+                Chance:      0.8,
+            },
+        },
+        "2": { // Another room
+            {
+                Type:        components.SpawnTypeNPC,
+                TemplateID:  "goblin",
+                MinCount:    1,
+                MaxCount:    2,
+                RespawnTime: 60 * time.Second,
+                Chance:      0.6,
+            },
+            {
+                Type:        components.SpawnTypeNPC,
+                TemplateID:  "rat",
+                MinCount:    2,
+                MaxCount:    4,
+                RespawnTime: 30 * time.Second,
+                Chance:      0.9,
+            },
+        },
+        "3": { // Town square
+            {
+                Type:        components.SpawnTypeNPC,
+                TemplateID:  "guard",
+                MinCount:    2,
+                MaxCount:    2,
+                RespawnTime: 120 * time.Second,
+                Chance:      1.0,
+            },
+            {
+                Type:        components.SpawnTypeNPC,
+                TemplateID:  "merchant",
+                MinCount:    1,
+                MaxCount:    1,
+                RespawnTime: 180 * time.Second,
+                Chance:      1.0,
+            },
+        },
+    }
+
+    for roomID, configs := range spawns {
+        spawn := components.NewSpawn(common.EntityID(roomID))
+        spawn.Configs = configs
+
+        entity, err := g.world.FindEntity(common.EntityID(roomID))
+        if err == nil {
+            g.world.AddComponent(&entity, spawn)
+            log.Info().Msgf("Added spawn component to room %s with %d configs", roomID, len(configs))
+        }
+    }
 }
 
 func (g *Game) initCommands() {
@@ -115,7 +183,12 @@ func (g *Game) initCommands() {
 		Handler:     handleKill,
 		Description: "Attack another player or NPC.",
 	})
-
+	g.RegisterCommand(&Command{
+    Name:        "examine",
+    Aliases:     []string{"ex", "exa"},
+    Handler:     handleExamine,
+    Description: "Examine something or someone in detail.",
+	})
 	directions := map[string]string{
 		"north": "n",
 		"south": "s",

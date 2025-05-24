@@ -12,6 +12,7 @@ import (
 	"unicode"
 
 	"dmud/internal/common"
+	"dmud/internal/ecs"
 
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
@@ -25,22 +26,20 @@ func init() {
 
 type EntityID string
 
-type WorldLike interface {
-	GetComponent(entityID common.EntityID, componentName string) (interface{}, error)
-}
+func GetTypedComponent[T any](w *ecs.World, entityID common.EntityID, componentType string) (T, error) {
+    var zero T
 
-func GetTypedComponent[T any](w WorldLike, entityID common.EntityID, componentName string) (T, error) {
-	componentUntyped, err := w.GetComponent(entityID, componentName)
-	if err != nil {
-		var zero T
-		return zero, err
-	}
-	typedComponent, ok := componentUntyped.(T)
-	if !ok {
-		var zero T
-		return zero, fmt.Errorf("failed to cast component %s to the expected type. Actual type: %T", componentName, componentUntyped)
-	}
-	return typedComponent, nil
+    component, err := w.GetComponent(entityID, componentType)
+    if err != nil {
+        return zero, err
+    }
+
+    typed, ok := component.(T)
+    if !ok {
+        return zero, fmt.Errorf("component %s is not of expected type", componentType)
+    }
+
+    return typed, nil
 }
 
 func CalculateDeltaTime() float64 {

@@ -1,6 +1,7 @@
 package components
 
 import (
+	"dmud/internal/util"
 	"sync"
 
 	"github.com/rs/zerolog/log"
@@ -43,6 +44,32 @@ func (r *Room) GetExit(direction string) *Exit {
 		}
 	}
 	return nil
+}
+
+func (r *Room) GetNPCs(w util.WorldLike) []*NPC {
+    r.RLock()
+    defer r.RUnlock()
+
+    var npcs []*NPC
+
+    // Find all NPCs in this room
+    entities, err := w.FindEntitiesByComponentPredicate("NPC", func(i interface{}) bool {
+        npc, ok := i.(*NPC)
+        return ok && npc.Room == r
+    })
+
+    if err != nil {
+        return npcs
+    }
+
+    for _, entity := range entities {
+        npcComponent, err := util.GetTypedComponent[*NPC](w, entity.ID, "NPC")
+        if err == nil {
+            npcs = append(npcs, npcComponent)
+        }
+    }
+
+    return npcs
 }
 
 func (r *Room) GetPlayer(name string) *Player {
