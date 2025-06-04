@@ -25,34 +25,34 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 		combat, err := getCombatComponent(w, attackingEntity.ID)
 		if err != nil {
 			log.Error().Msgf("Error getting attacker combat component: %v", err)
-			return
+			continue
 		}
 
 		if combat.TargetID == "" {
-			return
+			continue
 		}
 
 		attackingPlayer, err := getPlayerComponent(w, attackingEntity.ID)
 		if err != nil {
 			log.Error().Msgf("Error getting attacker player component: %v", err)
-			return
+			continue
 		}
 
 		targetPlayer, err := getPlayerComponent(w, combat.TargetID)
 		if err != nil {
 			log.Error().Msgf("Error getting target player component: %v", err)
-			return
+			continue
 		}
 
 		targetHealth, err := getHealthComponent(w, combat.TargetID)
 		if err != nil {
 			log.Error().Msgf("Error getting target health component: %v", err)
-			return
+			continue
 		}
 
 		if isTargetDead(targetHealth) {
 			handleTargetDeath(w, attackingEntity.ID, combat.TargetID, attackingPlayer, targetPlayer)
-			return
+			continue
 		}
 
 		attackPlayer(attackingPlayer, targetPlayer, combat, targetHealth)
