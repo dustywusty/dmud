@@ -71,9 +71,9 @@ func NewGame() *Game {
 		defaultRoom:        defaultRoom,
 		players:            make(map[string]*ecs.Entity),
 		world:              world,
-		AddPlayerChan:      make(chan common.Client),
-		RemovePlayerChan:   make(chan common.Client),
-		ExecuteCommandChan: make(chan ClientCommand),
+		AddPlayerChan:      make(chan common.Client, 64),
+		RemovePlayerChan:   make(chan common.Client, 64),
+		ExecuteCommandChan: make(chan ClientCommand, 256),
 	}
 
 	game.initCommands()

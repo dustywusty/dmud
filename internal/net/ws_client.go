@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"dmud/internal/common"
 	"dmud/internal/game"
@@ -87,15 +88,56 @@ func (c *WSClient) CloseConnection() error {
 	return nil
 }
 
+const (
+	writeWait  = 5 * time.Second
+	pongWait   = 60 * time.Second
+	pingPeriod = (pongWait * 9) / 10
+)
+
 func (c *WSClient) HandleRequest() {
 	g := c.game
 	slurRegexes := compileSlurRegexes()
 
+	// Read safety: limit + deadlines + pong handler
+	c.conn.SetReadLimit(64 << 10) // 64KB
+	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.conn.SetPongHandler(func(string) error {
+		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	})
+
+	// Heartbeat pings to detect half-open connections; stops when we return.
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
+		t := time.NewTicker(pingPeriod)
+		defer t.Stop()
+		for {
+			select {
+			case <-t.C:
+				c.writeMu.Lock()
+				_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+				if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					c.writeMu.Unlock()
+					return // reader will see the close soon; exit pinger
+				}
+				c.writeMu.Unlock()
+			case <-done:
+				return
+			}
+		}
+	}()
+
+	// Main read loop
 	for {
 		messageType, p, err := c.readMessage()
 		if err != nil {
 			handleReadError(err, c)
 			return
+		}
+
+		if messageType != websocket.TextMessage {
+			log.Warn().Msgf("Ignoring non-text message (%d) from %s", messageType, c.RemoteAddr())
+			continue
 		}
 
 		if containsSlur(slurRegexes, p) {
@@ -104,11 +146,7 @@ func (c *WSClient) HandleRequest() {
 			return
 		}
 
-		if messageType == websocket.TextMessage {
-			processTextMessage(p, c)
-		} else {
-			log.Warn().Msgf("Unknown message type %d from %s", messageType, c.RemoteAddr())
-		}
+		processTextMessage(p, c)
 	}
 }
 
@@ -126,6 +164,7 @@ func (c *WSClient) SendMessage(msg string) {
 	}
 
 	c.writeMu.Lock()
+	_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 	err := c.conn.WriteMessage(websocket.TextMessage, []byte(s))
 	c.writeMu.Unlock()
 
@@ -195,13 +234,5 @@ func processTextMessage(p []byte, c *WSClient) {
 
 func (c *WSClient) readMessage() (messageType int, p []byte, err error) {
 	messageType, p, err = c.conn.ReadMessage()
-	if err != nil {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		if c.status == common.Disconnected {
-			return
-		}
-		log.Error().Err(err).Msgf("Error reading message from %s", c.RemoteAddr())
-	}
 	return
 }

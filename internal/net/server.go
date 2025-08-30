@@ -166,6 +166,13 @@ func (s *Server) runWebSocketServer() {
 			s.connections[remoteAddr] = client
 			s.connectionMu.Unlock()
 
+			// On HTTP handler exit (which happens when the TCP conn dies), drop it
+			defer func() {
+				s.connectionMu.Lock()
+				delete(s.connections, remoteAddr)
+				s.connectionMu.Unlock()
+			}()
+
 			s.game.AddPlayerChan <- client
 		})
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
