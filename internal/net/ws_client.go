@@ -24,8 +24,8 @@ var upgrader = websocket.Upgrader{
 			return false
 		}
 
-		if strings.ToLower(parsedOrigin.Hostname()) != "localhost" {
-			log.Info().Msgf("Origin %s is not localhost", parsedOrigin.Hostname())
+		if strings.ToLower(parsedOrigin.Hostname()) != "dustywusty.github.io" {
+			log.Info().Msgf("Origin %s is not dustywusty.github.io", parsedOrigin.Hostname())
 			return false
 		}
 
