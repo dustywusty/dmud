@@ -52,8 +52,6 @@ func (c *TCPClient) HandleRequest() {
 			args = strings.Split(parts[1], " ")
 		}
 
-		c.SendMessage("\n")
-
 		g.ExecuteCommandChan <- game.ClientCommand{
 			Client: c,
 			Cmd:    cmd,

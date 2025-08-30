@@ -1,7 +1,6 @@
 package components
 
 import (
-	"dmud/internal/util"
 	"sync"
 
 	"github.com/rs/zerolog/log"
@@ -14,8 +13,6 @@ type Exit struct {
 }
 
 type Room struct {
-	sync.RWMutex
-
 	X int
 	Y int
 	Z int
@@ -30,7 +27,7 @@ type Room struct {
 func (r *Room) AddPlayer(p *Player) {
 	log.Info().Msgf("Player added to room: %s", p.Name)
 
-	r.Broadcast(p.Name + " enters")
+	r.Broadcast("\n" + p.Name + " enters")
 
 	r.PlayersMutex.Lock()
 	r.Players = append(r.Players, p)
@@ -46,41 +43,40 @@ func (r *Room) GetExit(direction string) *Exit {
 	return nil
 }
 
-func (r *Room) GetNPCs(w util.WorldLike) []*NPC {
-    r.RLock()
-    defer r.RUnlock()
+func (r *Room) GetNPCs(w WorldLike) []*NPC {
+	var npcs []*NPC
 
-    var npcs []*NPC
+	// Find all NPCs in this room
+	entities, err := w.FindEntitiesByComponentPredicate("NPC", func(i interface{}) bool {
+		npc, ok := i.(*NPC)
+		return ok && npc.Room == r
+	})
 
-    // Find all NPCs in this room
-    entities, err := w.FindEntitiesByComponentPredicate("NPC", func(i interface{}) bool {
-        npc, ok := i.(*NPC)
-        return ok && npc.Room == r
-    })
+	if err != nil {
+		return npcs
+	}
 
-    if err != nil {
-        return npcs
-    }
+	for _, entity := range entities {
+		npcComponent, err := w.GetComponent(entity.GetID(), "NPC")
+		if err == nil {
+			if npc, ok := npcComponent.(*NPC); ok {
+				npcs = append(npcs, npc)
+			}
+		}
+	}
 
-    for _, entity := range entities {
-        npcComponent, err := util.GetTypedComponent[*NPC](w, entity.ID, "NPC")
-        if err == nil {
-            npcs = append(npcs, npcComponent)
-        }
-    }
-
-    return npcs
+	return npcs
 }
 
 func (r *Room) GetPlayer(name string) *Player {
-	r.PlayersMutex.Lock()
+	r.PlayersMutex.RLock()
+	defer r.PlayersMutex.RUnlock()
+	
 	for _, player := range r.Players {
 		if player.Name == name {
-			r.PlayersMutex.Unlock()
 			return player
 		}
 	}
-	r.PlayersMutex.Unlock()
 	return nil
 }
 
@@ -101,14 +97,19 @@ func (r *Room) Broadcast(msg string, exclude ...*Player) {
 
 func (r *Room) RemovePlayer(p *Player) {
 	r.PlayersMutex.Lock()
+	removed := false
 	for i, player := range r.Players {
 		if player == p {
 			r.Players = append(r.Players[:i], r.Players[i+1:]...)
+			removed = true
 			break
 		}
 	}
 	r.PlayersMutex.Unlock()
-	r.Broadcast(p.Name + " leaves")
+	
+	if removed {
+		r.Broadcast("\n" + p.Name + " leaves")
+	}
 }
 
 // ..

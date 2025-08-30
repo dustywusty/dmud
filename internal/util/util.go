@@ -12,7 +12,6 @@ import (
 	"unicode"
 
 	"dmud/internal/common"
-	"dmud/internal/ecs"
 
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
@@ -25,22 +24,6 @@ func init() {
 }
 
 type EntityID string
-
-func GetTypedComponent[T any](w *ecs.World, entityID common.EntityID, componentType string) (T, error) {
-    var zero T
-
-    component, err := w.GetComponent(entityID, componentType)
-    if err != nil {
-        return zero, err
-    }
-
-    typed, ok := component.(T)
-    if !ok {
-        return zero, fmt.Errorf("component %s is not of expected type", componentType)
-    }
-
-    return typed, nil
-}
 
 func CalculateDeltaTime() float64 {
 	if lastTime.IsZero() {

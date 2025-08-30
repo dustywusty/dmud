@@ -15,6 +15,10 @@ type Entity struct {
 	UpdatedAt  carbon.Carbon
 }
 
+func (e Entity) GetID() common.EntityID {
+	return e.ID
+}
+
 func NewEntity(ids ...string) Entity {
 	var id string
 

@@ -2,7 +2,7 @@ package game
 
 import (
 	"dmud/internal/components"
-	"dmud/internal/util"
+	"dmud/internal/ecs"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -20,53 +20,54 @@ func handleKill(player *components.Player, args []string, game *Game) {
 
 // HandleKill processes the kill action for a player.
 func (g *Game) HandleKill(player *components.Player, targetName string) {
-    log.Trace().Msgf("Kill: %s", targetName)
+	log.Trace().Msgf("Kill: %s", targetName)
 
-    // First check for players
-    g.playersMu.Lock()
-    targetEntity := g.players[targetName]
-    playerEntity := g.players[player.Name]
-    g.playersMu.Unlock()
+	// First check for players
+	g.playersMu.Lock()
+	defer g.playersMu.Unlock()
+	
+	targetEntity := g.players[targetName]
+	playerEntity := g.players[player.Name]
 
-    if targetEntity == nil {
-        // Check for NPCs
-        npcs := player.Room.GetNPCs(g.world)
-        for _, npc := range npcs {
-            if strings.Contains(strings.ToLower(npc.Name), strings.ToLower(targetName)) {
-                // Find NPC entity
-                npcEntities, _ := g.world.FindEntitiesByComponentPredicate("NPC", func(i interface{}) bool {
-                    n, ok := i.(*components.NPC)
-                    return ok && n == npc
-                })
+	if targetEntity == nil {
+		// Check for NPCs
+		npcs := player.Room.GetNPCs(g.world.AsWorldLike())
+		for _, npc := range npcs {
+			if strings.Contains(strings.ToLower(npc.Name), strings.ToLower(targetName)) {
+				// Find NPC entity
+				npcEntities, _ := g.world.FindEntitiesByComponentPredicate("NPC", func(i interface{}) bool {
+					n, ok := i.(*components.NPC)
+					return ok && n == npc
+				})
 
-                if len(npcEntities) > 0 {
-                    targetEntity = &npcEntities[0]
-                    break
-                }
-            }
-        }
+				if len(npcEntities) > 0 {
+					targetEntity = &npcEntities[0]
+					break
+				}
+			}
+		}
 
-        if targetEntity == nil {
-            player.Broadcast("They aren't here.")
-            return
-        }
-    }
+		if targetEntity == nil {
+			player.Broadcast("They aren't here.")
+			return
+		}
+	}
 
-    if playerEntity == nil {
-        log.Warn().Msgf("Error getting player's own entity for %s", player.Name)
-        return
-    }
+	if playerEntity == nil {
+		log.Warn().Msgf("Error getting player's own entity for %s", player.Name)
+		return
+	}
 
-    combatComponent := &components.Combat{
-        TargetID:  targetEntity.ID,
-        MinDamage: 10,
-        MaxDamage: 50,
-    }
+	combatComponent := &components.Combat{
+		TargetID:  targetEntity.ID,
+		MinDamage: 10,
+		MaxDamage: 50,
+	}
 
-    g.world.AddComponent(playerEntity, combatComponent)
+	g.world.AddComponent(playerEntity, combatComponent)
 
-    // Announce combat
-    if npc, err := util.GetTypedComponent[*components.NPC](g.world, targetEntity.ID, "NPC"); err == nil {
-        player.Room.Broadcast(player.Name + " attacks " + npc.Name + "!")
-    }
+	// Announce combat
+	if npc, err := ecs.GetTypedComponent[*components.NPC](g.world, targetEntity.ID, "NPC"); err == nil {
+		player.Room.Broadcast(player.Name + " attacks " + npc.Name + "!")
+	}
 }

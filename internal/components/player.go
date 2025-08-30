@@ -2,6 +2,7 @@ package components
 
 import (
 	"dmud/internal/common"
+	"dmud/internal/util"
 	"strings"
 	"sync"
 )
@@ -13,6 +14,10 @@ type Player struct {
 
 	Name string
 	Room *Room
+
+	// Command history and auto-complete
+	CommandHistory *CommandHistory
+	AutoComplete   *util.AutoComplete
 }
 
 func (p *Player) Broadcast(m string) {
@@ -20,7 +25,7 @@ func (p *Player) Broadcast(m string) {
 }
 
 // Update the Player Look method
-func (p *Player) Look(w ecs.WorldLike) {
+func (p *Player) Look(w WorldLike) {
     if p.Room == nil {
         p.Broadcast("You are nowhere.")
         return

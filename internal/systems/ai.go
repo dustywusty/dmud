@@ -4,7 +4,6 @@ package systems
 import (
 	"dmud/internal/components"
 	"dmud/internal/ecs"
-	"dmud/internal/util"
 	"math/rand"
 	"time"
 )
@@ -40,12 +39,12 @@ func (as *AISystem) Update(w *ecs.World, deltaTime float64) {
 }
 
 func (as *AISystem) processNPCBehavior(w *ecs.World, npcEntity ecs.Entity) {
-    npc, err := util.GetTypedComponent[*components.NPC](w, npcEntity.ID, "NPC")
+    npc, err := ecs.GetTypedComponent[*components.NPC](w, npcEntity.ID, "NPC")
     if err != nil {
         return
     }
 
-    health, err := util.GetTypedComponent[*components.Health](w, npcEntity.ID, "Health")
+    health, err := ecs.GetTypedComponent[*components.Health](w, npcEntity.ID, "Health")
     if err != nil {
         return
     }
@@ -69,7 +68,7 @@ func (as *AISystem) processNPCBehavior(w *ecs.World, npcEntity ecs.Entity) {
 }
 
 func (as *AISystem) processAggressiveNPC(w *ecs.World, npcEntity ecs.Entity, npc *components.NPC) {
-    combat, _ := util.GetTypedComponent[*components.Combat](w, npcEntity.ID, "Combat")
+    combat, _ := ecs.GetTypedComponent[*components.Combat](w, npcEntity.ID, "Combat")
 
     // If not in combat, look for targets
     if combat == nil || combat.TargetID == "" {
@@ -99,7 +98,7 @@ func (as *AISystem) processAggressiveNPC(w *ecs.World, npcEntity ecs.Entity, npc
                     }
                     w.AddComponent(&npcEntity, newCombat)
 
-                    room.Broadcast(npc.Name + " attacks " + target.Name + "!")
+                    room.Broadcast("\n" + npc.Name + " attacks " + target.Name + "!")
                 }
             } else {
                 room.PlayersMutex.RUnlock()
@@ -113,10 +112,10 @@ func (as *AISystem) processFriendlyNPC(w *ecs.World, npcEntity ecs.Entity, npc *
     if time.Since(npc.LastAction) > 30*time.Second && rand.Float64() < 0.3 {
         dialogue := npc.GetRandomDialogue()
         if dialogue != "" && npc.Room != nil {
-            npc.Room.Broadcast(npc.Name + " says: " + dialogue)
+            npc.Room.Broadcast("\n" + npc.Name + " says: " + dialogue)
             npc.Lock()
+            defer npc.Unlock()
             npc.LastAction = time.Now()
-            npc.Unlock()
         }
     }
 }
@@ -132,10 +131,10 @@ func (as *AISystem) processPassiveNPC(w *ecs.World, npcEntity ecs.Entity, npc *c
     if time.Since(npc.LastAction) > 45*time.Second && rand.Float64() < 0.2 {
         dialogue := npc.GetRandomDialogue()
         if dialogue != "" && npc.Room != nil {
-            npc.Room.Broadcast(npc.Name + " " + dialogue)
+            npc.Room.Broadcast("\n" + npc.Name + " " + dialogue)
             npc.Lock()
+            defer npc.Unlock()
             npc.LastAction = time.Now()
-            npc.Unlock()
         }
     }
 }

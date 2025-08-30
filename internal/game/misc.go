@@ -10,7 +10,7 @@ import (
 )
 
 func handleLook(player *components.Player, args []string, game *Game) {
-	player.Look()
+	player.Look(game.world.AsWorldLike())
 }
 
 func handleWho(player *components.Player, args []string, game *Game) {
@@ -80,57 +80,64 @@ func (g *Game) HandleRename(player *components.Player, newName string) {
 	g.Broadcast(fmt.Sprintf("%s has changed their name to %s", oldName, player.Name))
 }
 
-
 // internal/game/misc.go - Add examine command
 
 func handleExamine(player *components.Player, args []string, game *Game) {
-    if len(args) == 0 {
-        player.Broadcast("Examine what?")
-        return
-    }
+	if len(args) == 0 {
+		player.Broadcast("Examine what?")
+		return
+	}
 
-    target := strings.Join(args, " ")
+	target := strings.Join(args, " ")
 
-    // Check for NPCs in the room
-    npcs := player.Room.GetNPCs(game.world)
-    for _, npc := range npcs {
-        if strings.Contains(strings.ToLower(npc.Name), strings.ToLower(target)) {
-            player.Broadcast(npc.Description)
+	// Check for NPCs in the room
+	npcs := player.Room.GetNPCs(game.world.AsWorldLike())
+	for _, npc := range npcs {
+		if strings.Contains(strings.ToLower(npc.Name), strings.ToLower(target)) {
+			player.Broadcast(npc.Description)
 
-            // Show health status
-            health, err := game.world.GetComponent(npc.EntityID, "Health")
-            if err == nil {
-                h := health.(*components.Health)
-                healthPercent := float64(h.Current) / float64(h.Max) * 100
+			// Show health status
+			npcEntities, _ := game.world.FindEntitiesByComponentPredicate("NPC", func(i interface{}) bool {
+				n, ok := i.(*components.NPC)
+				return ok && n == npc
+			})
 
-                var status string
-                switch {
-                case healthPercent >= 90:
-                    status = "is in excellent condition"
-                case healthPercent >= 70:
-                    status = "has a few scratches"
-                case healthPercent >= 50:
-                    status = "is wounded"
-                case healthPercent >= 30:
-                    status = "is badly wounded"
-                case healthPercent >= 10:
-                    status = "is near death"
-                default:
-                    status = "is dying"
-                }
+			if len(npcEntities) > 0 {
+				health, err := game.world.GetComponent(npcEntities[0].ID, "Health")
+				if err == nil {
+					h := health.(*components.Health)
+					healthPercent := float64(h.Current) / float64(h.Max) * 100
 
-                player.Broadcast(npc.Name + " " + status + ".")
-            }
-            return
-        }
-    }
+					var status string
+					switch {
+					case healthPercent >= 90:
+						status = "is in excellent condition"
+					case healthPercent >= 70:
+						status = "has a few scratches"
+					case healthPercent >= 50:
+						status = "is wounded"
+					case healthPercent >= 30:
+						status = "is badly wounded"
+					case healthPercent >= 10:
+						status = "is near death"
+					default:
+						status = "is dying"
+					}
 
-    // Check for players
-    targetPlayer := player.Room.GetPlayer(target)
-    if targetPlayer != nil {
-        player.Broadcast("You see " + targetPlayer.Name + ", a fellow adventurer.")
-        return
-    }
+					player.Broadcast(npc.Name + " " + status + ".")
+				}
+			}
 
-    player.Broadcast("You don't see that here.")
+			return
+		}
+	}
+
+	// Check for players
+	targetPlayer := player.Room.GetPlayer(target)
+	if targetPlayer != nil {
+		player.Broadcast("You see " + targetPlayer.Name + ", a fellow adventurer.")
+		return
+	}
+
+	player.Broadcast("You don't see that here.")
 }
