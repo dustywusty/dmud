@@ -34,8 +34,7 @@ func main() {
 
 	}
 	server := net.NewServer(&net.ServerConfig{
-		TCPHost: "", TCPPort: "", // Cloud Run can't expose raw TCP
-		WSHost: "0.0.0.0", WSPort: port, // single HTTP port
+		WSHost: "0.0.0.0", WSPort: port,
 	})
 
 	go server.Run()
