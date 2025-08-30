@@ -89,36 +89,35 @@ func (c *WSClient) CloseConnection() error {
 }
 
 const (
-	writeWait  = 5 * time.Second
 	pongWait   = 60 * time.Second
-	pingPeriod = (pongWait * 9) / 10
+	pingPeriod = 30 * time.Second // must be < pongWait
+	writeWait  = 10 * time.Second
 )
 
 func (c *WSClient) HandleRequest() {
 	g := c.game
 	slurRegexes := compileSlurRegexes()
 
-	// Read safety: limit + deadlines + pong handler
-	c.conn.SetReadLimit(64 << 10) // 64KB
+	// --- keep the read side alive & detect dead peers
 	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
 		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	})
 
-	// Heartbeat pings to detect half-open connections; stops when we return.
+	// --- ping loop (stops when read loop returns)
 	done := make(chan struct{})
-	defer close(done)
 	go func() {
-		t := time.NewTicker(pingPeriod)
-		defer t.Stop()
+		ticker := time.NewTicker(pingPeriod)
+		defer ticker.Stop()
 		for {
 			select {
-			case <-t.C:
+			case <-ticker.C:
 				c.writeMu.Lock()
 				_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 				if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 					c.writeMu.Unlock()
-					return // reader will see the close soon; exit pinger
+					// triggers removal on read side shortly
+					return
 				}
 				c.writeMu.Unlock()
 			case <-done:
@@ -127,26 +126,31 @@ func (c *WSClient) HandleRequest() {
 		}
 	}()
 
-	// Main read loop
 	for {
 		messageType, p, err := c.readMessage()
 		if err != nil {
+			close(done)
 			handleReadError(err, c)
 			return
 		}
 
-		if messageType != websocket.TextMessage {
-			log.Warn().Msgf("Ignoring non-text message (%d) from %s", messageType, c.RemoteAddr())
+		// drop empty/whitespace-only frames (prevents “blank command” noise)
+		if len(strings.TrimSpace(string(p))) == 0 {
 			continue
 		}
 
 		if containsSlur(slurRegexes, p) {
 			log.Warn().Msgf("Slur detected in message from %s. Message rejected.", c.RemoteAddr())
+			close(done)
 			g.RemovePlayerChan <- c
 			return
 		}
 
-		processTextMessage(p, c)
+		if messageType == websocket.TextMessage {
+			processTextMessage(p, c)
+		} else {
+			log.Warn().Msgf("Unknown message type %d from %s", messageType, c.RemoteAddr())
+		}
 	}
 }
 
