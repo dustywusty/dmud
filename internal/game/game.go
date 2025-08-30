@@ -91,10 +91,10 @@ func (g *Game) initializeSpawns() {
 			{
 				Type:        components.SpawnTypeNPC,
 				TemplateID:  "rat",
-				MinCount:    1,
-				MaxCount:    3,
+				MinCount:    5,
+				MaxCount:    10,
 				RespawnTime: 30 * time.Second,
-				Chance:      0.8,
+				Chance:      1,
 			},
 		},
 		"2": { // Another room
