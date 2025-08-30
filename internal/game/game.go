@@ -337,38 +337,34 @@ func (g *Game) HandleDisconnect(c common.Client) {
 	}
 
 	g.playersMu.Lock()
-	defer g.playersMu.Unlock()
-
 	playerEntity := g.players[player.Name]
 	if playerEntity == nil {
+		g.playersMu.Unlock()
 		log.Error().Msg("Player entity was nil")
 		return
 	}
-
 	g.world.RemoveEntity(playerEntity.ID)
 	delete(g.players, player.Name)
+	g.playersMu.Unlock()
 
 	c.CloseConnection()
-
 	g.Broadcast(fmt.Sprintf("%s has left the game.", player.Name), c)
 }
 
 // getPlayer retrieves the Player component associated with a client.
 func (g *Game) getPlayer(c common.Client) (*components.Player, error) {
-	g.playersMu.Lock()
-	defer g.playersMu.Unlock()
+	g.playersMu.RLock()
+	defer g.playersMu.RUnlock()
 
 	for _, playerEntity := range g.players {
 		playerComponent, err := g.world.GetComponent(playerEntity.ID, "Player")
 		if err != nil {
 			return nil, fmt.Errorf("error getting player component for entity id %s, %v", playerEntity.ID, err)
 		}
-
 		player, ok := playerComponent.(*components.Player)
 		if !ok {
 			return nil, fmt.Errorf("unable to cast component to Player")
 		}
-
 		if player.Client == c {
 			return player, nil
 		}
