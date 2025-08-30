@@ -55,29 +55,32 @@ func handleName(player *components.Player, args []string, game *Game) {
 }
 
 func (g *Game) HandleRename(player *components.Player, newName string) {
-	player.Lock()
-	defer player.Unlock()
-
+	newName = strings.TrimSpace(newName)
 	if newName == "" {
-		player.Broadcast(player.Name)
+		player.Broadcast("Usage: name <new_name>")
 		return
 	}
 
+	player.Lock()
 	oldName := player.Name
+	player.Unlock()
 
 	g.playersMu.Lock()
-	defer g.playersMu.Unlock()
-
 	if _, exists := g.players[newName]; exists {
+		g.playersMu.Unlock()
 		player.Broadcast(fmt.Sprintf("The name %s is already taken.", newName))
 		return
 	}
-
-	player.Name = newName
-	g.players[newName] = g.players[oldName]
+	ent := g.players[oldName]
 	delete(g.players, oldName)
+	g.players[newName] = ent
+	g.playersMu.Unlock()
 
-	g.Broadcast(fmt.Sprintf("%s has changed their name to %s", oldName, player.Name))
+	player.Lock()
+	player.Name = newName
+	player.Unlock()
+
+	g.Broadcast(fmt.Sprintf("%s has changed their name to %s", oldName, newName))
 }
 
 // internal/game/misc.go - Add examine command
