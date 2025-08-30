@@ -30,7 +30,9 @@ func main() {
 
 	server := net.NewServer(&net.ServerConfig{
 		TCPHost: "localhost",
-		TCPPort: "8888",
+		TCPPort: "8080",
+		WSHost:  "localhost",
+		WSPort:  "8081",
 	})
 
 	go server.Run()
