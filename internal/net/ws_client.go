@@ -17,19 +17,37 @@ import (
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		origin := r.Header.Get("Origin")
-		parsedOrigin, err := url.Parse(origin)
+		o := r.Header.Get("Origin")
+		if o == "" {
+			// Non-browser clients often omit Origin; allow.
+			return true
+		}
+		u, err := url.Parse(o)
 		if err != nil {
-			log.Error().Err(err).Msg("Error parsing Origin header")
+			log.Error().Err(err).Str("origin", o).Msg("bad Origin")
 			return false
 		}
-
-		if strings.ToLower(parsedOrigin.Hostname()) != "dustywusty.github.io" {
-			log.Info().Msgf("Origin %s is not dustywusty.github.io", parsedOrigin.Hostname())
-			return false
+		oh := strings.ToLower(u.Host)
+		rh := strings.ToLower(r.Host) // includes host[:port]
+		// strip port from r.Host for comparison
+		if i := strings.IndexByte(rh, ':'); i >= 0 {
+			rh = rh[:i]
 		}
 
-		return true
+		// Same-origin?
+		if oh == rh {
+			return true
+		}
+		// Cloud Run default domains
+		if strings.HasSuffix(oh, ".run.app") || strings.HasSuffix(oh, ".a.run.app") {
+			return true
+		}
+		// Your GH Pages front-end (keep this)
+		if oh == "dustywusty.github.io" {
+			return true
+		}
+		log.Info().Msgf("Rejected Origin %s for host %s", oh, rh)
+		return false
 	},
 }
 

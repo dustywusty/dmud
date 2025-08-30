@@ -28,9 +28,14 @@ func main() {
 		Logger()
 	log.Logger = logger
 
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+
+	}
 	server := net.NewServer(&net.ServerConfig{
-		WSHost: "0.0.0.0",
-		WSPort: "8080",
+		TCPHost: "", TCPPort: "", // Cloud Run can't expose raw TCP
+		WSHost: "0.0.0.0", WSPort: port, // single HTTP port
 	})
 
 	go server.Run()
