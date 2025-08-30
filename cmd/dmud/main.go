@@ -29,10 +29,8 @@ func main() {
 	log.Logger = logger
 
 	server := net.NewServer(&net.ServerConfig{
-		TCPHost: "localhost",
-		TCPPort: "8080",
-		WSHost:  "localhost",
-		WSPort:  "8081",
+		WSHost: "0.0.0.0",
+		WSPort: "8080",
 	})
 
 	go server.Run()
