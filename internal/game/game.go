@@ -286,8 +286,6 @@ func (g *Game) handleCommand(c ClientCommand) {
 	// Send prompt after command is processed
 	if client.SupportsPrompt() {
 		client.SendMessage("> ")
-	} else {
-		client.SendMessage("") // spacer (WS adds a clean blank line)
 	}
 }
 
