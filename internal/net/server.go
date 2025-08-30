@@ -35,13 +35,16 @@ type Server struct {
 	wsServer *http.Server
 	wsHost   string
 	wsPort   string
+
+	wsMux     *http.ServeMux
+	wsMuxOnce sync.Once
 }
 
 func (s *Server) Run() {
 	var wg sync.WaitGroup
-	started := 0
-
 	s.game = game.NewGame()
+
+	started := 0
 
 	if s.tcpHost != "" && s.tcpPort != "" {
 		wg.Add(1)
@@ -138,49 +141,42 @@ func (s *Server) runTCPListener() {
 func (s *Server) runWebSocketServer() {
 	done := make(chan bool)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	})
-	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		if !websocket.IsWebSocketUpgrade(r) {
-			http.Error(w, "websocket upgrade required", http.StatusUpgradeRequired)
-			return
-		}
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			log.Error().Err(err).Msg("websocket upgrade failed")
-			return
-		}
-		remoteAddr := conn.RemoteAddr().String()
-		log.Info().Msgf("Accepted WebSocket connection from %s", remoteAddr)
-		client := &WSClient{
-			conn:   conn,
-			status: common.Connected,
-			game:   s.game,
-		}
-		s.connectionMu.Lock()
-		s.connections[remoteAddr] = client
-		s.connectionMu.Unlock()
-		s.game.AddPlayerChan <- client
-	})
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("DMUD is up. Connect via WebSocket at wss://" + r.Host + "/ws\n"))
+	s.wsMuxOnce.Do(func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("ok"))
+		})
+		mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+			if !websocket.IsWebSocketUpgrade(r) {
+				http.Error(w, "websocket upgrade required", http.StatusUpgradeRequired)
+				return
+			}
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				log.Error().Err(err).Msg("websocket upgrade failed")
+				return
+			}
+			remoteAddr := conn.RemoteAddr().String()
+			log.Info().Msgf("Accepted WebSocket connection from %s", remoteAddr)
+
+			client := &WSClient{conn: conn, status: common.Connected, game: s.game}
+
+			s.connectionMu.Lock()
+			s.connections[remoteAddr] = client
+			s.connectionMu.Unlock()
+
+			s.game.AddPlayerChan <- client
+		})
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("DMUD up. Connect via wss://" + r.Host + "/ws\n"))
+		})
+		s.wsMux = mux
 	})
 
 	s.wsServer = &http.Server{
 		Addr:    fmt.Sprintf("%s:%s", s.wsHost, s.wsPort),
-		Handler: mux,
-	}
-
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("DMUD is up. Connect via WebSocket at wss://" + r.Host + "/ws\n"))
-	})
-
-	s.wsServer = &http.Server{
-		Addr:    fmt.Sprintf("%s:%s", s.wsHost, s.wsPort),
-		Handler: mux,
+		Handler: s.wsMux, // reuse same mux every time
 	}
 
 	log.Info().Msgf("Listening WebSocket on %s:%s", s.wsHost, s.wsPort)
