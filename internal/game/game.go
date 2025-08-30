@@ -85,66 +85,66 @@ func NewGame() *Game {
 }
 
 func (g *Game) initializeSpawns() {
-    // Add spawns to specific rooms
-    spawns := map[string][]components.SpawnConfig{
-        "1": { // Starting room
-            {
-                Type:        components.SpawnTypeNPC,
-                TemplateID:  "rat",
-                MinCount:    1,
-                MaxCount:    3,
-                RespawnTime: 30 * time.Second,
-                Chance:      0.8,
-            },
-        },
-        "2": { // Another room
-            {
-                Type:        components.SpawnTypeNPC,
-                TemplateID:  "goblin",
-                MinCount:    1,
-                MaxCount:    2,
-                RespawnTime: 60 * time.Second,
-                Chance:      0.6,
-            },
-            {
-                Type:        components.SpawnTypeNPC,
-                TemplateID:  "rat",
-                MinCount:    2,
-                MaxCount:    4,
-                RespawnTime: 30 * time.Second,
-                Chance:      0.9,
-            },
-        },
-        "3": { // Town square
-            {
-                Type:        components.SpawnTypeNPC,
-                TemplateID:  "guard",
-                MinCount:    2,
-                MaxCount:    2,
-                RespawnTime: 120 * time.Second,
-                Chance:      1.0,
-            },
-            {
-                Type:        components.SpawnTypeNPC,
-                TemplateID:  "merchant",
-                MinCount:    1,
-                MaxCount:    1,
-                RespawnTime: 180 * time.Second,
-                Chance:      1.0,
-            },
-        },
-    }
+	// Add spawns to specific rooms
+	spawns := map[string][]components.SpawnConfig{
+		"1": { // Starting room
+			{
+				Type:        components.SpawnTypeNPC,
+				TemplateID:  "rat",
+				MinCount:    1,
+				MaxCount:    3,
+				RespawnTime: 30 * time.Second,
+				Chance:      0.8,
+			},
+		},
+		"2": { // Another room
+			{
+				Type:        components.SpawnTypeNPC,
+				TemplateID:  "goblin",
+				MinCount:    1,
+				MaxCount:    2,
+				RespawnTime: 60 * time.Second,
+				Chance:      0.6,
+			},
+			{
+				Type:        components.SpawnTypeNPC,
+				TemplateID:  "rat",
+				MinCount:    2,
+				MaxCount:    4,
+				RespawnTime: 30 * time.Second,
+				Chance:      0.9,
+			},
+		},
+		"3": { // Town square
+			{
+				Type:        components.SpawnTypeNPC,
+				TemplateID:  "guard",
+				MinCount:    2,
+				MaxCount:    2,
+				RespawnTime: 120 * time.Second,
+				Chance:      1.0,
+			},
+			{
+				Type:        components.SpawnTypeNPC,
+				TemplateID:  "merchant",
+				MinCount:    1,
+				MaxCount:    1,
+				RespawnTime: 180 * time.Second,
+				Chance:      1.0,
+			},
+		},
+	}
 
-    for roomID, configs := range spawns {
-        spawn := components.NewSpawn(common.EntityID(roomID))
-        spawn.Configs = configs
+	for roomID, configs := range spawns {
+		spawn := components.NewSpawn(common.EntityID(roomID))
+		spawn.Configs = configs
 
-        entity, err := g.world.FindEntity(common.EntityID(roomID))
-        if err == nil {
-            g.world.AddComponent(&entity, spawn)
-            log.Info().Msgf("Added spawn component to room %s with %d configs", roomID, len(configs))
-        }
-    }
+		entity, err := g.world.FindEntity(common.EntityID(roomID))
+		if err == nil {
+			g.world.AddComponent(&entity, spawn)
+			log.Info().Msgf("Added spawn component to room %s with %d configs", roomID, len(configs))
+		}
+	}
 }
 
 func (g *Game) initCommands() {
@@ -282,9 +282,13 @@ func (g *Game) handleCommand(c ClientCommand) {
 	} else {
 		player.Broadcast(fmt.Sprintf("What do you mean, \"%s\"?", cmdInput))
 	}
-	
+
 	// Send prompt after command is processed
-	client.SendMessage("> ")
+	if client.SupportsPrompt() {
+		client.SendMessage("> ")
+	} else {
+		client.SendMessage("") // spacer (WS adds a clean blank line)
+	}
 }
 
 func (g *Game) HandleConnect(c common.Client) {
@@ -318,7 +322,11 @@ func (g *Game) HandleConnect(c common.Client) {
 	g.Broadcast(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
 
 	// Send initial prompt
-	c.SendMessage("> ")
+	if c.SupportsPrompt() {
+		c.SendMessage("> ")
+	} else {
+		c.SendMessage("") // spacer after the welcome text
+	}
 
 	go c.HandleRequest()
 }
@@ -332,7 +340,7 @@ func (g *Game) HandleDisconnect(c common.Client) {
 
 	g.playersMu.Lock()
 	defer g.playersMu.Unlock()
-	
+
 	playerEntity := g.players[player.Name]
 	if playerEntity == nil {
 		log.Error().Msg("Player entity was nil")
@@ -414,5 +422,3 @@ func (g *Game) loop() {
 		}
 	}
 }
-
-

@@ -59,6 +59,8 @@ type WSClient struct {
 	writeMu sync.Mutex // serialize writes; gorilla allows only one writer
 }
 
+func (c *WSClient) SupportsPrompt() bool { return false }
+
 var _ common.Client = (*WSClient)(nil)
 
 func (c *WSClient) CloseConnection() error {
