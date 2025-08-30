@@ -52,10 +52,11 @@ var upgrader = websocket.Upgrader{
 }
 
 type WSClient struct {
-	status common.ConnectionStatus
-	conn   *websocket.Conn
-	game   *game.Game
-	mu     sync.Mutex
+	status  common.ConnectionStatus
+	conn    *websocket.Conn
+	game    *game.Game
+	mu      sync.Mutex
+	writeMu sync.Mutex // serialize writes; gorilla allows only one writer
 }
 
 var _ common.Client = (*WSClient)(nil)
@@ -114,11 +115,22 @@ func (c *WSClient) RemoteAddr() string {
 }
 
 func (c *WSClient) SendMessage(msg string) {
-	err := c.conn.WriteMessage(websocket.TextMessage, []byte(msg))
+	s := msg
+	if !strings.HasPrefix(s, "\n") {
+		s = "\n" + s
+	}
+	if !strings.HasSuffix(s, "\n") {
+		s = s + "\n"
+	}
+
+	c.writeMu.Lock()
+	err := c.conn.WriteMessage(websocket.TextMessage, []byte(s))
+	c.writeMu.Unlock()
+
 	if err != nil {
-		log.Error().Msgf("Error sending message %s to %s: %s", msg, c.RemoteAddr(), err)
+		log.Error().Msgf("Error sending message to %s: %v", c.RemoteAddr(), err)
 	} else {
-		log.Trace().Msgf("Sent message to %s:\n%s", c.RemoteAddr(), msg)
+		log.Trace().Msgf("Sent message to %s", c.RemoteAddr())
 	}
 }
 
