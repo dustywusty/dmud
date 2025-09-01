@@ -44,7 +44,7 @@ var upgrader = websocket.Upgrader{
 			return true
 		}
 		// Your GH Pages front-end (keep this)
-		if oh == "dustywusty.github.io" {
+		if oh == "dusty.wtf" {
 			return true
 		}
 		log.Info().Msgf("Rejected Origin %s for host %s", oh, rh)
