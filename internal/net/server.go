@@ -10,6 +10,7 @@ import (
 	"dmud/internal/common"
 	"dmud/internal/game"
 
+	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
 )
 
@@ -34,15 +35,20 @@ type Server struct {
 	wsServer *http.Server
 	wsHost   string
 	wsPort   string
+
+	wsMux     *http.ServeMux
+	wsMuxOnce sync.Once
 }
 
 func (s *Server) Run() {
 	var wg sync.WaitGroup
-	wg.Add(2)
-
 	s.game = game.NewGame()
 
+	started := 0
+
 	if s.tcpHost != "" && s.tcpPort != "" {
+		wg.Add(1)
+		started++
 		go func() {
 			s.runTCPListener()
 			wg.Done()
@@ -50,10 +56,16 @@ func (s *Server) Run() {
 	}
 
 	if s.wsHost != "" && s.wsPort != "" {
+		wg.Add(1)
+		started++
 		go func() {
 			s.runWebSocketServer()
 			wg.Done()
 		}()
+	}
+
+	if started == 0 {
+		log.Fatal().Msg("No listeners configured")
 	}
 
 	wg.Wait()
@@ -129,31 +141,49 @@ func (s *Server) runTCPListener() {
 func (s *Server) runWebSocketServer() {
 	done := make(chan bool)
 
-	s.wsServer = &http.Server{
-		Addr: fmt.Sprintf("%s:%s", s.wsHost, s.wsPort),
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			conn, err := upgrader.Upgrade(w, r, nil)
-			if err != nil {
-				log.Error().Err(err).Msg("Failed to set websocket upgrade")
+	s.wsMuxOnce.Do(func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("ok"))
+		})
+		mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+			if !websocket.IsWebSocketUpgrade(r) {
+				http.Error(w, "websocket upgrade required", http.StatusUpgradeRequired)
 				return
 			}
-
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				log.Error().Err(err).Msg("websocket upgrade failed")
+				return
+			}
 			remoteAddr := conn.RemoteAddr().String()
-
 			log.Info().Msgf("Accepted WebSocket connection from %s", remoteAddr)
 
-			client := &WSClient{
-				conn:   conn,
-				status: common.Connected,
-				game:   s.game,
-			}
+			client := &WSClient{conn: conn, status: common.Connected, game: s.game}
 
 			s.connectionMu.Lock()
 			s.connections[remoteAddr] = client
 			s.connectionMu.Unlock()
 
+			// On HTTP handler exit (which happens when the TCP conn dies), drop it
+			defer func() {
+				s.connectionMu.Lock()
+				delete(s.connections, remoteAddr)
+				s.connectionMu.Unlock()
+			}()
+
 			s.game.AddPlayerChan <- client
-		}),
+		})
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			_, _ = w.Write([]byte("DMUD up. Connect via wss://" + r.Host + "/ws\n"))
+		})
+		s.wsMux = mux
+	})
+
+	s.wsServer = &http.Server{
+		Addr:    fmt.Sprintf("%s:%s", s.wsHost, s.wsPort),
+		Handler: s.wsMux, // reuse same mux every time
 	}
 
 	log.Info().Msgf("Listening WebSocket on %s:%s", s.wsHost, s.wsPort)

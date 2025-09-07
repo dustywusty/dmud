@@ -2,6 +2,7 @@ package game
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -35,7 +36,7 @@ type Game struct {
 	defaultRoom *components.Room
 
 	players   map[string]*ecs.Entity
-	playersMu sync.Mutex
+	playersMu sync.RWMutex
 
 	world *ecs.World
 
@@ -47,10 +48,14 @@ type Game struct {
 func NewGame() *Game {
 	combatSystem := &systems.CombatSystem{}
 	movementSystem := &systems.MovementSystem{}
+	spawnSystem := systems.NewSpawnSystem()
+	aiSystem := systems.NewAISystem()
 
 	world := ecs.NewWorld()
 	world.AddSystem(combatSystem)
 	world.AddSystem(movementSystem)
+	world.AddSystem(spawnSystem)
+	world.AddSystem(aiSystem)
 
 	defaultRoomUntyped, err := world.GetComponent("1", "Room")
 	if err != nil {
@@ -66,16 +71,80 @@ func NewGame() *Game {
 		defaultRoom:        defaultRoom,
 		players:            make(map[string]*ecs.Entity),
 		world:              world,
-		AddPlayerChan:      make(chan common.Client),
-		RemovePlayerChan:   make(chan common.Client),
-		ExecuteCommandChan: make(chan ClientCommand),
+		AddPlayerChan:      make(chan common.Client, 64),
+		RemovePlayerChan:   make(chan common.Client, 64),
+		ExecuteCommandChan: make(chan ClientCommand, 256),
 	}
 
 	game.initCommands()
+	game.initializeSpawns()
 
 	go game.loop()
 
 	return game
+}
+
+func (g *Game) initializeSpawns() {
+	// Add spawns to specific rooms
+	spawns := map[string][]components.SpawnConfig{
+		"1": { // Starting room
+			{
+				Type:        components.SpawnTypeNPC,
+				TemplateID:  "rat",
+				MinCount:    5,
+				MaxCount:    10,
+				RespawnTime: 30 * time.Second,
+				Chance:      1,
+			},
+		},
+		"2": { // Another room
+			{
+				Type:        components.SpawnTypeNPC,
+				TemplateID:  "goblin",
+				MinCount:    1,
+				MaxCount:    2,
+				RespawnTime: 60 * time.Second,
+				Chance:      0.6,
+			},
+			{
+				Type:        components.SpawnTypeNPC,
+				TemplateID:  "rat",
+				MinCount:    2,
+				MaxCount:    4,
+				RespawnTime: 30 * time.Second,
+				Chance:      0.9,
+			},
+		},
+		"3": { // Town square
+			{
+				Type:        components.SpawnTypeNPC,
+				TemplateID:  "guard",
+				MinCount:    2,
+				MaxCount:    2,
+				RespawnTime: 120 * time.Second,
+				Chance:      1.0,
+			},
+			{
+				Type:        components.SpawnTypeNPC,
+				TemplateID:  "merchant",
+				MinCount:    1,
+				MaxCount:    1,
+				RespawnTime: 180 * time.Second,
+				Chance:      1.0,
+			},
+		},
+	}
+
+	for roomID, configs := range spawns {
+		spawn := components.NewSpawn(common.EntityID(roomID))
+		spawn.Configs = configs
+
+		entity, err := g.world.FindEntity(common.EntityID(roomID))
+		if err == nil {
+			g.world.AddComponent(&entity, spawn)
+			log.Info().Msgf("Added spawn component to room %s with %d configs", roomID, len(configs))
+		}
+	}
 }
 
 func (g *Game) initCommands() {
@@ -115,7 +184,41 @@ func (g *Game) initCommands() {
 		Handler:     handleKill,
 		Description: "Attack another player or NPC.",
 	})
-
+	g.RegisterCommand(&Command{
+		Name:        "examine",
+		Aliases:     []string{"ex", "exa"},
+		Handler:     handleExamine,
+		Description: "Examine something or someone in detail.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "history",
+		Aliases:     []string{"hist"},
+		Handler:     handleHistory,
+		Description: "Show your command history.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "clear",
+		Handler:     handleClear,
+		Description: "Clear your command history.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "suggest",
+		Aliases:     []string{"sug"},
+		Handler:     handleSuggest,
+		Description: "Get suggestions for commands or player names.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "complete",
+		Aliases:     []string{"comp"},
+		Handler:     handleComplete,
+		Description: "Get instant auto-completion for commands or player names.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "help",
+		Aliases:     []string{"h", "?"},
+		Handler:     handleHelp,
+		Description: "Show help information for commands.",
+	})
 	directions := map[string]string{
 		"north": "n",
 		"south": "s",
@@ -154,19 +257,45 @@ func (g *Game) handleCommand(c ClientCommand) {
 		return
 	}
 
+	// Add command to history
+	fullCommand := cmdInput
+	if len(cmdArgs) > 0 {
+		fullCommand = cmdInput + " " + strings.Join(cmdArgs, " ")
+	}
+	player.CommandHistory.AddCommand(fullCommand)
+
+	// Update auto-complete with all available commands
+	for cmdName := range commandRegistry {
+		player.AutoComplete.AddCommand(cmdName)
+	}
+
+	// Update auto-complete with all player names
+	g.playersMu.RLock()
+	for playerName := range g.players {
+		player.AutoComplete.AddPlayer(playerName)
+	}
+	g.playersMu.RUnlock()
+
 	cmd, exists := commandRegistry[cmdInput]
 	if exists {
 		cmd.Handler(player, cmdArgs, g)
 	} else {
 		player.Broadcast(fmt.Sprintf("What do you mean, \"%s\"?", cmdInput))
 	}
+
+	// Send prompt after command is processed
+	if client.SupportsPrompt() {
+		client.SendMessage("> ")
+	}
 }
 
 func (g *Game) HandleConnect(c common.Client) {
 	playerComponent := &components.Player{
-		Client: c,
-		Name:   util.GenerateRandomName(),
-		Room:   g.defaultRoom,
+		Client:         c,
+		Name:           util.GenerateRandomName(),
+		Room:           g.defaultRoom,
+		CommandHistory: components.NewCommandHistory(),
+		AutoComplete:   util.NewAutoComplete(),
 	}
 	healthComponent := &components.Health{
 		Max:     100,
@@ -190,6 +319,13 @@ func (g *Game) HandleConnect(c common.Client) {
 
 	g.Broadcast(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
 
+	// Send initial prompt
+	if c.SupportsPrompt() {
+		c.SendMessage("> ")
+	} else {
+		c.SendMessage("") // spacer after the welcome text
+	}
+
 	go c.HandleRequest()
 }
 
@@ -203,36 +339,32 @@ func (g *Game) HandleDisconnect(c common.Client) {
 	g.playersMu.Lock()
 	playerEntity := g.players[player.Name]
 	if playerEntity == nil {
-		log.Error().Msg("Player entity was nil")
 		g.playersMu.Unlock()
+		log.Error().Msg("Player entity was nil")
 		return
 	}
-
 	g.world.RemoveEntity(playerEntity.ID)
 	delete(g.players, player.Name)
 	g.playersMu.Unlock()
 
 	c.CloseConnection()
-
 	g.Broadcast(fmt.Sprintf("%s has left the game.", player.Name), c)
 }
 
 // getPlayer retrieves the Player component associated with a client.
 func (g *Game) getPlayer(c common.Client) (*components.Player, error) {
-	g.playersMu.Lock()
-	defer g.playersMu.Unlock()
+	g.playersMu.RLock()
+	defer g.playersMu.RUnlock()
 
 	for _, playerEntity := range g.players {
 		playerComponent, err := g.world.GetComponent(playerEntity.ID, "Player")
 		if err != nil {
 			return nil, fmt.Errorf("error getting player component for entity id %s, %v", playerEntity.ID, err)
 		}
-
 		player, ok := playerComponent.(*components.Player)
 		if !ok {
 			return nil, fmt.Errorf("unable to cast component to Player")
 		}
-
 		if player.Client == c {
 			return player, nil
 		}
@@ -243,6 +375,9 @@ func (g *Game) getPlayer(c common.Client) (*components.Player, error) {
 // Broadcast sends a message to all players, excluding specified clients.
 func (g *Game) Broadcast(m string, excludeClients ...common.Client) {
 	log.Info().Msgf("Broadcasting: %s", m)
+
+	g.playersMu.RLock()
+	defer g.playersMu.RUnlock()
 
 	for _, playerEntity := range g.players {
 		playerComponent, err := g.world.GetComponent(playerEntity.ID, "Player")

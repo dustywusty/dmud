@@ -4,7 +4,6 @@ import (
 	"dmud/internal/common"
 	"dmud/internal/components"
 	"dmud/internal/ecs"
-	"dmud/internal/util"
 	"fmt"
 	"math/rand"
 	"time"
@@ -25,85 +24,177 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 		combat, err := getCombatComponent(w, attackingEntity.ID)
 		if err != nil {
 			log.Error().Msgf("Error getting attacker combat component: %v", err)
-			return
+			continue
 		}
 
 		if combat.TargetID == "" {
-			return
+			continue
 		}
 
-		attackingPlayer, err := getPlayerComponent(w, attackingEntity.ID)
-		if err != nil {
-			log.Error().Msgf("Error getting attacker player component: %v", err)
-			return
+		// Get attacker info (could be player or NPC)
+		var attackerName string
+		var attackerRoom *components.Room
+		attackerPlayer, _ := getPlayerComponent(w, attackingEntity.ID)
+		attackerNPC, _ := getNPCComponent(w, attackingEntity.ID)
+
+		if attackerPlayer != nil {
+			attackerName = attackerPlayer.Name
+			attackerRoom = attackerPlayer.Room
+		} else if attackerNPC != nil {
+			attackerName = attackerNPC.Name
+			attackerRoom = attackerNPC.Room
+		} else {
+			// Neither player nor NPC
+			w.RemoveComponent(attackingEntity.ID, "Combat")
+			continue
 		}
 
-		targetPlayer, err := getPlayerComponent(w, combat.TargetID)
-		if err != nil {
-			log.Error().Msgf("Error getting target player component: %v", err)
-			return
+		// Get target info (could be player or NPC)
+		targetID := common.EntityID(combat.TargetID)
+		var targetName string
+		var targetRoom *components.Room
+		targetPlayer, _ := getPlayerComponent(w, targetID)
+		targetNPC, _ := getNPCComponent(w, targetID)
+
+		if targetPlayer != nil {
+			targetName = targetPlayer.Name
+			targetRoom = targetPlayer.Room
+		} else if targetNPC != nil {
+			targetName = targetNPC.Name
+			targetRoom = targetNPC.Room
+		} else {
+			// Target no longer exists
+			combat.TargetID = ""
+			if attackerPlayer != nil {
+				attackerPlayer.Broadcast("Your target is no longer valid.")
+			}
+			continue
 		}
 
-		targetHealth, err := getHealthComponent(w, combat.TargetID)
+		// Verify both are in same room
+		if attackerRoom != targetRoom {
+			combat.TargetID = ""
+			if attackerPlayer != nil {
+				attackerPlayer.Broadcast("Your target is no longer here.")
+			}
+			continue
+		}
+
+		targetHealth, err := getHealthComponent(w, targetID)
 		if err != nil {
-			log.Error().Msgf("Error getting target health component: %v", err)
-			return
+			combat.TargetID = ""
+			if attackerPlayer != nil {
+				attackerPlayer.Broadcast("Your target cannot be damaged.")
+			}
+			continue
 		}
 
 		if isTargetDead(targetHealth) {
-			handleTargetDeath(w, attackingEntity.ID, combat.TargetID, attackingPlayer, targetPlayer)
-			return
+			handleTargetDeath(w.AsWorldLike(), attackingEntity.ID, targetID,
+				attackerPlayer, targetPlayer, attackerNPC, targetNPC)
+			continue
 		}
 
-		attackPlayer(attackingPlayer, targetPlayer, combat, targetHealth)
+		performAttack(attackerPlayer, targetPlayer, attackerNPC, targetNPC,
+			attackerName, targetName, combat, targetHealth)
 	}
 }
 
 func findAttackingEntities(w *ecs.World) ([]ecs.Entity, error) {
 	return w.FindEntitiesByComponentPredicate("Combat", func(i interface{}) bool {
-		return true
+		c := i.(*components.Combat)
+		return c.TargetID != ""
 	})
 }
 
 func getCombatComponent(w *ecs.World, entityID common.EntityID) (*components.Combat, error) {
-	return util.GetTypedComponent[*components.Combat](w, entityID, "Combat")
+	return ecs.GetTypedComponent[*components.Combat](w, entityID, "Combat")
 }
 
 func getPlayerComponent(w *ecs.World, entityID common.EntityID) (*components.Player, error) {
-	return util.GetTypedComponent[*components.Player](w, entityID, "Player")
+	return ecs.GetTypedComponent[*components.Player](w, entityID, "Player")
+}
+
+func getNPCComponent(w *ecs.World, entityID common.EntityID) (*components.NPC, error) {
+	return ecs.GetTypedComponent[*components.NPC](w, entityID, "NPC")
 }
 
 func getHealthComponent(w *ecs.World, entityID common.EntityID) (*components.Health, error) {
-	return util.GetTypedComponent[*components.Health](w, entityID, "Health")
+	return ecs.GetTypedComponent[*components.Health](w, entityID, "Health")
 }
 
 func isTargetDead(health *components.Health) bool {
 	return health.Current <= 0
 }
 
-func handleTargetDeath(w *ecs.World, attackerID common.EntityID, targetID common.EntityID, attackerPlayer, targetPlayer *components.Player) {
-	combat := &components.Combat{}
-	combat.TargetID = ""
+func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targetID common.EntityID,
+	attackerPlayer, targetPlayer *components.Player, attackerNPC, targetNPC *components.NPC) {
 
-	w.RemoveComponent(attackerID, "Combat")
-	w.RemoveComponent(targetID, "Combat")
+	// Clear combat states
+	if combatComp, err := w.GetComponent(attackerID, "Combat"); err == nil {
+		combat := combatComp.(*components.Combat)
+		combat.TargetID = ""
+	}
+	if combatComp, err := w.GetComponent(targetID, "Combat"); err == nil {
+		combat := combatComp.(*components.Combat)
+		combat.TargetID = ""
+	}
 
-	attackerPlayer.Broadcast(fmt.Sprintf("You killed %s!", targetPlayer.Name))
-	targetPlayer.Broadcast("You have died!")
+	// Handle different death scenarios
+	if targetPlayer != nil {
+		// Player died
+		targetPlayer.Broadcast("You have died!")
+		if attackerPlayer != nil {
+			attackerPlayer.Broadcast(fmt.Sprintf("You killed %s!", targetPlayer.Name))
+			targetPlayer.Room.Broadcast(fmt.Sprintf("%s has been slain by %s!", targetPlayer.Name, attackerPlayer.Name))
+		} else if attackerNPC != nil {
+			targetPlayer.Room.Broadcast(fmt.Sprintf("%s has been slain by %s!", targetPlayer.Name, attackerNPC.Name))
+		}
+
+		// TODO: Handle respawn
+		// For now, restore health
+		if healthComp, err := w.GetComponent(targetID, "Health"); err == nil {
+			health := healthComp.(*components.Health)
+			health.Current = health.Max
+			// health.UpdateStatus()
+			targetPlayer.Broadcast("You have been revived with full health.")
+		}
+	} else if targetNPC != nil {
+		// NPC died
+		if targetNPC.Room != nil {
+			targetNPC.Room.Broadcast(targetNPC.Name + " has been slain!")
+		}
+
+		if attackerPlayer != nil {
+			attackerPlayer.Broadcast("You have defeated " + targetNPC.Name + "!")
+			// TODO: Award experience/loot
+		}
+
+		// Remove NPC from world (spawn system will respawn it)
+		w.RemoveEntity(targetID)
+	}
 }
 
-func attackPlayer(attackerPlayer, targetPlayer *components.Player, combat *components.Combat, targetHealth *components.Health) {
+func performAttack(attackerPlayer, targetPlayer *components.Player, attackerNPC, targetNPC *components.NPC,
+	attackerName, targetName string, combat *components.Combat, targetHealth *components.Health) {
+
 	s := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(s)
 
 	damage := r.Intn(combat.MaxDamage-combat.MinDamage+1) + combat.MinDamage
 
 	targetHealth.Lock()
+	defer targetHealth.Unlock()
 	targetHealth.Current -= damage
-	targetHealth.Unlock()
 
-	attackerPlayer.Broadcast(fmt.Sprintf("You attacked %s for %d damage!", targetPlayer.Name, damage))
-	targetPlayer.Broadcast(fmt.Sprintf("%s attacked you for %d damage!", attackerPlayer.Name, damage))
+	// Send appropriate messages based on entity types
+	if attackerPlayer != nil {
+		attackerPlayer.Broadcast(fmt.Sprintf("You attacked %s for %d damage!", targetName, damage))
+	}
 
-	log.Trace().Msg(fmt.Sprintf("%s attacked %s for %d damage!", attackerPlayer.Name, targetPlayer.Name, damage))
+	if targetPlayer != nil {
+		targetPlayer.Broadcast(fmt.Sprintf("%s attacked you for %d damage!", attackerName, damage))
+	}
+
+	log.Trace().Msg(fmt.Sprintf("%s attacked %s for %d damage!", attackerName, targetName, damage))
 }

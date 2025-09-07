@@ -126,6 +126,16 @@ func (w *World) GetComponent(entityID common.EntityID, componentName string) (in
 	return nil, fmt.Errorf("entity %s not found", entityID)
 }
 
+func (w *WorldLikeAdapter) RemoveComponent(entityID common.EntityID, componentType string) error {
+	w.World.RemoveComponent(entityID, componentType)
+	return nil
+}
+
+func (w *WorldLikeAdapter) RemoveEntity(entityID common.EntityID) error {
+	w.World.RemoveEntity(entityID)
+	return nil
+}
+
 func (w *World) RemoveComponent(entityID common.EntityID, componentName string) {
 	w.componentMutex.Lock()
 	defer w.componentMutex.Unlock()
@@ -245,4 +255,32 @@ func loadRoomsFromFile(filename string) []Room {
 		log.Error().Err(err).Msg("")
 	}
 	return rooms
+}
+
+// WorldLikeAdapter wraps World to implement components.WorldLike
+type WorldLikeAdapter struct {
+	*World
+}
+
+func (w *WorldLikeAdapter) FindEntitiesByComponentPredicate(componentType string, predicate func(interface{}) bool) ([]components.EntityLike, error) {
+	entities, err := w.World.FindEntitiesByComponentPredicate(componentType, predicate)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert []Entity to []components.EntityLike
+	result := make([]components.EntityLike, len(entities))
+	for i, entity := range entities {
+		result[i] = entity
+	}
+	return result, nil
+}
+
+func (w *WorldLikeAdapter) GetComponent(entityID common.EntityID, componentType string) (interface{}, error) {
+	return w.World.GetComponent(entityID, componentType)
+}
+
+// Add this method to World
+func (w *World) AsWorldLike() components.WorldLike {
+	return &WorldLikeAdapter{w}
 }

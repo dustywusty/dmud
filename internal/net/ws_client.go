@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"dmud/internal/common"
 	"dmud/internal/game"
@@ -17,28 +18,49 @@ import (
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		origin := r.Header.Get("Origin")
-		parsedOrigin, err := url.Parse(origin)
+		o := r.Header.Get("Origin")
+		if o == "" {
+			// Non-browser clients often omit Origin; allow.
+			return true
+		}
+		u, err := url.Parse(o)
 		if err != nil {
-			log.Error().Err(err).Msg("Error parsing Origin header")
+			log.Error().Err(err).Str("origin", o).Msg("bad Origin")
 			return false
 		}
-
-		if strings.ToLower(parsedOrigin.Hostname()) != "localhost" {
-			log.Info().Msgf("Origin %s is not localhost", parsedOrigin.Hostname())
-			return false
+		oh := strings.ToLower(u.Host)
+		rh := strings.ToLower(r.Host) // includes host[:port]
+		// strip port from r.Host for comparison
+		if i := strings.IndexByte(rh, ':'); i >= 0 {
+			rh = rh[:i]
 		}
 
-		return true
+		// Same-origin?
+		if oh == rh {
+			return true
+		}
+		// Cloud Run default domains
+		if strings.HasSuffix(oh, ".run.app") || strings.HasSuffix(oh, ".a.run.app") {
+			return true
+		}
+		// Your GH Pages front-end (keep this)
+		if oh == "dusty.wtf" {
+			return true
+		}
+		log.Info().Msgf("Rejected Origin %s for host %s", oh, rh)
+		return false
 	},
 }
 
 type WSClient struct {
-	status common.ConnectionStatus
-	conn   *websocket.Conn
-	game   *game.Game
-	mu     sync.Mutex
+	status  common.ConnectionStatus
+	conn    *websocket.Conn
+	game    *game.Game
+	mu      sync.Mutex
+	writeMu sync.Mutex // serialize writes; gorilla allows only one writer
 }
+
+func (c *WSClient) SupportsPrompt() bool { return false }
 
 var _ common.Client = (*WSClient)(nil)
 
@@ -66,19 +88,60 @@ func (c *WSClient) CloseConnection() error {
 	return nil
 }
 
+const (
+	pongWait   = 60 * time.Second
+	pingPeriod = 30 * time.Second // must be < pongWait
+	writeWait  = 10 * time.Second
+)
+
 func (c *WSClient) HandleRequest() {
 	g := c.game
 	slurRegexes := compileSlurRegexes()
 
+	// --- keep the read side alive & detect dead peers
+	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.conn.SetPongHandler(func(string) error {
+		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	})
+
+	// --- ping loop (stops when read loop returns)
+	done := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(pingPeriod)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				c.writeMu.Lock()
+				_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+				if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					c.writeMu.Unlock()
+					// triggers removal on read side shortly
+					return
+				}
+				c.writeMu.Unlock()
+			case <-done:
+				return
+			}
+		}
+	}()
+
 	for {
 		messageType, p, err := c.readMessage()
 		if err != nil {
+			close(done)
 			handleReadError(err, c)
 			return
 		}
 
+		// drop empty/whitespace-only frames (prevents “blank command” noise)
+		if len(strings.TrimSpace(string(p))) == 0 {
+			continue
+		}
+
 		if containsSlur(slurRegexes, p) {
 			log.Warn().Msgf("Slur detected in message from %s. Message rejected.", c.RemoteAddr())
+			close(done)
 			g.RemovePlayerChan <- c
 			return
 		}
@@ -96,11 +159,23 @@ func (c *WSClient) RemoteAddr() string {
 }
 
 func (c *WSClient) SendMessage(msg string) {
-	err := c.conn.WriteMessage(websocket.TextMessage, []byte(msg))
+	s := msg
+	if !strings.HasPrefix(s, "\n") {
+		s = "\n" + s
+	}
+	if !strings.HasSuffix(s, "\n") {
+		s = s + "\n"
+	}
+
+	c.writeMu.Lock()
+	_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+	err := c.conn.WriteMessage(websocket.TextMessage, []byte(s))
+	c.writeMu.Unlock()
+
 	if err != nil {
-		log.Error().Msgf("Error sending message %s to %s: %s", msg, c.RemoteAddr(), err)
+		log.Error().Msgf("Error sending message to %s: %v", c.RemoteAddr(), err)
 	} else {
-		log.Trace().Msgf("Sent message to %s:\n%s", c.RemoteAddr(), msg)
+		log.Trace().Msgf("Sent message to %s", c.RemoteAddr())
 	}
 }
 
@@ -163,13 +238,5 @@ func processTextMessage(p []byte, c *WSClient) {
 
 func (c *WSClient) readMessage() (messageType int, p []byte, err error) {
 	messageType, p, err = c.conn.ReadMessage()
-	if err != nil {
-		c.mu.Lock()
-		defer c.mu.Unlock()
-		if c.status == common.Disconnected {
-			return
-		}
-		log.Error().Err(err).Msgf("Error reading message from %s", c.RemoteAddr())
-	}
 	return
 }

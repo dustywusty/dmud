@@ -16,6 +16,8 @@ type TCPClient struct {
 	game *game.Game
 }
 
+func (c *TCPClient) SupportsPrompt() bool { return true }
+
 var _ common.Client = (*TCPClient)(nil)
 
 func (c *TCPClient) CloseConnection() error {
@@ -52,8 +54,6 @@ func (c *TCPClient) HandleRequest() {
 			args = strings.Split(parts[1], " ")
 		}
 
-		c.SendMessage("\n")
-
 		g.ExecuteCommandChan <- game.ClientCommand{
 			Client: c,
 			Cmd:    cmd,
@@ -67,6 +67,9 @@ func (c *TCPClient) RemoteAddr() string {
 }
 
 func (c *TCPClient) SendMessage(msg string) {
+	if !strings.HasSuffix(msg, "\n") {
+		msg += "\n"
+	}
 	_, err := c.conn.Write([]byte(msg))
 	if err != nil {
 		log.Error().Err(err).Msg("Error sending message to TCPClient: %v")

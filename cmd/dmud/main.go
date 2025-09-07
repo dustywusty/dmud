@@ -28,9 +28,13 @@ func main() {
 		Logger()
 	log.Logger = logger
 
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+
+	}
 	server := net.NewServer(&net.ServerConfig{
-		TCPHost: "localhost",
-		TCPPort: "8888",
+		WSHost: "0.0.0.0", WSPort: port,
 	})
 
 	go server.Run()

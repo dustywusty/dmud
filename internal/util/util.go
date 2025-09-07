@@ -25,24 +25,6 @@ func init() {
 
 type EntityID string
 
-type WorldLike interface {
-	GetComponent(entityID common.EntityID, componentName string) (interface{}, error)
-}
-
-func GetTypedComponent[T any](w WorldLike, entityID common.EntityID, componentName string) (T, error) {
-	componentUntyped, err := w.GetComponent(entityID, componentName)
-	if err != nil {
-		var zero T
-		return zero, err
-	}
-	typedComponent, ok := componentUntyped.(T)
-	if !ok {
-		var zero T
-		return zero, fmt.Errorf("failed to cast component %s to the expected type. Actual type: %T", componentName, componentUntyped)
-	}
-	return typedComponent, nil
-}
-
 func CalculateDeltaTime() float64 {
 	if lastTime.IsZero() {
 		lastTime = time.Now()

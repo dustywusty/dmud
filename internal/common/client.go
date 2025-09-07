@@ -21,4 +21,5 @@ type Client interface {
 	HandleRequest()
 	SendMessage(msg string)
 	RemoteAddr() string
+	SupportsPrompt() bool
 }

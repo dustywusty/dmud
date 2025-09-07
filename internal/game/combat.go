@@ -2,6 +2,7 @@ package game
 
 import (
 	"dmud/internal/components"
+	"dmud/internal/ecs"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -21,14 +22,35 @@ func handleKill(player *components.Player, args []string, game *Game) {
 func (g *Game) HandleKill(player *components.Player, targetName string) {
 	log.Trace().Msgf("Kill: %s", targetName)
 
+	// First check for players
 	g.playersMu.Lock()
+	defer g.playersMu.Unlock()
+	
 	targetEntity := g.players[targetName]
 	playerEntity := g.players[player.Name]
-	g.playersMu.Unlock()
 
 	if targetEntity == nil {
-		player.Broadcast("They aren't here.")
-		return
+		// Check for NPCs
+		npcs := player.Room.GetNPCs(g.world.AsWorldLike())
+		for _, npc := range npcs {
+			if strings.Contains(strings.ToLower(npc.Name), strings.ToLower(targetName)) {
+				// Find NPC entity
+				npcEntities, _ := g.world.FindEntitiesByComponentPredicate("NPC", func(i interface{}) bool {
+					n, ok := i.(*components.NPC)
+					return ok && n == npc
+				})
+
+				if len(npcEntities) > 0 {
+					targetEntity = &npcEntities[0]
+					break
+				}
+			}
+		}
+
+		if targetEntity == nil {
+			player.Broadcast("They aren't here.")
+			return
+		}
 	}
 
 	if playerEntity == nil {
@@ -43,4 +65,9 @@ func (g *Game) HandleKill(player *components.Player, targetName string) {
 	}
 
 	g.world.AddComponent(playerEntity, combatComponent)
+
+	// Announce combat
+	if npc, err := ecs.GetTypedComponent[*components.NPC](g.world, targetEntity.ID, "NPC"); err == nil {
+		player.Room.Broadcast(player.Name + " attacks " + npc.Name + "!")
+	}
 }

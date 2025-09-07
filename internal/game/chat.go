@@ -14,6 +14,7 @@ func handleSay(player *components.Player, args []string, game *Game) {
 		player.Broadcast("Say what?")
 		return
 	}
+	player.Broadcast("You say: " + msg) // echo to speaker
 	player.Room.Broadcast(fmt.Sprintf("%s says: %s", player.Name, msg), player)
 }
 
