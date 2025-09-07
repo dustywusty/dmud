@@ -70,6 +70,7 @@ func HandleMovement(w *ecs.World, movingEntity ecs.Entity) {
 	room.RemovePlayer(movingPlayer)
 
 	movingPlayer.Room = exit.Room
+	movingPlayer.RoomID = exit.RoomID
 	movingPlayer.Room.AddPlayer(movingPlayer)
 	movingPlayer.Broadcast(exit.Room.Description)
 }
