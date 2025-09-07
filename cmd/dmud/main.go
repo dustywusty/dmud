@@ -5,6 +5,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"dmud/internal/db"
 	"dmud/internal/net"
 	"dmud/internal/util"
 
@@ -27,6 +28,8 @@ func main() {
 		Str("thread_id", util.GetGID()).
 		Logger()
 	log.Logger = logger
+
+	db.Init()
 
 	port := os.Getenv("PORT")
 	if port == "" {
