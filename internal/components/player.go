@@ -12,8 +12,9 @@ type Player struct {
 
 	Client common.Client
 
-	Name string
-	Room *Room
+	Name   string
+	Room   *Room
+	RoomID string
 
 	// Command history and auto-complete
 	CommandHistory *CommandHistory

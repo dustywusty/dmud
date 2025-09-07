@@ -1,13 +1,16 @@
 package game
 
 import (
+	"context"
 	"fmt"
+	"net"
 	"strings"
 	"sync"
 	"time"
 
 	"dmud/internal/common"
 	"dmud/internal/components"
+	"dmud/internal/db"
 	"dmud/internal/ecs"
 	"dmud/internal/systems"
 	"dmud/internal/util"
@@ -290,32 +293,63 @@ func (g *Game) handleCommand(c ClientCommand) {
 }
 
 func (g *Game) HandleConnect(c common.Client) {
+	ctx := context.Background()
+	id := c.RemoteAddr()
+	if host, _, err := net.SplitHostPort(id); err == nil {
+		id = host
+	}
+
+	character, err := db.LoadCharacter(ctx, id)
+	if err != nil {
+		character = &db.Character{
+			ID:        id,
+			Name:      util.GenerateRandomName(),
+			RoomID:    "1",
+			Health:    100,
+			MaxHealth: 100,
+			Inventory: []string{},
+		}
+		_ = db.SaveCharacter(ctx, character)
+	}
+
+	room := g.defaultRoom
+	if comp, err := g.world.GetComponent(common.EntityID(character.RoomID), "Room"); err == nil {
+		if r, ok := comp.(*components.Room); ok {
+			room = r
+		}
+	} else {
+		character.RoomID = "1"
+	}
+
 	playerComponent := &components.Player{
 		Client:         c,
-		Name:           util.GenerateRandomName(),
-		Room:           g.defaultRoom,
+		Name:           character.Name,
+		Room:           room,
+		RoomID:         character.RoomID,
 		CommandHistory: components.NewCommandHistory(),
 		AutoComplete:   util.NewAutoComplete(),
 	}
 	healthComponent := &components.Health{
-		Max:     100,
-		Current: 100,
+		Max:     character.MaxHealth,
+		Current: character.Health,
 	}
+	inventoryComponent := &components.Inventory{Items: character.Inventory}
 
 	playerEntity := ecs.NewEntity()
 	g.world.AddEntity(playerEntity)
 
 	g.world.AddComponent(&playerEntity, playerComponent)
 	g.world.AddComponent(&playerEntity, healthComponent)
+	g.world.AddComponent(&playerEntity, inventoryComponent)
 
 	g.playersMu.Lock()
 	g.players[playerComponent.Name] = &playerEntity
 	g.playersMu.Unlock()
 
-	g.defaultRoom.AddPlayer(playerComponent)
+	room.AddPlayer(playerComponent)
 
 	playerComponent.Broadcast(util.WelcomeBanner)
-	playerComponent.Broadcast(g.defaultRoom.Description)
+	playerComponent.Broadcast(room.Description)
 
 	g.Broadcast(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
 
@@ -343,6 +377,41 @@ func (g *Game) HandleDisconnect(c common.Client) {
 		log.Error().Msg("Player entity was nil")
 		return
 	}
+
+	var currentHealth, maxHealth int
+	if comp, err := g.world.GetComponent(playerEntity.ID, "Health"); err == nil {
+		if hc, ok := comp.(*components.Health); ok {
+			hc.RLock()
+			currentHealth = hc.Current
+			maxHealth = hc.Max
+			hc.RUnlock()
+		}
+	}
+
+	inventory := []string{}
+	if comp, err := g.world.GetComponent(playerEntity.ID, "Inventory"); err == nil {
+		if inv, ok := comp.(*components.Inventory); ok {
+			inv.RLock()
+			inventory = append(inventory, inv.Items...)
+			inv.RUnlock()
+		}
+	}
+
+	id := c.RemoteAddr()
+	if host, _, err := net.SplitHostPort(id); err == nil {
+		id = host
+	}
+
+	character := &db.Character{
+		ID:        id,
+		Name:      player.Name,
+		RoomID:    player.RoomID,
+		Health:    currentHealth,
+		MaxHealth: maxHealth,
+		Inventory: inventory,
+	}
+	_ = db.SaveCharacter(context.Background(), character)
+
 	g.world.RemoveEntity(playerEntity.ID)
 	delete(g.players, player.Name)
 	g.playersMu.Unlock()
