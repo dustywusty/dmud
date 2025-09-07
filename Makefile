@@ -1,6 +1,7 @@
-GO=/usr/local/go/bin/go
 BINARY_NAME=dmud
 BINARY_PATH=bin/
+
+GO := $(shell which go)
 
 default: build
 
