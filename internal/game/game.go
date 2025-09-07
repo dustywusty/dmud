@@ -50,12 +50,14 @@ func NewGame() *Game {
 	movementSystem := &systems.MovementSystem{}
 	spawnSystem := systems.NewSpawnSystem()
 	aiSystem := systems.NewAISystem()
+	autosaveSystem := systems.NewAutosaveSystem()
 
 	world := ecs.NewWorld()
 	world.AddSystem(combatSystem)
 	world.AddSystem(movementSystem)
 	world.AddSystem(spawnSystem)
 	world.AddSystem(aiSystem)
+	world.AddSystem(autosaveSystem)
 
 	defaultRoomUntyped, err := world.GetComponent("1", "Room")
 	if err != nil {
