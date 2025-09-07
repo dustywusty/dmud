@@ -13,6 +13,8 @@ import (
 	"dmud/internal/util"
 
 	"github.com/rs/zerolog/log"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 type ClientCommand struct {
@@ -51,7 +53,12 @@ func NewGame() *Game {
 	spawnSystem := systems.NewSpawnSystem()
 	aiSystem := systems.NewAISystem()
 
-	world := ecs.NewWorld()
+	db, err := gorm.Open(sqlite.Open("resources/dmud.db"), &gorm.Config{})
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to connect database")
+	}
+
+	world := ecs.NewWorld(db)
 	world.AddSystem(combatSystem)
 	world.AddSystem(movementSystem)
 	world.AddSystem(spawnSystem)

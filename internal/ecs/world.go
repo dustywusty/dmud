@@ -10,6 +10,7 @@ import (
 	"dmud/internal/util"
 
 	"github.com/rs/zerolog/log"
+	"gorm.io/gorm"
 )
 
 type World struct {
@@ -189,13 +190,13 @@ func (w *World) Update() {
 	}
 }
 
-func NewWorld() *World {
+func NewWorld(db *gorm.DB) *World {
 	world := &World{
 		entities:   make(map[common.EntityID]Entity),
 		components: make(map[common.EntityID]map[string]Component),
 	}
 
-	rooms := loadRoomsFromFile("./resources/rooms.json")
+	rooms := loadRoomsFromDB(db)
 
 	for _, room := range rooms {
 		roomEntity := NewEntity(room.ID)
@@ -244,16 +245,51 @@ func NewWorld() *World {
 }
 
 type Room struct {
-	ID          string            `json:"id"`
-	Description string            `json:"description"`
-	Exits       map[string]string `json:"exits"`
+	ID          string
+	Description string
+	Exits       map[string]string
 }
 
-func loadRoomsFromFile(filename string) []Room {
-	var rooms []Room
-	if err := util.ParseJSON(filename, &rooms); err != nil {
-		log.Error().Err(err).Msg("")
+func loadRoomsFromDB(db *gorm.DB) []Room {
+	type roomRecord struct {
+		ID          string
+		Description string
 	}
+
+	type exitRecord struct {
+		RoomID       string
+		Direction    string
+		TargetRoomID string `gorm:"column:target_room_id"`
+	}
+
+	var roomRecords []roomRecord
+	if err := db.Table("rooms").Find(&roomRecords).Error; err != nil {
+		log.Error().Err(err).Msg("failed to query rooms")
+		return nil
+	}
+
+	var exitRecords []exitRecord
+	if err := db.Table("exits").Find(&exitRecords).Error; err != nil {
+		log.Error().Err(err).Msg("failed to query exits")
+	}
+
+	exitMap := make(map[string]map[string]string)
+	for _, e := range exitRecords {
+		if _, ok := exitMap[e.RoomID]; !ok {
+			exitMap[e.RoomID] = make(map[string]string)
+		}
+		exitMap[e.RoomID][e.Direction] = e.TargetRoomID
+	}
+
+	rooms := make([]Room, 0, len(roomRecords))
+	for _, r := range roomRecords {
+		exits := exitMap[r.ID]
+		if exits == nil {
+			exits = make(map[string]string)
+		}
+		rooms = append(rooms, Room{ID: r.ID, Description: r.Description, Exits: exits})
+	}
+
 	return rooms
 }
 
