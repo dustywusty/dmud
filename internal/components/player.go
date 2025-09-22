@@ -21,7 +21,21 @@ type Player struct {
 }
 
 func (p *Player) Broadcast(m string) {
-	p.Client.SendMessage(m)
+	msg := m
+
+	if !p.Client.SupportsPrompt() {
+		trimmed := strings.TrimLeft(msg, "\n")
+
+		switch {
+		case trimmed == "" && strings.Contains(msg, "\n"):
+			// Preserve intentional blank lines but collapse multiples to one.
+			msg = "\n"
+		case trimmed != "":
+			msg = trimmed
+		}
+	}
+
+	p.Client.SendMessage(msg)
 }
 
 // Update the Player Look method
