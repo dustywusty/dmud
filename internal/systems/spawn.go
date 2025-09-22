@@ -160,7 +160,7 @@ func (ss *SpawnSystem) spawnNPC(w *ecs.World, room *components.Room, config comp
 	spawn.ActiveSpawns[template.ID] = npcEntity.ID
 
 	// Announce spawn to room (with newline to avoid interrupting typing)
-	room.Broadcast("\n" + template.Name + " arrives.")
+	room.Broadcast(template.Name + " arrives.")
 
 	log.Info().Msgf("Spawned NPC: %s in room %s", template.Name, spawn.RoomID)
 }

@@ -27,7 +27,7 @@ type Room struct {
 func (r *Room) AddPlayer(p *Player) {
 	log.Info().Msgf("Player added to room: %s", p.Name)
 
-	r.Broadcast("\n" + p.Name + " enters")
+	r.Broadcast(p.Name + " enters")
 
 	r.PlayersMutex.Lock()
 	r.Players = append(r.Players, p)
@@ -71,7 +71,7 @@ func (r *Room) GetNPCs(w WorldLike) []*NPC {
 func (r *Room) GetPlayer(name string) *Player {
 	r.PlayersMutex.RLock()
 	defer r.PlayersMutex.RUnlock()
-	
+
 	for _, player := range r.Players {
 		if player.Name == name {
 			return player
@@ -106,9 +106,9 @@ func (r *Room) RemovePlayer(p *Player) {
 		}
 	}
 	r.PlayersMutex.Unlock()
-	
+
 	if removed {
-		r.Broadcast("\n" + p.Name + " leaves")
+		r.Broadcast(p.Name + " leaves")
 	}
 }
 
