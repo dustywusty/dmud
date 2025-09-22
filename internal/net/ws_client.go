@@ -47,6 +47,9 @@ var upgrader = websocket.Upgrader{
 		if oh == "dusty.wtf" {
 			return true
 		}
+		if oh == "dusty-wtf.pages.dev" || strings.HasSuffix(oh, ".dusty-wtf.pages.dev") {
+			return true
+		}
 		log.Info().Msgf("Rejected Origin %s for host %s", oh, rh)
 		return false
 	},
