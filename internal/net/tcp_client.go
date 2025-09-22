@@ -67,7 +67,7 @@ func (c *TCPClient) RemoteAddr() string {
 }
 
 func (c *TCPClient) SendMessage(msg string) {
-	if !strings.HasSuffix(msg, "\n") {
+	if strings.Contains(msg, "\n") && !strings.HasSuffix(msg, "\n") {
 		msg += "\n"
 	}
 	_, err := c.conn.Write([]byte(msg))
