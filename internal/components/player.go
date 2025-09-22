@@ -3,6 +3,7 @@ package components
 import (
 	"dmud/internal/common"
 	"dmud/internal/util"
+	"fmt"
 	"strings"
 	"sync"
 )
@@ -54,19 +55,23 @@ func (p *Player) Look(w WorldLike) {
 		for i, exit := range p.Room.Exits {
 			exits[i] = exit.Direction
 		}
-		p.Broadcast("Exits: " + strings.Join(exits, ", "))
+		p.Broadcast(fmt.Sprintf("Exits: [%s]", strings.Join(exits, ", ")))
 	}
 
 	// Show other players
 	p.Room.PlayersMutex.RLock()
+	var otherPlayers []string
 	for _, player := range p.Room.Players {
 		if player != p {
-			p.Broadcast("  " + player.Name + " is here.")
+			otherPlayers = append(otherPlayers, player.Name)
 		}
 	}
 	p.Room.PlayersMutex.RUnlock()
+	for _, name := range otherPlayers {
+		p.Broadcast("  " + name + " is here.")
+	}
 
-	// Show NPCs
+	// Show NPCs after players
 	npcs := p.Room.GetNPCs(w)
 	for _, npc := range npcs {
 		p.Broadcast("  " + npc.Name + " is here.")
