@@ -163,14 +163,14 @@ func (c *WSClient) RemoteAddr() string {
 
 func (c *WSClient) SendMessage(msg string) {
 	s := msg
-	if strings.Contains(s, "\n") {
-		if !strings.HasPrefix(s, "\n") {
-			s = "\n" + s
-		}
-		if !strings.HasSuffix(s, "\n") {
-			s = s + "\n"
-		}
-	}
+	// if strings.Contains(s, "\n") {
+	// 	if !strings.HasPrefix(s, "\n") {
+	// 		s = "\n" + s
+	// 	}
+	// 	if !strings.HasSuffix(s, "\n") {
+	// 		s = s + "\n"
+	// 	}
+	// }
 
 	c.writeMu.Lock()
 	_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
