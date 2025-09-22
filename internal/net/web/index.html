@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DMUD</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="page" id="app">
+    <header class="header">
+      <div class="header__status">
+        <span class="status-badge" data-role="status">Connecting…</span>
+        <span class="status-host" data-role="host"></span>
+      </div>
+      <div class="header__actions">
+        <button class="ghost-button" type="button" data-action="reconnect" title="Reconnect to the server">Reconnect</button>
+      </div>
+    </header>
+
+    <main class="shell" data-role="output" aria-live="polite" aria-atomic="false"></main>
+
+    <form class="command-bar" data-role="form" autocomplete="off">
+      <label class="sr-only" for="command-input">Command input</label>
+      <input id="command-input" class="command-bar__input" data-role="input" type="text"
+             spellcheck="false" autocapitalize="none" autocomplete="off" autofocus
+             placeholder="Type a command and press Enter">
+      <button class="command-bar__send" type="submit">Send</button>
+    </form>
+
+    <p class="hint" data-role="hint">Type <code>/clear</code> to clear the log or <code>help</code> for in-game help.</p>
+  </div>
+
+  <script type="module" src="./client.js"></script>
+</body>
+</html>

@@ -175,9 +175,7 @@ func (s *Server) runWebSocketServer() {
 
 			s.game.AddPlayerChan <- client
 		})
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			_, _ = w.Write([]byte("DMUD up. Connect via wss://" + r.Host + "/ws\n"))
-		})
+		mux.Handle("/", s.webFileServer())
 		s.wsMux = mux
 	})
 
