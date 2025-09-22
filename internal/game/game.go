@@ -323,7 +323,7 @@ func (g *Game) HandleConnect(c common.Client) {
 	if c.SupportsPrompt() {
 		c.SendMessage("> ")
 	} else {
-		c.SendMessage("") // spacer after the welcome text
+		c.SendMessage("\n") // spacer after the welcome text
 	}
 
 	go c.HandleRequest()
