@@ -55,7 +55,7 @@ func (p *Player) Look(w WorldLike) {
 		for i, exit := range p.Room.Exits {
 			exits[i] = exit.Direction
 		}
-		p.Broadcast(fmt.Sprintf("\nExits: [%s]\n\n", strings.Join(exits, ", ")))
+		p.Broadcast(fmt.Sprintf("\n\n--------------------------------Exits: [%s]--------------------------------\n\n", strings.Join(exits, ", ")))
 	}
 
 	// Show other players
