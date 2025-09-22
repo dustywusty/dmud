@@ -55,7 +55,7 @@ func (p *Player) Look(w WorldLike) {
 		for i, exit := range p.Room.Exits {
 			exits[i] = exit.Direction
 		}
-		p.Broadcast(fmt.Sprintf("\nExits: [%s]\n", strings.Join(exits, ", ")))
+		p.Broadcast(fmt.Sprintf("\nExits: [%s]\n\n", strings.Join(exits, ", ")))
 	}
 
 	// Show other players
@@ -68,12 +68,12 @@ func (p *Player) Look(w WorldLike) {
 	}
 	p.Room.PlayersMutex.RUnlock()
 	for _, name := range otherPlayers {
-		p.Broadcast("  " + name + " is here.")
+		p.Broadcast(name + " is here.")
 	}
 
 	// Show NPCs after players
 	npcs := p.Room.GetNPCs(w)
 	for _, npc := range npcs {
-		p.Broadcast("  " + npc.Name + " is here.")
+		p.Broadcast(npc.Name + " is here.")
 	}
 }
