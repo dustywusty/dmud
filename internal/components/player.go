@@ -3,7 +3,6 @@ package components
 import (
 	"dmud/internal/common"
 	"dmud/internal/util"
-	"fmt"
 	"strings"
 	"sync"
 )
@@ -25,21 +24,22 @@ func (p *Player) Broadcast(msg string) {
 	p.Client.SendMessage(msg)
 }
 
-// Update the Player Look method
 func (p *Player) Look(w WorldLike) {
+	p.Broadcast(p.DescribeArea(w))
+}
+
+// DescribeArea returns information about the player's current area, including
+// other players, NPCs, and exits.
+func (p *Player) DescribeArea(w WorldLike) string {
 	if p.Area == nil {
-		p.Broadcast("You are nowhere.")
-		return
+		return "You are nowhere."
 	}
 
-	// Area description
-	p.Broadcast(p.Area.Description + "\n\n")
+	var b strings.Builder
 
-	// if p.Area.Region != "" {
-	// 	p.Broadcast("Region: " + p.Area.Region + "\n\n")
-	// }
+	b.WriteString(p.Area.Description)
+	b.WriteString("\n\n")
 
-	// Show other players
 	p.Area.PlayersMutex.RLock()
 	var otherPlayers []string
 	for _, player := range p.Area.Players {
@@ -49,21 +49,25 @@ func (p *Player) Look(w WorldLike) {
 	}
 	p.Area.PlayersMutex.RUnlock()
 	for _, name := range otherPlayers {
-		p.Broadcast(name + " is here.")
+		b.WriteString(name)
+		b.WriteString(" is here.\n")
 	}
 
-	// Show NPCs after players
 	npcs := p.Area.GetNPCs(w)
 	for _, npc := range npcs {
-		p.Broadcast(npc.Name + " is here.")
+		b.WriteString(npc.Name)
+		b.WriteString(" is here.\n")
 	}
 
-	// Show exits
 	if len(p.Area.Exits) > 0 {
 		exits := make([]string, len(p.Area.Exits))
 		for i, exit := range p.Area.Exits {
 			exits[i] = exit.Direction
 		}
-		p.Broadcast(fmt.Sprintf("\n\nExits: [%s]\n", strings.Join(exits, ", ")))
+		b.WriteString("\n\nExits: [")
+		b.WriteString(strings.Join(exits, ", "))
+		b.WriteString("]\n")
 	}
+
+	return b.String()
 }
