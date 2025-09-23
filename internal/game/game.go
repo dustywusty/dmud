@@ -315,7 +315,7 @@ func (g *Game) HandleConnect(c common.Client) {
 	g.defaultArea.AddPlayer(playerComponent)
 
 	playerComponent.Broadcast(util.WelcomeBanner)
-	playerComponent.Broadcast(g.defaultArea.Description)
+	playerComponent.Look(g.world.AsWorldLike())
 
 	// if g.defaultArea.Region != "" {
 	// 	playerComponent.Broadcast("Region: " + g.defaultArea.Region)
