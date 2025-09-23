@@ -33,9 +33,10 @@ func (p *Player) Look(w WorldLike) {
 	}
 
 	// Area description
-	p.Broadcast(p.Area.Description + "\n")
+	p.Broadcast(p.Area.Description + "\n\n")
+
 	if p.Area.Region != "" {
-		p.Broadcast("Region: " + p.Area.Region)
+		p.Broadcast("Region: " + p.Area.Region + "\n\n")
 	}
 
 	// Show other players
@@ -65,6 +66,6 @@ func (p *Player) Look(w WorldLike) {
 		for i, exit := range p.Area.Exits {
 			exits[i] = exit.Direction
 		}
-		p.Broadcast(fmt.Sprintf("\n\nExits: [%s]", strings.Join(exits, ", ")))
+		p.Broadcast(fmt.Sprintf("\n\nExits: [%s]\n", strings.Join(exits, ", ")))
 	}
 }
