@@ -9,25 +9,25 @@ import (
 )
 
 type NPC struct {
-    sync.RWMutex
+	sync.RWMutex
 
-    Name        string
-    Description string
-    Room        *Room
-    TemplateID  string
-    Behavior    NPCBehavior
-    Dialogue    []string
-    LastAction  time.Time
-    Target      common.EntityID // For aggressive NPCs
+	Name        string
+	Description string
+	Area        *Area
+	TemplateID  string
+	Behavior    NPCBehavior
+	Dialogue    []string
+	LastAction  time.Time
+	Target      common.EntityID // For aggressive NPCs
 }
 
 func (n *NPC) GetRandomDialogue() string {
-    n.RLock()
-    defer n.RUnlock()
+	n.RLock()
+	defer n.RUnlock()
 
-    if len(n.Dialogue) == 0 {
-        return ""
-    }
+	if len(n.Dialogue) == 0 {
+		return ""
+	}
 
-    return n.Dialogue[rand.Intn(len(n.Dialogue))]
+	return n.Dialogue[rand.Intn(len(n.Dialogue))]
 }

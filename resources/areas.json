@@ -1,6 +1,7 @@
 [
     {
         "id": "1",
+        "region": "Whispering Woods",
         "exits": {
             "north": "2",
             "east": "7"
@@ -9,6 +10,7 @@
     },
     {
         "id": "2",
+        "region": "Whispering Woods",
         "exits": {
             "north": "3",
             "south": "1",
@@ -18,6 +20,7 @@
     },
     {
         "id": "3",
+        "region": "Whispering Woods",
         "exits": {
             "south": "2",
             "east": "5",
@@ -27,6 +30,7 @@
     },
     {
         "id": "4",
+        "region": "Whispering Woods",
         "exits": {
             "west": "2",
             "north": "5"
@@ -35,6 +39,7 @@
     },
     {
         "id": "5",
+        "region": "Whispering Woods",
         "exits": {
             "west": "3",
             "south": "4"
@@ -43,6 +48,7 @@
     },
     {
         "id": "6",
+        "region": "Whispering Woods",
         "exits": {
             "east": "3"
         },
@@ -50,6 +56,7 @@
     },
     {
         "id": "7",
+        "region": "Forsaken Keep",
         "exits": {
             "west": "1",
             "east": "8",
@@ -59,6 +66,7 @@
     },
     {
         "id": "8",
+        "region": "Forsaken Keep",
         "exits": {
             "west": "7",
             "north": "9",
@@ -68,6 +76,7 @@
     },
     {
         "id": "9",
+        "region": "Forsaken Keep",
         "exits": {
             "south": "8",
             "east": "15"
@@ -76,6 +85,7 @@
     },
     {
         "id": "10",
+        "region": "Forsaken Keep",
         "exits": {
             "west": "8",
             "down": "12"
@@ -84,6 +94,7 @@
     },
     {
         "id": "11",
+        "region": "Forsaken Keep",
         "exits": {
             "north": "7",
             "down": "13"
@@ -92,6 +103,7 @@
     },
     {
         "id": "12",
+        "region": "Undercrypt Depths",
         "exits": {
             "up": "10",
             "north": "14"
@@ -100,6 +112,7 @@
     },
     {
         "id": "13",
+        "region": "Undercrypt Depths",
         "exits": {
             "up": "11",
             "east": "14"
@@ -108,6 +121,7 @@
     },
     {
         "id": "14",
+        "region": "Undercrypt Depths",
         "exits": {
             "west": "13",
             "south": "12",
@@ -117,6 +131,7 @@
     },
     {
         "id": "15",
+        "region": "Undercrypt Depths",
         "exits": {
             "west": "14",
             "up": "9"

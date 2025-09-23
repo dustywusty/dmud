@@ -86,8 +86,8 @@ func handleHelp(player *components.Player, args []string, game *Game) {
 		b.WriteString("Basic Commands:\n")
 		b.WriteString("  look          - Look around your current location\n")
 		b.WriteString("  who            - List online players\n")
-		b.WriteString("  say <message>  - Say something to players in the same room\n")
-		b.WriteString("  shout <message> - Shout to nearby rooms\n")
+		b.WriteString("  say <message>  - Say something to players in the same area\n")
+		b.WriteString("  shout <message> - Shout to nearby areas\n")
 		b.WriteString("  examine <target> - Examine something or someone\n")
 		b.WriteString("  kill <target>  - Attack a player or NPC\n")
 		b.WriteString("  exit           - Leave the game\n")
@@ -125,19 +125,19 @@ func handleHelp(player *components.Player, args []string, game *Game) {
 
 	// Define command help
 	commandHelp := map[string]string{
-		"look":     "Look around your current location to see the room description, exits, and other players/NPCs present.",
+		"look":     "Look around your current location to see the area description, exits, and other players/NPCs present.",
 		"who":      "List all players currently online in the game.",
-		"say":      "Say something to all players in the same room. Usage: say <message>",
-		"shout":    "Shout a message that can be heard in nearby rooms. Usage: shout <message>",
+		"say":      "Say something to all players in the same area. Usage: say <message>",
+		"shout":    "Shout a message that can be heard in nearby areas. Usage: shout <message>",
 		"examine":  "Examine something or someone in detail. Usage: examine <target>",
 		"kill":     "Attack another player or NPC. Usage: kill <target>",
 		"exit":     "Leave the game and disconnect from the server.",
-		"north":    "Move north to the adjacent room (if an exit exists).",
-		"south":    "Move south to the adjacent room (if an exit exists).",
-		"east":     "Move east to the adjacent room (if an exit exists).",
-		"west":     "Move west to the adjacent room (if an exit exists).",
-		"up":       "Move up to the adjacent room (if an exit exists).",
-		"down":     "Move down to the adjacent room (if an exit exists).",
+		"north":    "Move north to the adjacent area (if an exit exists).",
+		"south":    "Move south to the adjacent area (if an exit exists).",
+		"east":     "Move east to the adjacent area (if an exit exists).",
+		"west":     "Move west to the adjacent area (if an exit exists).",
+		"up":       "Move up to the adjacent area (if an exit exists).",
+		"down":     "Move down to the adjacent area (if an exit exists).",
 		"name":     "Change your player name. Usage: name <new_name>",
 		"help":     "Show help information. Usage: help [command]",
 		"history":  "Show your command history (last 100 commands).",

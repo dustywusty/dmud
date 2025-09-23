@@ -8,15 +8,16 @@ import (
 
 type Exit struct {
 	Direction string
-	RoomID    string
-	Room      *Room
+	AreaID    string
+	Area      *Area
 }
 
-type Room struct {
+type Area struct {
 	X int
 	Y int
 	Z int
 
+	Region      string
 	Description string
 	Exits       []Exit
 	Players     []*Player
@@ -24,32 +25,32 @@ type Room struct {
 	PlayersMutex sync.RWMutex
 }
 
-func (r *Room) AddPlayer(p *Player) {
-	log.Info().Msgf("Player added to room: %s", p.Name)
+func (a *Area) AddPlayer(p *Player) {
+	log.Info().Msgf("Player added to area: %s", p.Name)
 
-	r.Broadcast(p.Name + " enters")
+	a.Broadcast(p.Name + " enters")
 
-	r.PlayersMutex.Lock()
-	r.Players = append(r.Players, p)
-	r.PlayersMutex.Unlock()
+	a.PlayersMutex.Lock()
+	a.Players = append(a.Players, p)
+	a.PlayersMutex.Unlock()
 }
 
-func (r *Room) GetExit(direction string) *Exit {
-	for _, exit := range r.Exits {
+func (a *Area) GetExit(direction string) *Exit {
+	for i := range a.Exits {
+		exit := &a.Exits[i]
 		if exit.Direction == direction {
-			return &exit
+			return exit
 		}
 	}
 	return nil
 }
 
-func (r *Room) GetNPCs(w WorldLike) []*NPC {
+func (a *Area) GetNPCs(w WorldLike) []*NPC {
 	var npcs []*NPC
 
-	// Find all NPCs in this room
 	entities, err := w.FindEntitiesByComponentPredicate("NPC", func(i interface{}) bool {
 		npc, ok := i.(*NPC)
-		return ok && npc.Room == r
+		return ok && npc.Area == a
 	})
 
 	if err != nil {
@@ -68,11 +69,11 @@ func (r *Room) GetNPCs(w WorldLike) []*NPC {
 	return npcs
 }
 
-func (r *Room) GetPlayer(name string) *Player {
-	r.PlayersMutex.RLock()
-	defer r.PlayersMutex.RUnlock()
+func (a *Area) GetPlayer(name string) *Player {
+	a.PlayersMutex.RLock()
+	defer a.PlayersMutex.RUnlock()
 
-	for _, player := range r.Players {
+	for _, player := range a.Players {
 		if player.Name == name {
 			return player
 		}
@@ -80,39 +81,37 @@ func (r *Room) GetPlayer(name string) *Player {
 	return nil
 }
 
-func (r *Room) Broadcast(msg string, exclude ...*Player) {
-	r.PlayersMutex.Lock()
-	defer r.PlayersMutex.Unlock()
+func (a *Area) Broadcast(msg string, exclude ...*Player) {
+	a.PlayersMutex.Lock()
+	defer a.PlayersMutex.Unlock()
 
-	if len(r.Players) == 0 {
+	if len(a.Players) == 0 {
 		return
 	}
 
-	for _, player := range r.Players {
+	for _, player := range a.Players {
 		if !contains(exclude, player) {
 			player.Broadcast(msg)
 		}
 	}
 }
 
-func (r *Room) RemovePlayer(p *Player) {
-	r.PlayersMutex.Lock()
+func (a *Area) RemovePlayer(p *Player) {
+	a.PlayersMutex.Lock()
 	removed := false
-	for i, player := range r.Players {
+	for i, player := range a.Players {
 		if player == p {
-			r.Players = append(r.Players[:i], r.Players[i+1:]...)
+			a.Players = append(a.Players[:i], a.Players[i+1:]...)
 			removed = true
 			break
 		}
 	}
-	r.PlayersMutex.Unlock()
+	a.PlayersMutex.Unlock()
 
 	if removed {
-		r.Broadcast(p.Name + " leaves")
+		a.Broadcast(p.Name + " leaves")
 	}
 }
-
-// ..
 
 func contains(players []*Player, player *Player) bool {
 	for _, p := range players {

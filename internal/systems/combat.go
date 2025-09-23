@@ -33,16 +33,16 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 
 		// Get attacker info (could be player or NPC)
 		var attackerName string
-		var attackerRoom *components.Room
+		var attackerArea *components.Area
 		attackerPlayer, _ := getPlayerComponent(w, attackingEntity.ID)
 		attackerNPC, _ := getNPCComponent(w, attackingEntity.ID)
 
 		if attackerPlayer != nil {
 			attackerName = attackerPlayer.Name
-			attackerRoom = attackerPlayer.Room
+			attackerArea = attackerPlayer.Area
 		} else if attackerNPC != nil {
 			attackerName = attackerNPC.Name
-			attackerRoom = attackerNPC.Room
+			attackerArea = attackerNPC.Area
 		} else {
 			// Neither player nor NPC
 			w.RemoveComponent(attackingEntity.ID, "Combat")
@@ -52,16 +52,16 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 		// Get target info (could be player or NPC)
 		targetID := common.EntityID(combat.TargetID)
 		var targetName string
-		var targetRoom *components.Room
+		var targetArea *components.Area
 		targetPlayer, _ := getPlayerComponent(w, targetID)
 		targetNPC, _ := getNPCComponent(w, targetID)
 
 		if targetPlayer != nil {
 			targetName = targetPlayer.Name
-			targetRoom = targetPlayer.Room
+			targetArea = targetPlayer.Area
 		} else if targetNPC != nil {
 			targetName = targetNPC.Name
-			targetRoom = targetNPC.Room
+			targetArea = targetNPC.Area
 		} else {
 			// Target no longer exists
 			combat.TargetID = ""
@@ -71,8 +71,8 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 			continue
 		}
 
-		// Verify both are in same room
-		if attackerRoom != targetRoom {
+		// Verify both are in same area
+		if attackerArea != targetArea {
 			combat.TargetID = ""
 			if attackerPlayer != nil {
 				attackerPlayer.Broadcast("Your target is no longer here.")
@@ -146,9 +146,9 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 		targetPlayer.Broadcast("You have died!")
 		if attackerPlayer != nil {
 			attackerPlayer.Broadcast(fmt.Sprintf("You killed %s!", targetPlayer.Name))
-			targetPlayer.Room.Broadcast(fmt.Sprintf("%s has been slain by %s!", targetPlayer.Name, attackerPlayer.Name))
+			targetPlayer.Area.Broadcast(fmt.Sprintf("%s has been slain by %s!", targetPlayer.Name, attackerPlayer.Name))
 		} else if attackerNPC != nil {
-			targetPlayer.Room.Broadcast(fmt.Sprintf("%s has been slain by %s!", targetPlayer.Name, attackerNPC.Name))
+			targetPlayer.Area.Broadcast(fmt.Sprintf("%s has been slain by %s!", targetPlayer.Name, attackerNPC.Name))
 		}
 
 		// TODO: Handle respawn
@@ -161,8 +161,8 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 		}
 	} else if targetNPC != nil {
 		// NPC died
-		if targetNPC.Room != nil {
-			targetNPC.Room.Broadcast(targetNPC.Name + " has been slain!")
+		if targetNPC.Area != nil {
+			targetNPC.Area.Broadcast(targetNPC.Name + " has been slain!")
 		}
 
 		if attackerPlayer != nil {

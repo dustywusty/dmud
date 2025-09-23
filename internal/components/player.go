@@ -14,7 +14,7 @@ type Player struct {
 	Client common.Client
 
 	Name string
-	Room *Room
+	Area *Area
 
 	// Command history and auto-complete
 	CommandHistory *CommandHistory
@@ -27,29 +27,32 @@ func (p *Player) Broadcast(msg string) {
 
 // Update the Player Look method
 func (p *Player) Look(w WorldLike) {
-	if p.Room == nil {
+	if p.Area == nil {
 		p.Broadcast("You are nowhere.")
 		return
 	}
 
-	// Room description
-	p.Broadcast(p.Room.Description + "\n")
+	// Area description
+	p.Broadcast(p.Area.Description + "\n")
+	if p.Area.Region != "" {
+		p.Broadcast("Region: " + p.Area.Region)
+	}
 
 	// Show other players
-	p.Room.PlayersMutex.RLock()
+	p.Area.PlayersMutex.RLock()
 	var otherPlayers []string
-	for _, player := range p.Room.Players {
+	for _, player := range p.Area.Players {
 		if player != p {
 			otherPlayers = append(otherPlayers, player.Name)
 		}
 	}
-	p.Room.PlayersMutex.RUnlock()
+	p.Area.PlayersMutex.RUnlock()
 	for _, name := range otherPlayers {
 		p.Broadcast(name + " is here.")
 	}
 
 	// Show NPCs after players
-	npcs := p.Room.GetNPCs(w)
+	npcs := p.Area.GetNPCs(w)
 	for _, npc := range npcs {
 		p.Broadcast(npc.Name + " is here.")
 	}
@@ -57,9 +60,9 @@ func (p *Player) Look(w WorldLike) {
 	p.Broadcast("\n")
 
 	// Show exits
-	if len(p.Room.Exits) > 0 {
-		exits := make([]string, len(p.Room.Exits))
-		for i, exit := range p.Room.Exits {
+	if len(p.Area.Exits) > 0 {
+		exits := make([]string, len(p.Area.Exits))
+		for i, exit := range p.Area.Exits {
 			exits[i] = exit.Direction
 		}
 		p.Broadcast(fmt.Sprintf("\n\nExits: [%s]", strings.Join(exits, ", ")))

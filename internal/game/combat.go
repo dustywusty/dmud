@@ -25,13 +25,13 @@ func (g *Game) HandleKill(player *components.Player, targetName string) {
 	// First check for players
 	g.playersMu.Lock()
 	defer g.playersMu.Unlock()
-	
+
 	targetEntity := g.players[targetName]
 	playerEntity := g.players[player.Name]
 
 	if targetEntity == nil {
 		// Check for NPCs
-		npcs := player.Room.GetNPCs(g.world.AsWorldLike())
+		npcs := player.Area.GetNPCs(g.world.AsWorldLike())
 		for _, npc := range npcs {
 			if strings.Contains(strings.ToLower(npc.Name), strings.ToLower(targetName)) {
 				// Find NPC entity
@@ -68,6 +68,6 @@ func (g *Game) HandleKill(player *components.Player, targetName string) {
 
 	// Announce combat
 	if npc, err := ecs.GetTypedComponent[*components.NPC](g.world, targetEntity.ID, "NPC"); err == nil {
-		player.Room.Broadcast(player.Name + " attacks " + npc.Name + "!")
+		player.Area.Broadcast(player.Name + " attacks " + npc.Name + "!")
 	}
 }
