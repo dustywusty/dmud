@@ -21,21 +21,7 @@ type Player struct {
 	AutoComplete   *util.AutoComplete
 }
 
-func (p *Player) Broadcast(m string) {
-	msg := m
-
-	if !p.Client.SupportsPrompt() {
-		trimmed := strings.TrimLeft(msg, "\n")
-
-		switch {
-		case trimmed == "" && strings.Contains(msg, "\n"):
-			// Preserve intentional blank lines but collapse multiples to one.
-			msg = "\n"
-		case trimmed != "":
-			msg = trimmed
-		}
-	}
-
+func (p *Player) Broadcast(msg string) {
 	p.Client.SendMessage(msg)
 }
 
