@@ -33,7 +33,7 @@ type Command struct {
 var commandRegistry = make(map[string]*Command)
 
 type Game struct {
-	defaultRoom *components.Room
+	defaultArea *components.Area
 
 	players   map[string]*ecs.Entity
 	playersMu sync.RWMutex
@@ -57,18 +57,18 @@ func NewGame() *Game {
 	world.AddSystem(spawnSystem)
 	world.AddSystem(aiSystem)
 
-	defaultRoomUntyped, err := world.GetComponent("1", "Room")
+	defaultAreaUntyped, err := world.GetComponent("1", "Area")
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to get default room")
+		log.Fatal().Err(err).Msg("Failed to get default area")
 	}
 
-	defaultRoom, ok := defaultRoomUntyped.(*components.Room)
+	defaultArea, ok := defaultAreaUntyped.(*components.Area)
 	if !ok {
-		log.Fatal().Msg("Failed to cast default room to *components.Room")
+		log.Fatal().Msg("Failed to cast default area to *components.Area")
 	}
 
 	game := &Game{
-		defaultRoom:        defaultRoom,
+		defaultArea:        defaultArea,
 		players:            make(map[string]*ecs.Entity),
 		world:              world,
 		AddPlayerChan:      make(chan common.Client, 64),
@@ -85,9 +85,9 @@ func NewGame() *Game {
 }
 
 func (g *Game) initializeSpawns() {
-	// Add spawns to specific rooms
+	// Add spawns to specific areas
 	spawns := map[string][]components.SpawnConfig{
-		"1": { // Starting room
+		"1": { // Starting area
 			{
 				Type:        components.SpawnTypeNPC,
 				TemplateID:  "rat",
@@ -97,7 +97,7 @@ func (g *Game) initializeSpawns() {
 				Chance:      1,
 			},
 		},
-		"2": { // Another room
+		"2": { // Another area
 			{
 				Type:        components.SpawnTypeNPC,
 				TemplateID:  "goblin",
@@ -135,14 +135,14 @@ func (g *Game) initializeSpawns() {
 		},
 	}
 
-	for roomID, configs := range spawns {
-		spawn := components.NewSpawn(common.EntityID(roomID))
+	for areaID, configs := range spawns {
+		spawn := components.NewSpawn(common.EntityID(areaID))
 		spawn.Configs = configs
 
-		entity, err := g.world.FindEntity(common.EntityID(roomID))
+		entity, err := g.world.FindEntity(common.EntityID(areaID))
 		if err == nil {
 			g.world.AddComponent(&entity, spawn)
-			log.Info().Msgf("Added spawn component to room %s with %d configs", roomID, len(configs))
+			log.Info().Msgf("Added spawn component to area %s with %d configs", areaID, len(configs))
 		}
 	}
 }
@@ -171,7 +171,7 @@ func (g *Game) initCommands() {
 	g.RegisterCommand(&Command{
 		Name:        "say",
 		Handler:     handleSay,
-		Description: "Say something to players in the same room.",
+		Description: "Say something to players in the same area.",
 	})
 	g.RegisterCommand(&Command{
 		Name:        "shout",
@@ -293,7 +293,7 @@ func (g *Game) HandleConnect(c common.Client) {
 	playerComponent := &components.Player{
 		Client:         c,
 		Name:           util.GenerateRandomName(),
-		Room:           g.defaultRoom,
+		Area:           g.defaultArea,
 		CommandHistory: components.NewCommandHistory(),
 		AutoComplete:   util.NewAutoComplete(),
 	}
@@ -312,10 +312,13 @@ func (g *Game) HandleConnect(c common.Client) {
 	g.players[playerComponent.Name] = &playerEntity
 	g.playersMu.Unlock()
 
-	g.defaultRoom.AddPlayer(playerComponent)
+	g.defaultArea.AddPlayer(playerComponent)
 
 	playerComponent.Broadcast(util.WelcomeBanner)
-	playerComponent.Broadcast(g.defaultRoom.Description)
+	playerComponent.Broadcast(g.defaultArea.Description)
+	if g.defaultArea.Region != "" {
+		playerComponent.Broadcast("Region: " + g.defaultArea.Region)
+	}
 
 	g.Broadcast(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
 

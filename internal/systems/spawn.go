@@ -49,9 +49,9 @@ func (ss *SpawnSystem) processSpawn(w *ecs.World, spawnEntity ecs.Entity) {
 		return
 	}
 
-	room, err := ecs.GetTypedComponent[*components.Room](w, spawnEntity.ID, "Room")
+	area, err := ecs.GetTypedComponent[*components.Area](w, spawnEntity.ID, "Area")
 	if err != nil {
-		log.Error().Err(err).Msg("Error getting room component")
+		log.Error().Err(err).Msg("Error getting area component")
 		return
 	}
 
@@ -70,7 +70,7 @@ func (ss *SpawnSystem) processSpawn(w *ecs.World, spawnEntity ecs.Entity) {
 		if activeCount < config.MinCount {
 			// Check spawn chance
 			if rand.Float64() <= config.Chance {
-				ss.spawnNPC(w, room, config, spawn)
+				ss.spawnNPC(w, area, config, spawn)
 			}
 		}
 	}
@@ -94,7 +94,7 @@ func (ss *SpawnSystem) countActiveNPCs(w *ecs.World, spawn *components.Spawn, te
 	return count
 }
 
-func (ss *SpawnSystem) spawnNPC(w *ecs.World, room *components.Room, config components.SpawnConfig, spawn *components.Spawn) {
+func (ss *SpawnSystem) spawnNPC(w *ecs.World, area *components.Area, config components.SpawnConfig, spawn *components.Spawn) {
 	template, exists := components.NPCTemplates[config.TemplateID]
 	if !exists {
 		log.Error().Msgf("NPC template not found: %s", config.TemplateID)
@@ -112,10 +112,10 @@ func (ss *SpawnSystem) spawnNPC(w *ecs.World, room *components.Room, config comp
 		delete(spawn.ActiveSpawns, template.ID)
 	}
 
-	// Count existing NPCs of this type in the room
+	// Count existing NPCs of this type in the area
 	npcEntities, _ := w.FindEntitiesByComponentPredicate("NPC", func(i interface{}) bool {
 		n, ok := i.(*components.NPC)
-		return ok && n.Room == room && n.TemplateID == template.ID
+		return ok && n.Area == area && n.TemplateID == template.ID
 	})
 
 	// Only spawn if under the max count
@@ -131,7 +131,7 @@ func (ss *SpawnSystem) spawnNPC(w *ecs.World, room *components.Room, config comp
 	npc := &components.NPC{
 		Name:        template.Name,
 		Description: template.Description,
-		Room:        room,
+		Area:        area,
 		TemplateID:  template.ID,
 		Behavior:    template.Behavior,
 		Dialogue:    template.Dialogue,
@@ -159,8 +159,8 @@ func (ss *SpawnSystem) spawnNPC(w *ecs.World, room *components.Room, config comp
 	// Track the spawn
 	spawn.ActiveSpawns[template.ID] = npcEntity.ID
 
-	// Announce spawn to room (with newline to avoid interrupting typing)
-	room.Broadcast(template.Name + " arrives.")
+	// Announce spawn to area (with newline to avoid interrupting typing)
+	area.Broadcast(template.Name + " arrives.")
 
-	log.Info().Msgf("Spawned NPC: %s in room %s", template.Name, spawn.RoomID)
+	log.Info().Msgf("Spawned NPC: %s in area %s", template.Name, spawn.AreaID)
 }

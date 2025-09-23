@@ -93,8 +93,8 @@ func handleExamine(player *components.Player, args []string, game *Game) {
 
 	target := strings.Join(args, " ")
 
-	// Check for NPCs in the room
-	npcs := player.Room.GetNPCs(game.world.AsWorldLike())
+	// Check for NPCs in the area
+	npcs := player.Area.GetNPCs(game.world.AsWorldLike())
 	for _, npc := range npcs {
 		if strings.Contains(strings.ToLower(npc.Name), strings.ToLower(target)) {
 			player.Broadcast(npc.Description)
@@ -136,7 +136,7 @@ func handleExamine(player *components.Player, args []string, game *Game) {
 	}
 
 	// Check for players
-	targetPlayer := player.Room.GetPlayer(target)
+	targetPlayer := player.Area.GetPlayer(target)
 	if targetPlayer != nil {
 		player.Broadcast("You see " + targetPlayer.Name + ", a fellow adventurer.")
 		return

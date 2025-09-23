@@ -158,8 +158,8 @@ func (w *World) RemoveEntity(entityID common.EntityID) {
 		if !ok {
 			log.Error().Msgf("Error type asserting Player for player %s", entityID)
 		} else {
-			if player.Room != nil {
-				player.Room.RemovePlayer(player)
+			if player.Area != nil {
+				player.Area.RemovePlayer(player)
 			}
 		}
 	}
@@ -195,47 +195,48 @@ func NewWorld() *World {
 		components: make(map[common.EntityID]map[string]Component),
 	}
 
-	rooms := loadRoomsFromFile("./resources/rooms.json")
+	areas := loadAreasFromFile("./resources/areas.json")
 
-	for _, room := range rooms {
-		roomEntity := NewEntity(room.ID)
-		roomComponent := &components.Room{
-			Description: room.Description,
+	for _, area := range areas {
+		areaEntity := NewEntity(area.ID)
+		areaComponent := &components.Area{
+			Region:      area.Region,
+			Description: area.Description,
 		}
-		world.AddEntity(roomEntity)
-		world.AddComponent(&roomEntity, roomComponent)
+		world.AddEntity(areaEntity)
+		world.AddComponent(&areaEntity, areaComponent)
 	}
 
-	for _, room := range rooms {
-		component, err := world.GetComponent(common.EntityID(room.ID), "Room")
+	for _, area := range areas {
+		component, err := world.GetComponent(common.EntityID(area.ID), "Area")
 		if err != nil {
-			log.Error().Err(err).Msgf("Could not get Room for room %s", room.ID)
+			log.Error().Err(err).Msgf("Could not get Area for area %s", area.ID)
 			continue
 		}
 
-		roomComponent, ok := component.(*components.Room)
+		areaComponent, ok := component.(*components.Area)
 		if !ok {
-			log.Error().Msgf("Error type asserting Room for room %s", room.ID)
+			log.Error().Msgf("Error type asserting Area for area %s", area.ID)
 			continue
 		}
 
-		for direction, roomID := range room.Exits {
-			exitRoomUntyped, err := world.GetComponent(common.EntityID(roomID), "Room")
+		for direction, areaID := range area.Exits {
+			exitAreaUntyped, err := world.GetComponent(common.EntityID(areaID), "Area")
 			if err != nil {
-				log.Error().Err(err).Msgf("Could not get Room for exit room %s", roomID)
+				log.Error().Err(err).Msgf("Could not get Area for exit area %s", areaID)
 				continue
 			}
 
-			exitRoom, ok := exitRoomUntyped.(*components.Room)
+			exitArea, ok := exitAreaUntyped.(*components.Area)
 			if !ok {
-				log.Error().Msgf("Error type asserting Room for exit room %s", roomID)
+				log.Error().Msgf("Error type asserting Area for exit area %s", areaID)
 				continue
 			}
 
-			roomComponent.Exits = append(roomComponent.Exits, components.Exit{
+			areaComponent.Exits = append(areaComponent.Exits, components.Exit{
 				Direction: direction,
-				RoomID:    roomID,
-				Room:      exitRoom,
+				AreaID:    areaID,
+				Area:      exitArea,
 			})
 		}
 	}
@@ -243,18 +244,19 @@ func NewWorld() *World {
 	return world
 }
 
-type Room struct {
+type areaDefinition struct {
 	ID          string            `json:"id"`
+	Region      string            `json:"region"`
 	Description string            `json:"description"`
 	Exits       map[string]string `json:"exits"`
 }
 
-func loadRoomsFromFile(filename string) []Room {
-	var rooms []Room
-	if err := util.ParseJSON(filename, &rooms); err != nil {
+func loadAreasFromFile(filename string) []areaDefinition {
+	var areas []areaDefinition
+	if err := util.ParseJSON(filename, &areas); err != nil {
 		log.Error().Err(err).Msg("")
 	}
-	return rooms
+	return areas
 }
 
 // WorldLikeAdapter wraps World to implement components.WorldLike

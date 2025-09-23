@@ -73,15 +73,15 @@ func (as *AISystem) processAggressiveNPC(w *ecs.World, npcEntity ecs.Entity, npc
 	// If not in combat, look for targets
 	if combat == nil || combat.TargetID == "" {
 		npc.RLock()
-		room := npc.Room
+		area := npc.Area
 		npc.RUnlock()
 
-		if room != nil && len(room.Players) > 0 {
+		if area != nil && len(area.Players) > 0 {
 			// Pick a random player to attack
-			room.PlayersMutex.RLock()
-			if len(room.Players) > 0 {
-				target := room.Players[rand.Intn(len(room.Players))]
-				room.PlayersMutex.RUnlock()
+			area.PlayersMutex.RLock()
+			if len(area.Players) > 0 {
+				target := area.Players[rand.Intn(len(area.Players))]
+				area.PlayersMutex.RUnlock()
 
 				// Find player entity
 				playerEntities, _ := w.FindEntitiesByComponentPredicate("Player", func(i interface{}) bool {
@@ -98,10 +98,10 @@ func (as *AISystem) processAggressiveNPC(w *ecs.World, npcEntity ecs.Entity, npc
 					}
 					w.AddComponent(&npcEntity, newCombat)
 
-					room.Broadcast(npc.Name + " attacks " + target.Name + "!")
+					area.Broadcast(npc.Name + " attacks " + target.Name + "!")
 				}
 			} else {
-				room.PlayersMutex.RUnlock()
+				area.PlayersMutex.RUnlock()
 			}
 		}
 	}
@@ -111,8 +111,8 @@ func (as *AISystem) processFriendlyNPC(w *ecs.World, npcEntity ecs.Entity, npc *
 	// Occasionally say something
 	if time.Since(npc.LastAction) > 30*time.Second && rand.Float64() < 0.3 {
 		dialogue := npc.GetRandomDialogue()
-		if dialogue != "" && npc.Room != nil {
-			npc.Room.Broadcast(npc.Name + " says: " + dialogue)
+		if dialogue != "" && npc.Area != nil {
+			npc.Area.Broadcast(npc.Name + " says: " + dialogue)
 			npc.Lock()
 			defer npc.Unlock()
 			npc.LastAction = time.Now()
@@ -130,8 +130,8 @@ func (as *AISystem) processPassiveNPC(w *ecs.World, npcEntity ecs.Entity, npc *c
 	// Passive NPCs might flee when attacked or just emote
 	if time.Since(npc.LastAction) > 45*time.Second && rand.Float64() < 0.2 {
 		dialogue := npc.GetRandomDialogue()
-		if dialogue != "" && npc.Room != nil {
-			npc.Room.Broadcast(npc.Name + " " + dialogue)
+		if dialogue != "" && npc.Area != nil {
+			npc.Area.Broadcast(npc.Name + " " + dialogue)
 			npc.Lock()
 			defer npc.Unlock()
 			npc.LastAction = time.Now()

@@ -54,22 +54,22 @@ func HandleMovement(w *ecs.World, movingEntity ecs.Entity) {
 		return
 	}
 
-	room := movingPlayer.Room
-	if room == nil {
-		log.Warn().Msgf("%v moving, but not in a room", movingPlayer)
+	area := movingPlayer.Area
+	if area == nil {
+		log.Warn().Msgf("%v moving, but not in an area", movingPlayer)
 		movingPlayer.Broadcast("Do you know where you are?")
 		return
 	}
 
-	exit := room.GetExit(moving.Direction)
+	exit := area.GetExit(moving.Direction)
 	if exit == nil {
 		movingPlayer.Broadcast("You can't go that way.")
 		return
 	}
 
-	room.RemovePlayer(movingPlayer)
+	area.RemovePlayer(movingPlayer)
 
-	movingPlayer.Room = exit.Room
-	movingPlayer.Room.AddPlayer(movingPlayer)
-	movingPlayer.Broadcast(exit.Room.Description)
+	movingPlayer.Area = exit.Area
+	movingPlayer.Area.AddPlayer(movingPlayer)
+	movingPlayer.Broadcast(exit.Area.Description)
 }
