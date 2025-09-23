@@ -35,9 +35,9 @@ func (p *Player) Look(w WorldLike) {
 	// Area description
 	p.Broadcast(p.Area.Description + "\n\n")
 
-	if p.Area.Region != "" {
-		p.Broadcast("Region: " + p.Area.Region + "\n\n")
-	}
+	// if p.Area.Region != "" {
+	// 	p.Broadcast("Region: " + p.Area.Region + "\n\n")
+	// }
 
 	// Show other players
 	p.Area.PlayersMutex.RLock()
@@ -57,8 +57,6 @@ func (p *Player) Look(w WorldLike) {
 	for _, npc := range npcs {
 		p.Broadcast(npc.Name + " is here.")
 	}
-
-	p.Broadcast("\n")
 
 	// Show exits
 	if len(p.Area.Exits) > 0 {

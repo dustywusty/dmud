@@ -316,9 +316,10 @@ func (g *Game) HandleConnect(c common.Client) {
 
 	playerComponent.Broadcast(util.WelcomeBanner)
 	playerComponent.Broadcast(g.defaultArea.Description)
-	if g.defaultArea.Region != "" {
-		playerComponent.Broadcast("Region: " + g.defaultArea.Region)
-	}
+
+	// if g.defaultArea.Region != "" {
+	// 	playerComponent.Broadcast("Region: " + g.defaultArea.Region)
+	// }
 
 	g.Broadcast(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
 
