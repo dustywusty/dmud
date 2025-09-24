@@ -11,14 +11,15 @@ import (
 type NPC struct {
 	sync.RWMutex
 
-	Name        string
-	Description string
-	Area        *Area
-	TemplateID  string
-	Behavior    NPCBehavior
-	Dialogue    []string
-	LastAction  time.Time
-	Target      common.EntityID // For aggressive NPCs
+	Name         string
+	Description  string
+	Area         *Area
+	TemplateID   string
+	Behavior     NPCBehavior
+	Dialogue     []string
+	LastAction   time.Time
+	LastMovement time.Time
+	Target       common.EntityID // For aggressive NPCs
 }
 
 func (n *NPC) GetRandomDialogue() string {
