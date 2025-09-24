@@ -129,13 +129,14 @@ func (ss *SpawnSystem) spawnNPC(w *ecs.World, area *components.Area, config comp
 
 	// Add NPC component
 	npc := &components.NPC{
-		Name:        template.Name,
-		Description: template.Description,
-		Area:        area,
-		TemplateID:  template.ID,
-		Behavior:    template.Behavior,
-		Dialogue:    template.Dialogue,
-		LastAction:  time.Now(),
+		Name:         template.Name,
+		Description:  template.Description,
+		Area:         area,
+		TemplateID:   template.ID,
+		Behavior:     template.Behavior,
+		Dialogue:     template.Dialogue,
+		LastAction:   time.Now(),
+		LastMovement: time.Now(),
 	}
 	w.AddComponent(&npcEntity, npc)
 
