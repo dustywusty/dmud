@@ -2,8 +2,10 @@
 package systems
 
 import (
+	"dmud/internal/common"
 	"dmud/internal/components"
 	"dmud/internal/ecs"
+	"fmt"
 	"math/rand"
 	"time"
 )
@@ -207,9 +209,167 @@ func (as *AISystem) processFriendlyNPC(w *ecs.World, npcEntity ecs.Entity, npc *
 }
 
 func (as *AISystem) processGuardNPC(w *ecs.World, npcEntity ecs.Entity, npc *components.NPC) {
-	// Guards could intervene in fights or warn troublemakers
-	// For now, just act friendly
+	combat, _ := ecs.GetTypedComponent[*components.Combat](w, npcEntity.ID, "Combat")
+
+	if as.guardIntervene(w, npcEntity, npc, combat) {
+		return
+	}
+
 	as.processFriendlyNPC(w, npcEntity, npc)
+}
+
+func (as *AISystem) guardIntervene(w *ecs.World, npcEntity ecs.Entity, npc *components.NPC, combat *components.Combat) bool {
+	npc.RLock()
+	area := npc.Area
+	npc.RUnlock()
+
+	if area == nil {
+		return false
+	}
+
+	if combat != nil {
+		combat.RLock()
+		hasTarget := combat.TargetID != ""
+		combat.RUnlock()
+
+		if hasTarget {
+			return true
+		}
+	}
+
+	aggressorID, aggressorName := findAreaAggressor(w, area, npcEntity.ID)
+	if aggressorID == "" {
+		return false
+	}
+
+	if combat == nil {
+		minDamage := 5
+		maxDamage := 10
+		if template, ok := components.NPCTemplates[npc.TemplateID]; ok {
+			minDamage = template.MinDamage
+			maxDamage = template.MaxDamage
+		}
+
+		combat = &components.Combat{
+			MinDamage: minDamage,
+			MaxDamage: maxDamage,
+		}
+		w.AddComponent(&npcEntity, combat)
+	}
+
+	combat.Lock()
+	combat.TargetID = aggressorID
+	combat.Unlock()
+
+	area.Broadcast(fmt.Sprintf("%s shouts, \"Keep the peace!\" and attacks %s!", npc.Name, aggressorName))
+
+	return true
+}
+
+func findAreaAggressor(w *ecs.World, area *components.Area, guardID common.EntityID) (common.EntityID, string) {
+	if area == nil {
+		return "", ""
+	}
+
+	npcEntities, _ := w.FindEntitiesByComponentPredicate("NPC", func(i interface{}) bool {
+		npc, ok := i.(*components.NPC)
+		if !ok {
+			return false
+		}
+		return npc.Area == area
+	})
+
+	for _, entity := range npcEntities {
+		if entity.ID == guardID {
+			continue
+		}
+
+		npcComp, err := ecs.GetTypedComponent[*components.NPC](w, entity.ID, "NPC")
+		if err != nil {
+			continue
+		}
+
+		if npcComp.Behavior == components.BehaviorGuard {
+			continue
+		}
+
+		targetID, targetPlayer, targetNPC := getCombatTargetInfo(w, entity.ID)
+		if !guardShouldIntervene(area, guardID, targetID, targetPlayer, targetNPC) {
+			continue
+		}
+
+		return entity.ID, npcComp.Name
+	}
+
+	playerEntities, _ := w.FindEntitiesByComponentPredicate("Player", func(i interface{}) bool {
+		player, ok := i.(*components.Player)
+		if !ok {
+			return false
+		}
+		return player.Area == area
+	})
+
+	for _, entity := range playerEntities {
+		if entity.ID == guardID {
+			continue
+		}
+
+		playerComp, err := ecs.GetTypedComponent[*components.Player](w, entity.ID, "Player")
+		if err != nil {
+			continue
+		}
+
+		targetID, targetPlayer, targetNPC := getCombatTargetInfo(w, entity.ID)
+		if !guardShouldIntervene(area, guardID, targetID, targetPlayer, targetNPC) {
+			continue
+		}
+
+		return entity.ID, playerComp.Name
+	}
+
+	return "", ""
+}
+
+func getCombatTargetInfo(w *ecs.World, entityID common.EntityID) (common.EntityID, *components.Player, *components.NPC) {
+	combatComp, err := ecs.GetTypedComponent[*components.Combat](w, entityID, "Combat")
+	if err != nil {
+		return "", nil, nil
+	}
+
+	combatComp.RLock()
+	targetID := combatComp.TargetID
+	combatComp.RUnlock()
+
+	if targetID == "" {
+		return "", nil, nil
+	}
+
+	targetPlayer, _ := ecs.GetTypedComponent[*components.Player](w, targetID, "Player")
+	targetNPC, _ := ecs.GetTypedComponent[*components.NPC](w, targetID, "NPC")
+
+	return targetID, targetPlayer, targetNPC
+}
+
+func guardShouldIntervene(area *components.Area, guardID, targetID common.EntityID, targetPlayer *components.Player, targetNPC *components.NPC) bool {
+	if targetID == "" {
+		return false
+	}
+
+	if targetID == guardID {
+		return true
+	}
+
+	if targetPlayer != nil && targetPlayer.Area == area {
+		return true
+	}
+
+	if targetNPC != nil && targetNPC.Area == area {
+		if targetNPC.Behavior != components.BehaviorAggressive && targetNPC.Behavior != components.BehaviorGuard {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (as *AISystem) processPassiveNPC(w *ecs.World, npcEntity ecs.Entity, npc *components.NPC) {

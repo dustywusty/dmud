@@ -148,8 +148,8 @@ func (ss *SpawnSystem) spawnNPC(w *ecs.World, area *components.Area, config comp
 	}
 	w.AddComponent(&npcEntity, health)
 
-	// Add Combat component for aggressive NPCs
-	if template.Behavior == components.BehaviorAggressive {
+	// Add Combat component for NPCs that can fight on their own
+	if template.Behavior == components.BehaviorAggressive || template.Behavior == components.BehaviorGuard {
 		combat := &components.Combat{
 			MinDamage: template.MinDamage,
 			MaxDamage: template.MaxDamage,
