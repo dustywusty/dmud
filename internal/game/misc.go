@@ -54,6 +54,27 @@ func handleName(player *components.Player, args []string, game *Game) {
 	game.HandleRename(player, newName)
 }
 
+func handleRecall(player *components.Player, args []string, game *Game) {
+	if player.Area == nil {
+		player.Area = game.defaultArea
+		game.defaultArea.AddPlayer(player)
+		player.Broadcast("You gather your senses and return to the starting area.")
+		player.Look(game.world.AsWorldLike())
+		return
+	}
+
+	if player.Area == game.defaultArea {
+		player.Broadcast("You are already at the starting area.")
+		return
+	}
+
+	player.Area.RemovePlayer(player)
+	player.Area = game.defaultArea
+	game.defaultArea.AddPlayer(player)
+	player.Broadcast("You focus for a moment and recall to the starting area.")
+	player.Look(game.world.AsWorldLike())
+}
+
 func (g *Game) HandleRename(player *components.Player, newName string) {
 	newName = strings.TrimSpace(newName)
 	if newName == "" {

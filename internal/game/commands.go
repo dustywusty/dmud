@@ -83,37 +83,11 @@ func handleComplete(player *components.Player, args []string, game *Game) {
 func handleHelp(player *components.Player, args []string, game *Game) {
 	if len(args) == 0 {
 		var b strings.Builder
-		b.WriteString("Basic Commands:\n")
-		b.WriteString("  look          - Look around your current location\n")
-		b.WriteString("  who            - List online players\n")
-		b.WriteString("  say <message>  - Say something to players in the same area\n")
-		b.WriteString("  shout <message> - Shout to nearby areas\n")
-		b.WriteString("  examine <target> - Examine something or someone\n")
-		b.WriteString("  kill <target>  - Attack a player or NPC\n")
-		b.WriteString("  exit           - Leave the game\n")
-		b.WriteString("\n")
-		b.WriteString("Movement Commands:\n")
-		b.WriteString("  north/n        - Move north\n")
-		b.WriteString("  south/s        - Move south\n")
-		b.WriteString("  east/e         - Move east\n")
-		b.WriteString("  west/w         - Move west\n")
-		b.WriteString("  up/u           - Move up\n")
-		b.WriteString("  down/d         - Move down\n")
-
-		b.WriteString("\n")
-		b.WriteString("Player Management:\n")
-		b.WriteString("  name <new_name> - Change your player name\n")
-
-		b.WriteString("\n")
-		b.WriteString("Utility Commands:\n")
-		b.WriteString("  help           - Show this help message\n")
-		b.WriteString("  history/hist   - Show your command history\n")
-		b.WriteString("  clear          - Clear your command history\n")
-		b.WriteString("  suggest <partial> - Get suggestions for commands or players\n")
-		b.WriteString("  complete <partial> - Get instant auto-completion\n")
-
-		b.WriteString("\n")
-		b.WriteString("Type 'help <command>' for detailed information about a specific command.\n")
+		b.WriteString("Available commands:\n")
+		b.WriteString("  look, who, say <message>, shout <message>, examine <target>, kill <target>, name <new_name>, recall, exit\n")
+		b.WriteString("Movement: north/south/east/west/up/down\n")
+		b.WriteString("Utility: help [command], history, clear, suggest <partial>, complete <partial>\n")
+		b.WriteString("\nType 'help <command>' for detailed information about a specific command.\n")
 
 		player.Broadcast(b.String())
 
@@ -139,6 +113,7 @@ func handleHelp(player *components.Player, args []string, game *Game) {
 		"up":       "Move up to the adjacent area (if an exit exists).",
 		"down":     "Move down to the adjacent area (if an exit exists).",
 		"name":     "Change your player name. Usage: name <new_name>",
+		"recall":   "Return to the starting area instantly.",
 		"help":     "Show help information. Usage: help [command]",
 		"history":  "Show your command history (last 100 commands).",
 		"clear":    "Clear your command history.",

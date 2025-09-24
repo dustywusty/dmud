@@ -169,6 +169,11 @@ func (g *Game) initCommands() {
 		Description: "Change your player name.",
 	})
 	g.RegisterCommand(&Command{
+		Name:        "recall",
+		Handler:     handleRecall,
+		Description: "Return to the starting area.",
+	})
+	g.RegisterCommand(&Command{
 		Name:        "say",
 		Handler:     handleSay,
 		Description: "Say something to players in the same area.",
