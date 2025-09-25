@@ -9,6 +9,7 @@ import (
 
 	"dmud/internal/common"
 	"dmud/internal/game"
+	"dmud/internal/storage"
 
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
@@ -28,6 +29,8 @@ type Server struct {
 
 	game *game.Game
 
+	storage *storage.Storage
+
 	tcpListener net.Listener
 	tcpHost     string
 	tcpPort     string
@@ -42,7 +45,7 @@ type Server struct {
 
 func (s *Server) Run() {
 	var wg sync.WaitGroup
-	s.game = game.NewGame()
+	s.game = game.NewGame(s.storage)
 
 	started := 0
 
@@ -201,12 +204,13 @@ func (s *Server) runWebSocketServer() {
 	<-done
 }
 
-func NewServer(config *ServerConfig) *Server {
+func NewServer(config *ServerConfig, store *storage.Storage) *Server {
 	return &Server{
 		tcpHost:     config.TCPHost,
 		tcpPort:     config.TCPPort,
 		wsHost:      config.WSHost,
 		wsPort:      config.WSPort,
 		connections: make(map[string]common.Client),
+		storage:     store,
 	}
 }

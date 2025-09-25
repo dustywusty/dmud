@@ -9,6 +9,7 @@ import (
 	"dmud/internal/common"
 	"dmud/internal/components"
 	"dmud/internal/ecs"
+	"dmud/internal/storage"
 	"dmud/internal/systems"
 	"dmud/internal/util"
 
@@ -40,18 +41,28 @@ type Game struct {
 
 	world *ecs.World
 
+	storage     *storage.Storage
+	lastPersist time.Time
+
 	AddPlayerChan      chan common.Client
 	RemovePlayerChan   chan common.Client
 	ExecuteCommandChan chan ClientCommand
 }
 
-func NewGame() *Game {
+func NewGame(store *storage.Storage) *Game {
 	combatSystem := &systems.CombatSystem{}
 	movementSystem := &systems.MovementSystem{}
 	spawnSystem := systems.NewSpawnSystem()
 	aiSystem := systems.NewAISystem()
 
 	world := ecs.NewWorld()
+	if store != nil {
+		if err := store.BootstrapWorld(world); err != nil {
+			log.Fatal().Err(err).Msg("Failed to bootstrap world from storage")
+		}
+	} else {
+		world.PopulateFromFile("./resources/areas.json")
+	}
 	world.AddSystem(combatSystem)
 	world.AddSystem(movementSystem)
 	world.AddSystem(spawnSystem)
@@ -71,6 +82,7 @@ func NewGame() *Game {
 		defaultArea:        defaultArea,
 		players:            make(map[string]*ecs.Entity),
 		world:              world,
+		storage:            store,
 		AddPlayerChan:      make(chan common.Client, 64),
 		RemovePlayerChan:   make(chan common.Client, 64),
 		ExecuteCommandChan: make(chan ClientCommand, 256),
@@ -78,6 +90,13 @@ func NewGame() *Game {
 
 	game.initCommands()
 	game.initializeSpawns()
+
+	if store != nil {
+		if err := store.SaveWorld(world); err != nil {
+			log.Error().Err(err).Msg("Failed to persist initial world state")
+		}
+		game.lastPersist = time.Now()
+	}
 
 	go game.loop()
 
@@ -136,6 +155,9 @@ func (g *Game) initializeSpawns() {
 	}
 
 	for areaID, configs := range spawns {
+		if _, err := g.world.GetComponent(common.EntityID(areaID), "Spawn"); err == nil {
+			continue
+		}
 		spawn := components.NewSpawn(common.EntityID(areaID))
 		spawn.Configs = configs
 
@@ -295,47 +317,90 @@ func (g *Game) handleCommand(c ClientCommand) {
 }
 
 func (g *Game) HandleConnect(c common.Client) {
-	playerComponent := &components.Player{
-		Client:         c,
-		Name:           util.GenerateRandomName(),
-		Area:           g.defaultArea,
-		CommandHistory: components.NewCommandHistory(),
-		AutoComplete:   util.NewAutoComplete(),
-	}
-	healthComponent := &components.Health{
-		Max:     100,
-		Current: 100,
+	addr := util.ExtractHost(c.RemoteAddr())
+
+	var (
+		playerComponent *components.Player
+		playerEntity    ecs.Entity
+		returning       bool
+	)
+
+	if g.storage != nil {
+		if model, err := g.storage.FindPlayerByAddress(addr); err == nil && model != nil {
+			entity, err := g.world.FindEntity(common.EntityID(model.EntityID))
+			if err == nil && entity.ID != "" {
+				if component, err := g.world.GetComponent(entity.ID, "Player"); err == nil {
+					if existing, ok := component.(*components.Player); ok {
+						playerComponent = existing
+						playerEntity = entity
+						returning = true
+					}
+				}
+			}
+		}
 	}
 
-	playerEntity := ecs.NewEntity()
-	g.world.AddEntity(playerEntity)
+	if playerComponent == nil {
+		playerComponent = &components.Player{
+			Client:         c,
+			Name:           util.GenerateRandomName(),
+			Area:           g.defaultArea,
+			CommandHistory: components.NewCommandHistory(),
+			AutoComplete:   util.NewAutoComplete(),
+			LastKnownAddr:  addr,
+		}
+		healthComponent := &components.Health{
+			Max:     100,
+			Current: 100,
+		}
 
-	g.world.AddComponent(&playerEntity, playerComponent)
-	g.world.AddComponent(&playerEntity, healthComponent)
+		playerEntity = ecs.NewEntity()
+		g.world.AddEntity(playerEntity)
+
+		g.world.AddComponent(&playerEntity, playerComponent)
+		g.world.AddComponent(&playerEntity, healthComponent)
+	} else {
+		playerComponent.Client = c
+		playerComponent.LastKnownAddr = addr
+		if playerComponent.CommandHistory == nil {
+			playerComponent.CommandHistory = components.NewCommandHistory()
+		}
+		if playerComponent.AutoComplete == nil {
+			playerComponent.AutoComplete = util.NewAutoComplete()
+		}
+		if playerComponent.Area == nil {
+			playerComponent.Area = g.defaultArea
+		}
+	}
 
 	g.playersMu.Lock()
 	g.players[playerComponent.Name] = &playerEntity
 	g.playersMu.Unlock()
 
-	g.defaultArea.AddPlayer(playerComponent)
+	playerComponent.Area.AddPlayer(playerComponent)
 
-	playerComponent.Broadcast(util.WelcomeBanner)
+	if returning {
+		playerComponent.Broadcast(fmt.Sprintf("Welcome back, %s!", playerComponent.Name))
+	} else {
+		playerComponent.Broadcast(util.WelcomeBanner)
+	}
 	playerComponent.Look(g.world.AsWorldLike())
-
-	// if g.defaultArea.Region != "" {
-	// 	playerComponent.Broadcast("Region: " + g.defaultArea.Region)
-	// }
 
 	g.Broadcast(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
 
-	// Send initial prompt
 	if c.SupportsPrompt() {
 		c.SendMessage("> ")
 	} else {
-		c.SendMessage("\n") // spacer after the welcome text
+		c.SendMessage("\n")
 	}
 
 	go c.HandleRequest()
+
+	if g.storage != nil {
+		if err := g.storage.UpdatePlayerAddress(string(playerEntity.ID), addr); err != nil {
+			log.Error().Err(err).Msg("Failed to update player address")
+		}
+	}
 }
 
 // HandleDisconnect is called when a client disconnects from the game.
@@ -352,12 +417,23 @@ func (g *Game) HandleDisconnect(c common.Client) {
 		log.Error().Msg("Player entity was nil")
 		return
 	}
-	g.world.RemoveEntity(playerEntity.ID)
 	delete(g.players, player.Name)
 	g.playersMu.Unlock()
 
+	if player.Area != nil {
+		player.Area.RemovePlayer(player)
+	}
+	player.Client = nil
+	player.LastKnownAddr = util.ExtractHost(c.RemoteAddr())
+
 	c.CloseConnection()
 	g.Broadcast(fmt.Sprintf("%s has left the game.", player.Name), c)
+
+	if g.storage != nil {
+		if err := g.storage.UpdatePlayerAddress(string(playerEntity.ID), player.LastKnownAddr); err != nil {
+			log.Error().Err(err).Msg("Failed to persist player disconnect state")
+		}
+	}
 }
 
 // getPlayer retrieves the Player component associated with a client.
@@ -412,7 +488,18 @@ func (g *Game) loop() {
 	updateTicker := time.NewTicker(10 * time.Millisecond)
 	defer updateTicker.Stop()
 
+	var persistTicker *time.Ticker
+	if g.storage != nil {
+		persistTicker = time.NewTicker(g.storage.PersistInterval())
+		defer persistTicker.Stop()
+	}
+
 	for {
+		var persistChan <-chan time.Time
+		if persistTicker != nil {
+			persistChan = persistTicker.C
+		}
+
 		select {
 		case client := <-g.AddPlayerChan:
 			g.HandleConnect(client)
@@ -422,6 +509,20 @@ func (g *Game) loop() {
 			g.handleCommand(command)
 		case <-updateTicker.C:
 			g.world.Update()
+		case <-persistChan:
+			g.persistWorld()
 		}
 	}
+}
+
+func (g *Game) persistWorld() {
+	if g.storage == nil {
+		return
+	}
+
+	if err := g.storage.SaveWorld(g.world); err != nil {
+		log.Error().Err(err).Msg("Failed to persist world state")
+		return
+	}
+	g.lastPersist = time.Now()
 }

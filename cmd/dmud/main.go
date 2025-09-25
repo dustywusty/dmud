@@ -6,6 +6,7 @@ import (
 	"syscall"
 
 	"dmud/internal/net"
+	"dmud/internal/storage"
 	"dmud/internal/util"
 
 	"github.com/rs/zerolog"
@@ -33,9 +34,14 @@ func main() {
 		port = "8080"
 
 	}
+	store, err := storage.NewFromEnv()
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to initialize storage")
+	}
+
 	server := net.NewServer(&net.ServerConfig{
 		WSHost: "0.0.0.0", WSPort: port,
-	})
+	}, store)
 
 	go server.Run()
 

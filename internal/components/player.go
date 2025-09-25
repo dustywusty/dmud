@@ -12,8 +12,9 @@ type Player struct {
 
 	Client common.Client
 
-	Name string
-	Area *Area
+	Name          string
+	Area          *Area
+	LastKnownAddr string
 
 	// Command history and auto-complete
 	CommandHistory *CommandHistory
@@ -21,6 +22,9 @@ type Player struct {
 }
 
 func (p *Player) Broadcast(msg string) {
+	if p.Client == nil {
+		return
+	}
 	p.Client.SendMessage(msg)
 }
 
