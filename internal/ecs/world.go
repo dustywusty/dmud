@@ -190,25 +190,41 @@ func (w *World) Update() {
 }
 
 func NewWorld() *World {
-	world := &World{
+	return &World{
 		entities:   make(map[common.EntityID]Entity),
 		components: make(map[common.EntityID]map[string]Component),
 	}
+}
 
-	areas := loadAreasFromFile("./resources/areas.json")
+type areaDefinition struct {
+	ID          string            `json:"id"`
+	Region      string            `json:"region"`
+	Description string            `json:"description"`
+	Exits       map[string]string `json:"exits"`
+}
 
+func loadAreasFromFile(filename string) []areaDefinition {
+	var areas []areaDefinition
+	if err := util.ParseJSON(filename, &areas); err != nil {
+		log.Error().Err(err).Msg("")
+	}
+	return areas
+}
+
+// PopulateFromDefinitions seeds the world using area definitions.
+func (w *World) PopulateFromDefinitions(areas []areaDefinition) {
 	for _, area := range areas {
 		areaEntity := NewEntity(area.ID)
 		areaComponent := &components.Area{
 			Region:      area.Region,
 			Description: area.Description,
 		}
-		world.AddEntity(areaEntity)
-		world.AddComponent(&areaEntity, areaComponent)
+		w.AddEntity(areaEntity)
+		w.AddComponent(&areaEntity, areaComponent)
 	}
 
 	for _, area := range areas {
-		component, err := world.GetComponent(common.EntityID(area.ID), "Area")
+		component, err := w.GetComponent(common.EntityID(area.ID), "Area")
 		if err != nil {
 			log.Error().Err(err).Msgf("Could not get Area for area %s", area.ID)
 			continue
@@ -221,7 +237,7 @@ func NewWorld() *World {
 		}
 
 		for direction, areaID := range area.Exits {
-			exitAreaUntyped, err := world.GetComponent(common.EntityID(areaID), "Area")
+			exitAreaUntyped, err := w.GetComponent(common.EntityID(areaID), "Area")
 			if err != nil {
 				log.Error().Err(err).Msgf("Could not get Area for exit area %s", areaID)
 				continue
@@ -240,23 +256,36 @@ func NewWorld() *World {
 			})
 		}
 	}
-
-	return world
 }
 
-type areaDefinition struct {
-	ID          string            `json:"id"`
-	Region      string            `json:"region"`
-	Description string            `json:"description"`
-	Exits       map[string]string `json:"exits"`
+// PopulateFromFile seeds the world with area definitions from a JSON file.
+func (w *World) PopulateFromFile(filename string) {
+	areas := loadAreasFromFile(filename)
+	w.PopulateFromDefinitions(areas)
 }
 
-func loadAreasFromFile(filename string) []areaDefinition {
-	var areas []areaDefinition
-	if err := util.ParseJSON(filename, &areas); err != nil {
-		log.Error().Err(err).Msg("")
+// Snapshot returns a copy of the current entity and component mappings.
+func (w *World) Snapshot() (map[common.EntityID]Entity, map[common.EntityID]map[string]Component) {
+	snapshotEntities := make(map[common.EntityID]Entity)
+	snapshotComponents := make(map[common.EntityID]map[string]Component)
+
+	w.entityMutex.RLock()
+	for id, entity := range w.entities {
+		snapshotEntities[id] = entity
 	}
-	return areas
+	w.entityMutex.RUnlock()
+
+	w.componentMutex.RLock()
+	for id, comps := range w.components {
+		inner := make(map[string]Component, len(comps))
+		for name, component := range comps {
+			inner[name] = component
+		}
+		snapshotComponents[id] = inner
+	}
+	w.componentMutex.RUnlock()
+
+	return snapshotEntities, snapshotComponents
 }
 
 // WorldLikeAdapter wraps World to implement components.WorldLike
