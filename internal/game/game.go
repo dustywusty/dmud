@@ -56,8 +56,11 @@ func NewGame(store *storage.Storage) *Game {
 	aiSystem := systems.NewAISystem()
 
 	world := ecs.NewWorld()
+	seededFromResources := false
 	if store != nil {
-		if err := store.BootstrapWorld(world); err != nil {
+		var err error
+		seededFromResources, err = store.BootstrapWorld(world)
+		if err != nil {
 			log.Fatal().Err(err).Msg("Failed to bootstrap world from storage")
 		}
 	} else {
@@ -92,8 +95,10 @@ func NewGame(store *storage.Storage) *Game {
 	game.initializeSpawns()
 
 	if store != nil {
-		if err := store.SaveWorld(world); err != nil {
-			log.Error().Err(err).Msg("Failed to persist initial world state")
+		if !seededFromResources {
+			if err := store.SaveWorld(world); err != nil {
+				log.Error().Err(err).Msg("Failed to persist initial world state")
+			}
 		}
 		game.lastPersist = time.Now()
 	}

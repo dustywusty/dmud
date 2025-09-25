@@ -86,87 +86,33 @@ func (s *Storage) SetPersistInterval(d time.Duration) {
 }
 
 // BootstrapWorld ensures the world is loaded from storage or seeded from resources.
-func (s *Storage) BootstrapWorld(world *ecs.World) error {
+// It returns true when the world was seeded from static definitions (on first run).
+func (s *Storage) BootstrapWorld(world *ecs.World) (bool, error) {
 	if s == nil {
-		return errors.New("storage is nil")
+		return false, errors.New("storage is nil")
 	}
 
 	var areaCount int64
 	if err := s.db.Model(&AreaModel{}).Count(&areaCount).Error; err != nil {
-		return fmt.Errorf("count areas: %w", err)
+		return false, fmt.Errorf("count areas: %w", err)
 	}
 
 	if areaCount == 0 {
 		log.Info().Msg("No areas in database, seeding from resources")
 		if err := s.seedFromResources(world); err != nil {
-			return err
+			return false, err
 		}
 		if err := s.SaveWorld(world); err != nil {
-			return err
+			return false, err
 		}
-		return nil
+		return true, nil
 	}
 
-	return s.LoadWorld(world)
+	return false, s.LoadWorld(world)
 }
 
 func (s *Storage) seedFromResources(world *ecs.World) error {
-	type areaDefinition struct {
-		ID          string            `json:"id"`
-		Region      string            `json:"region"`
-		Description string            `json:"description"`
-		Exits       map[string]string `json:"exits"`
-	}
-
-	var areas []areaDefinition
-	if err := util.ParseJSON("./resources/areas.json", &areas); err != nil {
-		return fmt.Errorf("load areas: %w", err)
-	}
-
-	for _, area := range areas {
-		entity := ecs.NewEntity(area.ID)
-		world.AddEntity(entity)
-		areaComponent := &components.Area{
-			Region:      area.Region,
-			Description: area.Description,
-		}
-		world.AddComponent(&entity, areaComponent)
-	}
-
-	for _, area := range areas {
-		component, err := world.GetComponent(common.EntityID(area.ID), "Area")
-		if err != nil {
-			log.Error().Err(err).Msgf("Could not get Area for area %s", area.ID)
-			continue
-		}
-
-		areaComponent, ok := component.(*components.Area)
-		if !ok {
-			log.Error().Msgf("Error type asserting Area for area %s", area.ID)
-			continue
-		}
-
-		for direction, areaID := range area.Exits {
-			exitAreaUntyped, err := world.GetComponent(common.EntityID(areaID), "Area")
-			if err != nil {
-				log.Error().Err(err).Msgf("Could not get Area for exit area %s", areaID)
-				continue
-			}
-
-			exitArea, ok := exitAreaUntyped.(*components.Area)
-			if !ok {
-				log.Error().Msgf("Error type asserting Area for exit area %s", areaID)
-				continue
-			}
-
-			areaComponent.Exits = append(areaComponent.Exits, components.Exit{
-				Direction: direction,
-				AreaID:    areaID,
-				Area:      exitArea,
-			})
-		}
-	}
-
+	world.PopulateFromFile("./resources/areas.json")
 	return nil
 }
 
