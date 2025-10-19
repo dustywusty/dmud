@@ -28,6 +28,7 @@ type Command struct {
 	Aliases     []string
 	Handler     CommandHandler
 	Description string
+	Hidden      bool
 }
 
 var commandRegistry = make(map[string]*Command)
@@ -224,6 +225,11 @@ func (g *Game) initCommands() {
 		Handler:     handleHelp,
 		Description: "Show help information for commands.",
 	})
+	g.RegisterCommand(&Command{
+		Name:    "xyzzy",
+		Handler: handleXyzzy,
+		Hidden:  true,
+	})
 	directions := map[string]string{
 		"north": "n",
 		"south": "s",
@@ -270,7 +276,10 @@ func (g *Game) handleCommand(c ClientCommand) {
 	player.CommandHistory.AddCommand(fullCommand)
 
 	// Update auto-complete with all available commands
-	for cmdName := range commandRegistry {
+	for cmdName, cmd := range commandRegistry {
+		if cmd.Hidden {
+			continue
+		}
 		player.AutoComplete.AddCommand(cmdName)
 	}
 
