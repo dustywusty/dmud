@@ -137,5 +137,11 @@
             "up": "9"
         },
         "description": "ABYSSAL SHRINE\n\nA vast pit dominates the center of this chamber, its bottom lost in darkness. Around it stands a circle of obsidian obelisks, each inscribed with writing that seems to shift and change as you try to read it. The air is unnaturally cold, and strange whispers echo from the pit. A narrow staircase winds upward along the wall."
+    },
+    {
+        "id": "99",
+        "region": "Veiled Between",
+        "exits": {},
+        "description": "THE HIDDEN INTERstice\n\nThe world blurs into a corridor of starlight and stillness. Floating glyphs hum softly in the gloom, and a single obsidian archway frames the void beyond. Time feels paused here, as though you stand between one heartbeat and the next."
     }
 ]
