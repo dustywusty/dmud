@@ -40,10 +40,12 @@ func handleHistory(player *components.Player, args []string, game *Game) {
 		return
 	}
 
-	player.Broadcast("Command History:")
+	var b strings.Builder
+	b.WriteString("Command History:\n")
 	for i, cmd := range history {
-		player.Broadcast(fmt.Sprintf("%d: %s", i+1, cmd))
+		b.WriteString(fmt.Sprintf("%d: %s\n", i+1, cmd))
 	}
+	player.Broadcast(b.String())
 }
 
 // handleClear clears the player's command history
@@ -72,15 +74,18 @@ func handleSuggest(player *components.Player, args []string, game *Game) {
 		return
 	}
 
-	player.Broadcast(fmt.Sprintf("Suggestions for '%s':", partial))
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("Suggestions for '%s':\n", partial))
 
 	if len(cmdSuggestions) > 0 {
-		player.Broadcast("Commands: " + strings.Join(cmdSuggestions, ", "))
+		b.WriteString("Commands: " + strings.Join(cmdSuggestions, ", ") + "\n")
 	}
 
 	if len(playerSuggestions) > 0 {
-		player.Broadcast("Players: " + strings.Join(playerSuggestions, ", "))
+		b.WriteString("Players: " + strings.Join(playerSuggestions, ", ") + "\n")
 	}
+
+	player.Broadcast(b.String())
 }
 
 // handleComplete provides instant auto-completion (best match only)
