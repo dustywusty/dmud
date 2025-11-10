@@ -23,13 +23,11 @@ func NewAISystem() *AISystem {
 }
 
 func (as *AISystem) Update(w *ecs.World, deltaTime float64) {
-	// Only update AI every 2 seconds
 	if time.Since(as.lastUpdate) < 2*time.Second {
 		return
 	}
 	as.lastUpdate = time.Now()
 
-	// Find all NPCs
 	npcEntities, err := w.FindEntitiesByComponentPredicate("NPC", func(i interface{}) bool {
 		return true
 	})
@@ -53,7 +51,6 @@ func (as *AISystem) processNPCBehavior(w *ecs.World, npcEntity ecs.Entity) {
 		return
 	}
 
-	// Don't process dead NPCs
 	if health.Status == components.Dead {
 		return
 	}
@@ -62,7 +59,6 @@ func (as *AISystem) processNPCBehavior(w *ecs.World, npcEntity ecs.Entity) {
 
 	as.attemptWander(w, npcEntity, npc, combat)
 
-	// Process based on behavior type
 	switch npc.Behavior {
 	case components.BehaviorAggressive:
 		as.processAggressiveNPC(w, npcEntity, npc, combat)
@@ -123,7 +119,7 @@ func (as *AISystem) processAggressiveNPC(w *ecs.World, npcEntity ecs.Entity, npc
 	}
 }
 
-func (as *AISystem) attemptWander(w *ecs.World, npcEntity ecs.Entity, npc *components.NPC, combat *components.Combat) {
+func (as *AISystem) attemptWander(_ *ecs.World, _ ecs.Entity, npc *components.NPC, combat *components.Combat) {
 	if combat != nil {
 		combat.RLock()
 		inCombat := combat.TargetID != ""
@@ -195,7 +191,7 @@ func regionExits(area *components.Area) []components.Exit {
 	return exits
 }
 
-func (as *AISystem) processFriendlyNPC(w *ecs.World, npcEntity ecs.Entity, npc *components.NPC) {
+func (as *AISystem) processFriendlyNPC(_ *ecs.World, npcEntity ecs.Entity, npc *components.NPC) {
 	// Occasionally say something
 	if time.Since(npc.LastAction) > 30*time.Second && rand.Float64() < 0.3 {
 		dialogue := npc.GetRandomDialogue()
@@ -210,11 +206,9 @@ func (as *AISystem) processFriendlyNPC(w *ecs.World, npcEntity ecs.Entity, npc *
 
 func (as *AISystem) processGuardNPC(w *ecs.World, npcEntity ecs.Entity, npc *components.NPC) {
 	combat, _ := ecs.GetTypedComponent[*components.Combat](w, npcEntity.ID, "Combat")
-
 	if as.guardIntervene(w, npcEntity, npc, combat) {
 		return
 	}
-
 	as.processFriendlyNPC(w, npcEntity, npc)
 }
 
