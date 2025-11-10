@@ -8,6 +8,8 @@ type WorldLike interface {
 	GetComponent(entityID common.EntityID, componentType string) (interface{}, error)
 	RemoveComponent(entityID common.EntityID, componentType string) error
 	RemoveEntity(entityID common.EntityID) error
+	CreateEntity() EntityLike
+	AddComponentToEntity(entity EntityLike, component interface{})
 }
 
 type EntityLike interface {
