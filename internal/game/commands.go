@@ -83,11 +83,40 @@ func handleComplete(player *components.Player, args []string, game *Game) {
 func handleHelp(player *components.Player, args []string, game *Game) {
 	if len(args) == 0 {
 		var b strings.Builder
-		b.WriteString("Available commands:\n")
-		b.WriteString("  look, who, say <message>, shout <message>, examine <target>, kill <target>, name <new_name>, recall, exit\n")
-		b.WriteString("Movement: north/south/east/west/up/down\n")
-		b.WriteString("Utility: help [command], history, clear, suggest <partial>, complete <partial>\n")
-		b.WriteString("\nType 'help <command>' for detailed information about a specific command.\n")
+		b.WriteString("==============================================\n")
+		b.WriteString("               AVAILABLE COMMANDS             \n")
+		b.WriteString("==============================================\n\n")
+
+		b.WriteString("EXPLORATION\n")
+		b.WriteString("  look              - View your current location\n")
+		b.WriteString("  examine <target>  - Examine something closely\n\n")
+
+		b.WriteString("COMMUNICATION\n")
+		b.WriteString("  say <message>     - Speak to nearby players\n")
+		b.WriteString("  shout <message>   - Shout to adjacent areas\n")
+		b.WriteString("  who               - List online players\n\n")
+
+		b.WriteString("COMBAT\n")
+		b.WriteString("  kill <target>     - Attack a target\n\n")
+
+		b.WriteString("MOVEMENT\n")
+		b.WriteString("  north, south, east, west, up, down\n\n")
+
+		b.WriteString("CHARACTER\n")
+		b.WriteString("  name <new_name>   - Change your name\n")
+		b.WriteString("  recall            - Return to starting area\n\n")
+
+		b.WriteString("UTILITY\n")
+		b.WriteString("  help [command]    - Show help information\n")
+		b.WriteString("  history           - View command history\n")
+		b.WriteString("  clear             - Clear command history\n")
+		b.WriteString("  suggest <partial> - Get command suggestions\n")
+		b.WriteString("  complete <partial>- Auto-complete commands\n")
+		b.WriteString("  exit              - Leave the game\n\n")
+
+		b.WriteString("==============================================\n")
+		b.WriteString("Type 'help <command>' for detailed information\n")
+		b.WriteString("==============================================\n")
 
 		player.Broadcast(b.String())
 
