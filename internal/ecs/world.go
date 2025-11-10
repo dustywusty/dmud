@@ -282,6 +282,22 @@ func (w *WorldLikeAdapter) GetComponent(entityID common.EntityID, componentType 
 	return w.World.GetComponent(entityID, componentType)
 }
 
+func (w *WorldLikeAdapter) CreateEntity() components.EntityLike {
+	entity := NewEntity()
+	w.World.AddEntity(entity)
+	return entity
+}
+
+func (w *WorldLikeAdapter) AddComponentToEntity(entity components.EntityLike, component interface{}) {
+	// Convert EntityLike back to *Entity
+	e, ok := entity.(Entity)
+	if !ok {
+		log.Error().Msg("Failed to convert EntityLike to Entity")
+		return
+	}
+	w.World.AddComponent(&e, component)
+}
+
 // Add this method to World
 func (w *World) AsWorldLike() components.WorldLike {
 	return &WorldLikeAdapter{w}
