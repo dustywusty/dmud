@@ -151,6 +151,9 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 			targetPlayer.Area.Broadcast(fmt.Sprintf("%s has been slain by %s!", targetPlayer.Name, attackerNPC.Name))
 		}
 
+		// Create player corpse
+		spawnCorpse(w, targetPlayer.Name, targetID, true, targetPlayer.Area)
+
 		// TODO: Handle respawn
 		// For now, restore health
 		if healthComp, err := w.GetComponent(targetID, "Health"); err == nil {
@@ -170,9 +173,29 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 			// TODO: Award experience/loot
 		}
 
+		// Create NPC corpse before removing entity
+		spawnCorpse(w, targetNPC.Name, targetID, false, targetNPC.Area)
+
 		// Remove NPC from world (spawn system will respawn it)
 		w.RemoveEntity(targetID)
 	}
+}
+
+// spawnCorpse creates a corpse entity at the location of death
+func spawnCorpse(w components.WorldLike, victimName string, victimID common.EntityID, wasPlayer bool, area *components.Area) {
+	if area == nil {
+		return
+	}
+
+	// Create corpse entity
+	corpseEntity := w.CreateEntity()
+
+	// Create and add corpse component
+	corpse := components.NewCorpse(victimName, victimID, wasPlayer, area)
+	w.AddComponentToEntity(corpseEntity, corpse)
+
+	log.Debug().Msgf("Spawned corpse of %s (entity: %s) at area (%d,%d,%d)",
+		victimName, corpseEntity.GetID(), area.X, area.Y, area.Z)
 }
 
 func performAttack(attackerPlayer, targetPlayer *components.Player, attackerNPC, targetNPC *components.NPC,
