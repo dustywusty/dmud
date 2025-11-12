@@ -1,8 +1,8 @@
 # What is this?
 
-Hi! I've been learning GO by building a really basic MUD. This is that.
+Hey y'all, i've been trying to get better w/ go and this is that!
 
-It's extremely unstable right now, but I hope to get a real 1.0 one day! 🤞
+https://dusty.wtf/projects/dmud/
 
 # ...
 
@@ -12,6 +12,7 @@ find internal -type f -name '*.go' -exec sh -c 'echo "=== {} ==="; cat {}' \;
 make
 make watch # requires air
 ```
+
 
 
 
