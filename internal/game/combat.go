@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// handleKill processes the kill command.
 func handleKill(player *components.Player, args []string, game *Game) {
 	if len(args) == 0 {
 		player.Broadcast("Kill whom?")
@@ -18,7 +17,6 @@ func handleKill(player *components.Player, args []string, game *Game) {
 	game.HandleKill(player, targetName)
 }
 
-// HandleKill processes the kill action for a player.
 func (g *Game) HandleKill(player *components.Player, targetName string) {
 	log.Trace().Msgf("Kill: %s", targetName)
 

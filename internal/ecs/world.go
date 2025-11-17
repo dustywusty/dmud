@@ -259,7 +259,6 @@ func loadAreasFromFile(filename string) []areaDefinition {
 	return areas
 }
 
-// WorldLikeAdapter wraps World to implement components.WorldLike
 type WorldLikeAdapter struct {
 	*World
 }
@@ -298,7 +297,6 @@ func (w *WorldLikeAdapter) AddComponentToEntity(entity components.EntityLike, co
 	w.World.AddComponent(&e, component)
 }
 
-// Add this method to World
 func (w *World) AsWorldLike() components.WorldLike {
 	return &WorldLikeAdapter{w}
 }

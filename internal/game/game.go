@@ -333,10 +333,6 @@ func (g *Game) HandleConnect(c common.Client) {
 	playerComponent.Broadcast(util.WelcomeBanner)
 	playerComponent.Look(g.world.AsWorldLike())
 
-	// if g.defaultArea.Region != "" {
-	// 	playerComponent.Broadcast("Region: " + g.defaultArea.Region)
-	// }
-
 	g.Broadcast(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
 
 	// Send initial prompt
@@ -349,7 +345,6 @@ func (g *Game) HandleConnect(c common.Client) {
 	go c.HandleRequest()
 }
 
-// HandleDisconnect is called when a client disconnects from the game.
 func (g *Game) HandleDisconnect(c common.Client) {
 	player, err := g.getPlayer(c)
 	if err != nil {
@@ -371,7 +366,6 @@ func (g *Game) HandleDisconnect(c common.Client) {
 	g.Broadcast(fmt.Sprintf("%s has left the game.", player.Name), c)
 }
 
-// getPlayer retrieves the Player component associated with a client.
 func (g *Game) getPlayer(c common.Client) (*components.Player, error) {
 	g.playersMu.RLock()
 	defer g.playersMu.RUnlock()
@@ -392,7 +386,6 @@ func (g *Game) getPlayer(c common.Client) (*components.Player, error) {
 	return nil, fmt.Errorf("player not found")
 }
 
-// Broadcast sends a message to all players, excluding specified clients.
 func (g *Game) Broadcast(m string, excludeClients ...common.Client) {
 	log.Info().Msgf("Broadcasting: %s", m)
 
@@ -418,7 +411,6 @@ func (g *Game) Broadcast(m string, excludeClients ...common.Client) {
 	}
 }
 
-// loop is the main game loop that processes player connections and updates the world.
 func (g *Game) loop() {
 	updateTicker := time.NewTicker(10 * time.Millisecond)
 	defer updateTicker.Stop()

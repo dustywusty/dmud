@@ -50,19 +50,17 @@ func (p *Player) DescribeArea(w WorldLike) string {
 
 	npcs := p.Area.GetNPCs(w)
 
-	// Only add separator if there are players or NPCs to display
 	if len(otherPlayers) > 0 || len(npcs) > 0 {
 		b.WriteString("\n\n")
-	}
+		for _, name := range otherPlayers {
+			b.WriteString(name)
+			b.WriteString(" is here.\n")
+		}
 
-	for _, name := range otherPlayers {
-		b.WriteString(name)
-		b.WriteString(" is here.\n")
-	}
-
-	for _, npc := range npcs {
-		b.WriteString(npc.Name)
-		b.WriteString(" is here.\n")
+		for _, npc := range npcs {
+			b.WriteString(npc.Name)
+			b.WriteString(" is here.\n")
+		}
 	}
 
 	if len(p.Area.Exits) > 0 {
