@@ -136,6 +136,12 @@ func handleHelp(player *components.Player, args []string, game *Game) {
 		b.WriteString("MOVEMENT\n")
 		b.WriteString("  north, south, east, west, up, down\n\n")
 
+		b.WriteString("INVENTORY\n")
+		b.WriteString("  inventory         - View your items (aliases: inv, i)\n")
+		b.WriteString("  loot <corpse>     - Loot items from a corpse\n")
+		b.WriteString("  get <item>        - Pick up an item (aliases: pickup, take)\n")
+		b.WriteString("  drop <item>       - Drop an item\n\n")
+
 		b.WriteString("CHARACTER\n")
 		b.WriteString("  name <new_name>   - Change your name\n")
 		b.WriteString("  recall            - Return to starting area\n\n")

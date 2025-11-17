@@ -19,7 +19,7 @@ func handleWho(player *components.Player, args []string, game *Game) {
 
 	tw := table.NewWriter()
 	tw.SetStyle(table.StyleLight)
-	tw.AppendHeader(table.Row{"Player", "Race", "Class", "Online Since"})
+	tw.AppendHeader(table.Row{"Player", "Race", "Level", "Online Since"})
 
 	for _, playerEntity := range game.players {
 		playerComponent, err := game.world.GetComponent(playerEntity.ID, "Player")
@@ -32,7 +32,17 @@ func handleWho(player *components.Player, args []string, game *Game) {
 			log.Error().Msgf("Error type asserting component for player %s", playerEntity.ID)
 			continue
 		}
-		tw.AppendRow(table.Row{playerData.Name, "??", "??", playerEntity.CreatedAt.DiffForHumans()})
+
+		// Get player level
+		level := 1
+		expComponent, err := game.world.GetComponent(playerEntity.ID, "Experience")
+		if err == nil {
+			if exp, ok := expComponent.(*components.Experience); ok {
+				level = exp.GetLevel()
+			}
+		}
+
+		tw.AppendRow(table.Row{playerData.Name, "??", level, playerEntity.CreatedAt.DiffForHumans()})
 	}
 
 	player.Broadcast(tw.Render())
