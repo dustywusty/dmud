@@ -142,16 +142,23 @@ func (w *World) RemoveComponent(entityID common.EntityID, componentName string) 
 	w.componentMutex.Lock()
 	defer w.componentMutex.Unlock()
 
-	if _, ok := w.components[entityID]; ok {
-		delete(w.components[entityID], componentName)
-		if len(w.components[entityID]) == 0 {
-			delete(w.components, entityID)
-		}
-	} else {
-		log.Error().Msgf("Entity %s does not have component %s", entityID, componentName)
+	components, ok := w.components[entityID]
+	if !ok {
+		log.Error().Msgf("Entity %v does not exist (cannot remove component %s)", entityID, componentName)
+		return
 	}
 
-	log.Info().Msgf("Removed component %s from entity %s", componentName, entityID)
+	if _, exists := components[componentName]; !exists {
+		log.Warn().Msgf("Entity %v does not have component %s", entityID, componentName)
+		return
+	}
+
+	delete(components, componentName)
+	if len(components) == 0 {
+		delete(w.components, entityID)
+	}
+
+	log.Info().Msgf("Removed component %s from entity %v", componentName, entityID)
 }
 
 func (w *World) RemoveEntity(entityID common.EntityID) {
