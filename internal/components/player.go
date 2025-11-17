@@ -38,7 +38,6 @@ func (p *Player) DescribeArea(w WorldLike) string {
 	var b strings.Builder
 
 	b.WriteString(p.Area.Description)
-	b.WriteString("\n\n")
 
 	p.Area.PlayersMutex.RLock()
 	var otherPlayers []string
@@ -48,12 +47,19 @@ func (p *Player) DescribeArea(w WorldLike) string {
 		}
 	}
 	p.Area.PlayersMutex.RUnlock()
+
+	npcs := p.Area.GetNPCs(w)
+
+	// Only add separator if there are players or NPCs to display
+	if len(otherPlayers) > 0 || len(npcs) > 0 {
+		b.WriteString("\n\n")
+	}
+
 	for _, name := range otherPlayers {
 		b.WriteString(name)
 		b.WriteString(" is here.\n")
 	}
 
-	npcs := p.Area.GetNPCs(w)
 	for _, npc := range npcs {
 		b.WriteString(npc.Name)
 		b.WriteString(" is here.\n")
