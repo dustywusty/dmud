@@ -138,6 +138,26 @@ func (g *Game) initializeSpawns() {
 				Chance:      1.0,
 			},
 		},
+		"100": { // Chicken farm west
+			{
+				Type:        components.SpawnTypeNPC,
+				TemplateID:  "chicken",
+				MinCount:    15,
+				MaxCount:    20,
+				RespawnTime: 15 * time.Second,
+				Chance:      1.0,
+			},
+		},
+		"101": { // Chicken farm east
+			{
+				Type:        components.SpawnTypeNPC,
+				TemplateID:  "chicken",
+				MinCount:    15,
+				MaxCount:    20,
+				RespawnTime: 15 * time.Second,
+				Chance:      1.0,
+			},
+		},
 	}
 
 	for areaID, configs := range spawns {

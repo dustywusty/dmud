@@ -132,7 +132,13 @@ func (as *AISystem) attemptWander(_ *ecs.World, _ ecs.Entity, npc *components.NP
 	currentArea := npc.Area
 	lastMovement := npc.LastMovement
 	name := npc.Name
+	templateID := npc.TemplateID
 	npc.RUnlock()
+
+	// Check if this NPC is stationary
+	if template, ok := components.NPCTemplates[templateID]; ok && template.Stationary {
+		return
+	}
 
 	if currentArea == nil {
 		return

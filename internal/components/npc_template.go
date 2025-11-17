@@ -23,6 +23,7 @@ type NPCTemplate struct {
     Behavior    NPCBehavior
     Dialogue    []string // Random things they might say
     RespawnTime time.Duration
+    Stationary  bool // If true, NPC will not wander between areas
 }
 
 var NPCTemplates = map[string]NPCTemplate{
@@ -69,5 +70,17 @@ var NPCTemplates = map[string]NPCTemplate{
         Behavior:    BehaviorMerchant,
         Dialogue:    []string{"Fine wares for sale!", "Come, see my goods!", "Best prices in town!"},
         RespawnTime: 180 * time.Second,
+    },
+    "chicken": {
+        ID:          "chicken",
+        Name:        "a chicken",
+        Description: "A plump chicken pecking at the ground, oblivious to its surroundings.",
+        Health:      20,
+        MinDamage:   1,
+        MaxDamage:   2,
+        Behavior:    BehaviorPassive,
+        Dialogue:    []string{"*cluck cluck*", "*bawk!*"},
+        RespawnTime: 15 * time.Second,
+        Stationary:  true,
     },
 }

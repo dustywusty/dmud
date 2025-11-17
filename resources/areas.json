@@ -4,7 +4,9 @@
         "region": "Whispering Woods",
         "exits": {
             "north": "2",
-            "east": "7"
+            "east": "7",
+            "south": "100",
+            "west": "101"
         },
         "description": "THE BLIGHTED CROSSROADS\n\nYou stand at a misty crossroads where ancient paths converge. Twisted trees frame the scene, their bark black as pitch. The remnants of an old stone marker lie shattered at your feet. An eerie silence hangs in the air, broken only by the occasional distant howl."
     },
@@ -143,5 +145,21 @@
         "region": "Veiled Between",
         "exits": {},
         "description": "THE HIDDEN INTERstice\n\nThe world blurs into a corridor of starlight and stillness. Floating glyphs hum softly in the gloom, and a single obsidian archway frames the void beyond. Time feels paused here, as though you stand between one heartbeat and the next."
+    },
+    {
+        "id": "100",
+        "region": "Whispering Woods",
+        "exits": {
+            "north": "1"
+        },
+        "description": "ABANDONED CHICKEN FARM - WEST FIELD\n\nA dilapidated wooden fence surrounds this overgrown field. Feathers drift lazily across the patchy grass. A weather-beaten coop leans precariously to one side, its door hanging open. Chickens wander about freely, pecking at the ground without a care in the world. The distant sound of clucking fills the air."
+    },
+    {
+        "id": "101",
+        "region": "Whispering Woods",
+        "exits": {
+            "east": "1"
+        },
+        "description": "ABANDONED CHICKEN FARM - EAST FIELD\n\nThis neglected farmyard is overrun with chickens. Broken feeding troughs lie scattered about, and a collapsed barn provides some shelter from the elements. The chickens seem to have multiplied unchecked, forming small flocks that roam the area. Feathers and droppings cover everything."
     }
 ]
