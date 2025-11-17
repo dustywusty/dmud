@@ -30,7 +30,7 @@ var commandHelpText = map[string]string{
 	"suggest":   "Get suggestions for commands or player names. Usage: suggest <partial>",
 	"complete":  "Get instant auto-completion for commands or player names. Usage: complete <partial>",
 	"inventory": "View your inventory and see what items you are carrying. Usage: inventory (aliases: inv, i)",
-	"loot":      "Loot items from a corpse. Usage: loot <corpse_name>",
+	"loot":      "Loot items from a corpse. Usage: loot <corpse_name> or loot all (to loot all corpses in the area)",
 	"get":       "Pick up an item from the ground. Usage: get <item_name> (aliases: pickup, take)",
 	"drop":      "Drop an item from your inventory onto the ground. Usage: drop <item_name>",
 }
@@ -139,6 +139,7 @@ func handleHelp(player *components.Player, args []string, game *Game) {
 		b.WriteString("INVENTORY\n")
 		b.WriteString("  inventory         - View your items (aliases: inv, i)\n")
 		b.WriteString("  loot <corpse>     - Loot items from a corpse\n")
+		b.WriteString("  loot all          - Loot all corpses in the area\n")
 		b.WriteString("  get <item>        - Pick up an item (aliases: pickup, take)\n")
 		b.WriteString("  drop <item>       - Drop an item\n\n")
 

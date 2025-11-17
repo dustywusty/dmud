@@ -11,11 +11,17 @@ import (
 
 func (g *Game) handleLoot(player *components.Player, args []string, game *Game) {
 	if len(args) == 0 {
-		player.Broadcast("Loot what? Usage: loot <corpse>")
+		player.Broadcast("Loot what? Usage: loot <corpse> or loot all")
 		return
 	}
 
 	targetName := strings.ToLower(strings.Join(args, " "))
+
+	// Check for "loot all"
+	if targetName == "all" {
+		g.handleLootAll(player, game)
+		return
+	}
 
 	// Find corpses in the area
 	corpses, err := g.world.FindEntitiesByComponentPredicate("Corpse", func(i interface{}) bool {
@@ -98,6 +104,88 @@ func (g *Game) handleLoot(player *components.Player, args []string, game *Game) 
 		player.Area.Broadcast(fmt.Sprintf("%s loots %s.", player.Name, targetCorpse.GetDescription()), player)
 	} else {
 		player.Broadcast("You couldn't loot anything.")
+	}
+}
+
+func (g *Game) handleLootAll(player *components.Player, game *Game) {
+	// Find all corpses in the area
+	corpses, err := g.world.FindEntitiesByComponentPredicate("Corpse", func(i interface{}) bool {
+		c, ok := i.(*components.Corpse)
+		return ok && c.Area == player.Area
+	})
+
+	if err != nil || len(corpses) == 0 {
+		player.Broadcast("There are no corpses here to loot.")
+		return
+	}
+
+	// Get player's inventory
+	playerEntity, err := g.getPlayerEntity(player)
+	if err != nil {
+		log.Error().Err(err).Msg("Error getting player entity")
+		return
+	}
+
+	playerInvComp, err := g.world.GetComponent(playerEntity, "Inventory")
+	if err != nil {
+		player.Broadcast("You don't have an inventory!")
+		return
+	}
+	playerInventory := playerInvComp.(*components.Inventory)
+
+	totalLootedItems := make([]string, 0)
+	corpsesLooted := 0
+
+	for _, corpseEntity := range corpses {
+		corpseComp, err := g.world.GetComponent(corpseEntity.ID, "Corpse")
+		if err != nil {
+			continue
+		}
+
+		corpse := corpseComp.(*components.Corpse)
+
+		// Skip corpses with no inventory or empty inventory
+		if corpse.Inventory == nil {
+			continue
+		}
+
+		corpse.Inventory.Lock()
+
+		if len(corpse.Inventory.Items) == 0 {
+			corpse.Inventory.Unlock()
+			continue
+		}
+
+		// Loot items from this corpse
+		lootedFromCorpse := false
+		for _, item := range corpse.Inventory.Items {
+			if playerInventory.IsFull() {
+				corpse.Inventory.Unlock()
+				player.Broadcast("Your inventory is full!")
+				goto done
+			}
+
+			if playerInventory.AddItem(item.Clone()) {
+				totalLootedItems = append(totalLootedItems, item.Name)
+				lootedFromCorpse = true
+			}
+		}
+
+		// Clear this corpse's inventory
+		corpse.Inventory.Items = make([]*components.Item, 0)
+		corpse.Inventory.Unlock()
+
+		if lootedFromCorpse {
+			corpsesLooted++
+		}
+	}
+
+done:
+	if len(totalLootedItems) > 0 {
+		player.Broadcast(fmt.Sprintf("You looted %d corpse(s) and found: %s", corpsesLooted, strings.Join(totalLootedItems, ", ")))
+		player.Area.Broadcast(fmt.Sprintf("%s loots all the corpses.", player.Name), player)
+	} else {
+		player.Broadcast("There was nothing to loot.")
 	}
 }
 
