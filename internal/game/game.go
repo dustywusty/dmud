@@ -292,6 +292,11 @@ func (g *Game) initCommands() {
 		Description: "Show server uptime and statistics.",
 	})
 	g.RegisterCommand(&Command{
+		Name:        "version",
+		Handler:     handleVersion,
+		Description: "Show server version and build information.",
+	})
+	g.RegisterCommand(&Command{
 		Name:    "xyzzy",
 		Handler: handleXyzzy,
 		Hidden:  true,
