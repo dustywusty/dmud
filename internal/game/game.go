@@ -405,10 +405,18 @@ func (g *Game) HandleConnect(c common.Client) {
 	g.TotalConnects++
 	g.TotalConnectMu.Unlock()
 
-	// Track unique IPs
+	// Track unique IPs (strip port from address)
 	remoteAddr := c.RemoteAddr()
+	// Extract just the IP part (before the colon)
+	ipAddr := remoteAddr
+	if idx := strings.LastIndex(remoteAddr, ":"); idx != -1 {
+		ipAddr = remoteAddr[:idx]
+	}
+	// Strip IPv6 brackets if present
+	ipAddr = strings.Trim(ipAddr, "[]")
+
 	g.UniqueIPsMu.Lock()
-	g.UniqueIPs[remoteAddr] = true
+	g.UniqueIPs[ipAddr] = true
 	g.UniqueIPsMu.Unlock()
 
 	g.defaultArea.AddPlayer(playerComponent)
