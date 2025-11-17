@@ -44,6 +44,13 @@ type Game struct {
 	AddPlayerChan      chan common.Client
 	RemovePlayerChan   chan common.Client
 	ExecuteCommandChan chan ClientCommand
+
+	// Server stats
+	StartTime      time.Time
+	UniqueIPs      map[string]bool
+	UniqueIPsMu    sync.RWMutex
+	TotalConnects  int
+	TotalConnectMu sync.RWMutex
 }
 
 func NewGame() *Game {
@@ -79,6 +86,9 @@ func NewGame() *Game {
 		AddPlayerChan:      make(chan common.Client, 64),
 		RemovePlayerChan:   make(chan common.Client, 64),
 		ExecuteCommandChan: make(chan ClientCommand, 256),
+		StartTime:          time.Now(),
+		UniqueIPs:          make(map[string]bool),
+		TotalConnects:      0,
 	}
 
 	game.initCommands()
@@ -277,6 +287,11 @@ func (g *Game) initCommands() {
 		Description: "Hail an NPC to interact with them.",
 	})
 	g.RegisterCommand(&Command{
+		Name:        "uptime",
+		Handler:     handleUptime,
+		Description: "Show server uptime and statistics.",
+	})
+	g.RegisterCommand(&Command{
 		Name:    "xyzzy",
 		Handler: handleXyzzy,
 		Hidden:  true,
@@ -379,6 +394,17 @@ func (g *Game) HandleConnect(c common.Client) {
 	g.playersMu.Lock()
 	g.players[playerComponent.Name] = &playerEntity
 	g.playersMu.Unlock()
+
+	// Track connection stats
+	g.TotalConnectMu.Lock()
+	g.TotalConnects++
+	g.TotalConnectMu.Unlock()
+
+	// Track unique IPs
+	remoteAddr := c.RemoteAddr()
+	g.UniqueIPsMu.Lock()
+	g.UniqueIPs[remoteAddr] = true
+	g.UniqueIPsMu.Unlock()
 
 	g.defaultArea.AddPlayer(playerComponent)
 
