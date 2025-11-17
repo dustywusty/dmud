@@ -334,6 +334,7 @@ func (g *Game) HandleConnect(c common.Client) {
 
 	playerComponent.Broadcast(util.WelcomeBanner)
 	playerComponent.Look(g.world.AsWorldLike())
+	playerComponent.BroadcastState(g.world.AsWorldLike(), playerEntity.ID)
 
 	g.Broadcast(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
 

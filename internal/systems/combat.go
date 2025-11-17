@@ -98,6 +98,14 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 		performAttack(attackerPlayer, targetPlayer, attackerNPC, targetNPC,
 			attackerName, targetName, combat, targetHealth)
 
+		// Broadcast state updates to players involved in combat
+		if attackerPlayer != nil {
+			broadcastStateToPlayer(w, attackingEntity.ID)
+		}
+		if targetPlayer != nil {
+			broadcastStateToPlayer(w, targetID)
+		}
+
 		// Auto-retaliation: if target isn't already fighting back, make them attack the attacker
 		targetCombat, err := getCombatComponent(w, targetID)
 		if err != nil || targetCombat.TargetID == "" {
@@ -260,4 +268,11 @@ func performAttack(attackerPlayer, targetPlayer *components.Player, attackerNPC,
 	}
 
 	log.Trace().Msg(fmt.Sprintf("%s attacked %s for %d damage!", attackerName, targetName, damage))
+}
+
+func broadcastStateToPlayer(w *ecs.World, entityID common.EntityID) {
+	player, err := ecs.GetTypedComponent[*components.Player](w, entityID, "Player")
+	if err == nil && player != nil {
+		player.BroadcastState(w.AsWorldLike(), entityID)
+	}
 }

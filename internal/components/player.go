@@ -3,6 +3,7 @@ package components
 import (
 	"dmud/internal/common"
 	"dmud/internal/util"
+	"fmt"
 	"strings"
 	"sync"
 )
@@ -22,6 +23,49 @@ type Player struct {
 
 func (p *Player) Broadcast(msg string) {
 	p.Client.SendMessage(msg)
+}
+
+func (p *Player) BroadcastState(w WorldLike, entityID common.EntityID) {
+	health, err := w.GetComponent(entityID, "Health")
+	if err != nil {
+		return
+	}
+	h := health.(*Health)
+
+	statusEffects, _ := w.GetComponent(entityID, "StatusEffects")
+	hpBonus := 0
+	var effectsStr string
+	if statusEffects != nil {
+		se := statusEffects.(*StatusEffects)
+		hpBonus = se.GetTotalHPBonus()
+		se.RLock()
+		for i, effect := range se.Effects {
+			if i > 0 {
+				effectsStr += ","
+			}
+			effectsStr += fmt.Sprintf("%s:%d", effect.Name, effect.HPBonus)
+		}
+		se.RUnlock()
+	}
+
+	areaName := "Unknown"
+	if p.Area != nil {
+		areaName = p.Area.Description
+		if len(areaName) > 50 {
+			areaName = areaName[:50] + "..."
+		}
+	}
+
+	h.RLock()
+	currentHP := h.Current
+	maxHP := h.Max + hpBonus
+	h.RUnlock()
+
+	stateMsg := fmt.Sprintf("STATE|HP:%d/%d|AREA:%s", currentHP, maxHP, areaName)
+	if effectsStr != "" {
+		stateMsg += "|EFFECTS:" + effectsStr
+	}
+	p.Client.SendMessage(stateMsg)
 }
 
 func (p *Player) Look(w WorldLike) {
