@@ -53,7 +53,7 @@ func NewCorpse(victimName string, victimID common.EntityID, wasPlayer bool, area
 		VictimID:    victimID,
 		WasPlayer:   wasPlayer,
 		TimeOfDeath: time.Now(),
-		DecayTime:   5 * time.Minute, // Corpses last 5 minutes by default
+		DecayTime:   30 * time.Minute,
 		Area:        area,
 	}
 }

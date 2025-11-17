@@ -49,8 +49,9 @@ func (p *Player) DescribeArea(w WorldLike) string {
 	p.Area.PlayersMutex.RUnlock()
 
 	npcs := p.Area.GetNPCs(w)
+	corpses := p.Area.GetCorpses(w)
 
-	hasEntities := len(otherPlayers) > 0 || len(npcs) > 0
+	hasEntities := len(otherPlayers) > 0 || len(npcs) > 0 || len(corpses) > 0
 	if hasEntities {
 		b.WriteString("\n\n")
 		for _, name := range otherPlayers {
@@ -60,6 +61,11 @@ func (p *Player) DescribeArea(w WorldLike) string {
 
 		for _, npc := range npcs {
 			b.WriteString(npc.Name)
+			b.WriteString(" is here.\n")
+		}
+
+		for _, corpse := range corpses {
+			b.WriteString(corpse.GetDescription())
 			b.WriteString(" is here.\n")
 		}
 	}

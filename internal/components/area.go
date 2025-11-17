@@ -69,6 +69,30 @@ func (a *Area) GetNPCs(w WorldLike) []*NPC {
 	return npcs
 }
 
+func (a *Area) GetCorpses(w WorldLike) []*Corpse {
+	var corpses []*Corpse
+
+	entities, err := w.FindEntitiesByComponentPredicate("Corpse", func(i interface{}) bool {
+		corpse, ok := i.(*Corpse)
+		return ok && corpse.Area == a
+	})
+
+	if err != nil {
+		return corpses
+	}
+
+	for _, entity := range entities {
+		corpseComponent, err := w.GetComponent(entity.GetID(), "Corpse")
+		if err == nil {
+			if corpse, ok := corpseComponent.(*Corpse); ok {
+				corpses = append(corpses, corpse)
+			}
+		}
+	}
+
+	return corpses
+}
+
 func (a *Area) GetPlayer(name string) *Player {
 	a.PlayersMutex.RLock()
 	defer a.PlayersMutex.RUnlock()
