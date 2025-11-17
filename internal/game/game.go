@@ -142,9 +142,9 @@ func (g *Game) initializeSpawns() {
 			{
 				Type:        components.SpawnTypeNPC,
 				TemplateID:  "chicken",
-				MinCount:    15,
+				MinCount:    20,
 				MaxCount:    20,
-				RespawnTime: 15 * time.Second,
+				RespawnTime: 5 * time.Second,
 				Chance:      1.0,
 			},
 		},
@@ -152,9 +152,9 @@ func (g *Game) initializeSpawns() {
 			{
 				Type:        components.SpawnTypeNPC,
 				TemplateID:  "chicken",
-				MinCount:    15,
+				MinCount:    20,
 				MaxCount:    20,
-				RespawnTime: 15 * time.Second,
+				RespawnTime: 5 * time.Second,
 				Chance:      1.0,
 			},
 		},
