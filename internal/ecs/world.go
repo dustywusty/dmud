@@ -25,11 +25,12 @@ type World struct {
 }
 
 func (w *World) AddComponent(entity *Entity, component Component) {
-	w.componentMutex.Lock()
-	defer w.componentMutex.Unlock()
-
+	// Always acquire locks in the same order: entityMutex first, then componentMutex
 	w.entityMutex.Lock()
 	defer w.entityMutex.Unlock()
+
+	w.componentMutex.Lock()
+	defer w.componentMutex.Unlock()
 
 	componentName := reflect.TypeOf(component).Elem().Name()
 	if _, ok := w.components[entity.ID]; ok {
@@ -89,11 +90,12 @@ func (w *World) FindEntity(id common.EntityID) (Entity, error) {
 }
 
 func (w *World) FindEntitiesByComponentPredicate(componentType string, predicate func(interface{}) bool) ([]Entity, error) {
-	w.componentMutex.RLock()
-	defer w.componentMutex.RUnlock()
-
+	// Always acquire locks in the same order: entityMutex first, then componentMutex
 	w.entityMutex.RLock()
 	defer w.entityMutex.RUnlock()
+
+	w.componentMutex.RLock()
+	defer w.componentMutex.RUnlock()
 
 	entities := make([]Entity, 0)
 	for entityID, components := range w.components {
