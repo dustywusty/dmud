@@ -16,6 +16,9 @@ func handleSay(player *components.Player, args []string, game *Game) {
 	}
 	player.Broadcast("You say: " + msg) // echo to speaker
 	player.Area.Broadcast(fmt.Sprintf("%s says: %s", player.Name, msg), player)
+
+	// Check if this triggers NPC keyword responses
+	game.handleSayToNPC(player, msg)
 }
 
 func handleShout(player *components.Player, args []string, game *Game) {

@@ -33,6 +33,7 @@ var commandHelpText = map[string]string{
 	"loot":      "Loot items from a corpse. Usage: loot <corpse_name> or loot all (to loot all corpses in the area)",
 	"get":       "Pick up an item from the ground. Usage: get <item_name> (aliases: pickup, take)",
 	"drop":      "Drop an item from your inventory onto the ground. Usage: drop <item_name>",
+	"hail":      "Hail an NPC to start a conversation. Usage: hail <npc_name>",
 }
 
 // handleHistory shows the player's command history
@@ -127,7 +128,8 @@ func handleHelp(player *components.Player, args []string, game *Game) {
 		b.WriteString("COMMUNICATION\n")
 		b.WriteString("  say <message>     - Speak to nearby players\n")
 		b.WriteString("  shout <message>   - Shout to adjacent areas\n")
-		b.WriteString("  who               - List online players\n\n")
+		b.WriteString("  who               - List online players\n")
+		b.WriteString("  hail <npc>        - Interact with an NPC\n\n")
 
 		b.WriteString("COMBAT\n")
 		b.WriteString("  kill <target>     - Attack a target\n")

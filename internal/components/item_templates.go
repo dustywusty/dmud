@@ -65,6 +65,42 @@ var ItemTemplates = map[string]Item{
 		Stackable:   true,
 		Quantity:    1,
 	},
+	"leather_helmet": {
+		ID:          "leather_helmet",
+		Name:        "Leather Helmet",
+		Description: "A sturdy helmet made of tanned leather.",
+		Type:        ItemTypeArmor,
+		Value:       50,
+		Stackable:   false,
+		Quantity:    1,
+	},
+	"leather_chest": {
+		ID:          "leather_chest",
+		Name:        "Leather Chestpiece",
+		Description: "A protective chestpiece crafted from hardened leather.",
+		Type:        ItemTypeArmor,
+		Value:       75,
+		Stackable:   false,
+		Quantity:    1,
+	},
+	"leather_legs": {
+		ID:          "leather_legs",
+		Name:        "Leather Leggings",
+		Description: "Flexible leather leggings that provide good protection.",
+		Type:        ItemTypeArmor,
+		Value:       60,
+		Stackable:   false,
+		Quantity:    1,
+	},
+	"leather_boots": {
+		ID:          "leather_boots",
+		Name:        "Leather Boots",
+		Description: "Comfortable boots made from supple leather.",
+		Type:        ItemTypeArmor,
+		Value:       40,
+		Stackable:   false,
+		Quantity:    1,
+	},
 }
 
 // CreateItem creates a new item from a template with the specified quantity

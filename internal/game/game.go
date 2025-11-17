@@ -272,6 +272,11 @@ func (g *Game) initCommands() {
 		Description: "Drop an item from your inventory.",
 	})
 	g.RegisterCommand(&Command{
+		Name:        "hail",
+		Handler:     g.handleHail,
+		Description: "Hail an NPC to interact with them.",
+	})
+	g.RegisterCommand(&Command{
 		Name:    "xyzzy",
 		Handler: handleXyzzy,
 		Hidden:  true,
@@ -360,6 +365,7 @@ func (g *Game) HandleConnect(c common.Client) {
 	experienceComponent := components.NewExperience()
 	healthComponent := components.NewHealth(experienceComponent.Level)
 	inventoryComponent := components.NewInventory(20) // 20 slot inventory
+	questsComponent := components.NewPlayerQuests()
 
 	playerEntity := ecs.NewEntity()
 	g.world.AddEntity(playerEntity)
@@ -368,6 +374,7 @@ func (g *Game) HandleConnect(c common.Client) {
 	g.world.AddComponent(&playerEntity, experienceComponent)
 	g.world.AddComponent(&playerEntity, healthComponent)
 	g.world.AddComponent(&playerEntity, inventoryComponent)
+	g.world.AddComponent(&playerEntity, questsComponent)
 
 	g.playersMu.Lock()
 	g.players[playerComponent.Name] = &playerEntity
