@@ -4,6 +4,8 @@ import (
 	"dmud/internal/components"
 	"dmud/internal/ecs"
 	"fmt"
+
+	"github.com/rs/zerolog/log"
 )
 
 type StatusEffectSystem struct{}
@@ -42,6 +44,7 @@ func (ses *StatusEffectSystem) Update(w *ecs.World, deltaTime float64) {
 			continue
 		}
 
+		hasHPChange := false
 		for _, effect := range removed {
 			if effect.HPBonus > 0 {
 				health.Lock()
@@ -52,10 +55,14 @@ func (ses *StatusEffectSystem) Update(w *ecs.World, deltaTime float64) {
 				health.Unlock()
 
 				player.Broadcast(fmt.Sprintf("The %s has worn off. (-%d HP)", effect.Name, effect.HPBonus))
+				hasHPChange = true
 			}
 		}
 
 		// Broadcast state update after effects expire
-		player.BroadcastState(w.AsWorldLike(), entity.ID)
+		if hasHPChange {
+			log.Debug().Msgf("Broadcasting state update for %s after effect expiration", player.Name)
+			player.BroadcastState(w.AsWorldLike(), entity.ID)
+		}
 	}
 }
