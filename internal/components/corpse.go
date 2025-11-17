@@ -27,13 +27,31 @@ type Corpse struct {
 
 	// Items that can be looted from the corpse
 	Inventory *Inventory
+
+	// When the corpse was fully looted (empty)
+	LootedAt *time.Time
 }
 
 // IsDecayed checks if the corpse should be removed
 func (c *Corpse) IsDecayed() bool {
 	c.RLock()
 	defer c.RUnlock()
+
+	// If corpse was fully looted, decay after 5 seconds
+	if c.LootedAt != nil {
+		return time.Since(*c.LootedAt) >= 5*time.Second
+	}
+
+	// Otherwise use normal decay time
 	return time.Since(c.TimeOfDeath) >= c.DecayTime
+}
+
+// MarkAsLooted marks the corpse as having been fully looted
+func (c *Corpse) MarkAsLooted() {
+	c.Lock()
+	defer c.Unlock()
+	now := time.Now()
+	c.LootedAt = &now
 }
 
 // GetDescription returns a description of the corpse

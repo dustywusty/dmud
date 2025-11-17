@@ -102,6 +102,9 @@ func (g *Game) handleLoot(player *components.Player, args []string, game *Game) 
 	if len(lootedItems) > 0 {
 		player.Broadcast(fmt.Sprintf("You looted: %s", strings.Join(lootedItems, ", ")))
 		player.Area.Broadcast(fmt.Sprintf("%s loots %s.", player.Name, targetCorpse.GetDescription()), player)
+
+		// Mark corpse as looted so it decays in 5 seconds
+		targetCorpse.MarkAsLooted()
 	} else {
 		player.Broadcast("You couldn't loot anything.")
 	}
@@ -177,6 +180,8 @@ func (g *Game) handleLootAll(player *components.Player, game *Game) {
 
 		if lootedFromCorpse {
 			corpsesLooted++
+			// Mark corpse as looted so it decays in 5 seconds
+			corpse.MarkAsLooted()
 		}
 	}
 
