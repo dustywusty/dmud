@@ -14,7 +14,7 @@ var commandHelpText = map[string]string{
 	"say":      "Say something to all players in the same area. Usage: say <message>",
 	"shout":    "Shout a message that can be heard in nearby areas. Usage: shout <message>",
 	"examine":  "Examine something or someone in detail. Usage: examine <target>",
-	"kill":     "Attack another player or NPC. Usage: kill <target>",
+	"kill":     "Attack another player or NPC. Usage: kill <target> or kill all (to attack everything in the area)",
 	"exit":     "Leave the game and disconnect from the server.",
 	"north":    "Move north to the adjacent area (if an exit exists).",
 	"south":    "Move south to the adjacent area (if an exit exists).",
@@ -126,7 +126,8 @@ func handleHelp(player *components.Player, args []string, game *Game) {
 		b.WriteString("  who               - List online players\n\n")
 
 		b.WriteString("COMBAT\n")
-		b.WriteString("  kill <target>     - Attack a target\n\n")
+		b.WriteString("  kill <target>     - Attack a target\n")
+		b.WriteString("  kill all          - Attack everything in the area\n\n")
 
 		b.WriteString("MOVEMENT\n")
 		b.WriteString("  north, south, east, west, up, down\n\n")
