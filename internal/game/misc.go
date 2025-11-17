@@ -55,11 +55,18 @@ func handleName(player *components.Player, args []string, game *Game) {
 }
 
 func handleRecall(player *components.Player, args []string, game *Game) {
+	game.playersMu.RLock()
+	playerEntity := game.players[player.Name]
+	game.playersMu.RUnlock()
+
 	if player.Area == nil {
 		player.Area = game.defaultArea
 		game.defaultArea.AddPlayer(player)
 		player.Broadcast("You gather your senses and return to the starting area.")
 		player.Look(game.world.AsWorldLike())
+		if playerEntity != nil {
+			player.BroadcastState(game.world.AsWorldLike(), playerEntity.ID)
+		}
 		return
 	}
 
@@ -73,6 +80,9 @@ func handleRecall(player *components.Player, args []string, game *Game) {
 	game.defaultArea.AddPlayer(player)
 	player.Broadcast("You focus for a moment and recall to the starting area.\n")
 	player.Look(game.world.AsWorldLike())
+	if playerEntity != nil {
+		player.BroadcastState(game.world.AsWorldLike(), playerEntity.ID)
+	}
 }
 
 func (g *Game) HandleRename(player *components.Player, newName string) {
