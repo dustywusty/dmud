@@ -197,8 +197,6 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 				}
 			}
 			combat.Unlock()
-				}
-			}
 		} else {
 			combat.TargetID = ""
 			combat.Unlock()
