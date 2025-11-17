@@ -71,5 +71,5 @@ func HandleMovement(w *ecs.World, movingEntity ecs.Entity) {
 
 	movingPlayer.Area = exit.Area
 	movingPlayer.Area.AddPlayer(movingPlayer)
-	movingPlayer.Broadcast(exit.Area.Description)
+	movingPlayer.Look(w.AsWorldLike())
 }

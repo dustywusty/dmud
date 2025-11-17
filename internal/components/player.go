@@ -68,7 +68,7 @@ func (p *Player) DescribeArea(w WorldLike) string {
 		for i, exit := range p.Area.Exits {
 			exits[i] = exit.Direction
 		}
-		b.WriteString("\nExits: [")
+		b.WriteString("\n\nExits: [")
 		b.WriteString(strings.Join(exits, ", "))
 		b.WriteString("]\n")
 	}
