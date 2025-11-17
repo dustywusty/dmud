@@ -1,4 +1,3 @@
-// internal/components/spawn.go
 package components
 
 import (

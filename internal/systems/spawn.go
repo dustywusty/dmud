@@ -1,4 +1,3 @@
-// internal/systems/spawn.go
 package systems
 
 import (

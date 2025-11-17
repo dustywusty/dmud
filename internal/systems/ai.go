@@ -1,4 +1,3 @@
-// internal/systems/ai.go
 package systems
 
 import (

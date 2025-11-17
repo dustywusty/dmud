@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// CorpseSystem handles corpse decay and cleanup
 type CorpseSystem struct{}
 
 func NewCorpseSystem() *CorpseSystem {

@@ -1,4 +1,3 @@
-// internal/components/npc_template.go
 package components
 
 import "time"
@@ -26,7 +25,6 @@ type NPCTemplate struct {
     RespawnTime time.Duration
 }
 
-// Some basic NPC templates
 var NPCTemplates = map[string]NPCTemplate{
     "rat": {
         ID:          "rat",

@@ -1,4 +1,3 @@
-// internal/components/interfaces.go
 package components
 
 import "dmud/internal/common"

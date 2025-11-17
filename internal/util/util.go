@@ -88,8 +88,6 @@ func ParseJSON(filename string, v interface{}) error {
 	return json.Unmarshal(data, v)
 }
 
-// ..
-
 var AdjectiveVerbs1 = []string{
 	"vacuous",
 	"cheerful",

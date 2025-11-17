@@ -104,8 +104,6 @@ func (g *Game) HandleRename(player *components.Player, newName string) {
 	g.Broadcast(fmt.Sprintf("%s has changed their name to %s", oldName, newName))
 }
 
-// internal/game/misc.go - Add examine command
-
 func handleExamine(player *components.Player, args []string, game *Game) {
 	if len(args) == 0 {
 		player.Broadcast("Examine what?")

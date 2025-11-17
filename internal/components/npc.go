@@ -1,4 +1,3 @@
-// internal/components/npc.go
 package components
 
 import (
