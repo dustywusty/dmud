@@ -186,14 +186,17 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 			// Switch to next target in queue
 			combat.TargetID = combat.TargetQueue[0]
 			combat.TargetQueue = combat.TargetQueue[1:]
-			combat.Unlock()
 
 			// Announce switching targets if it's a player
 			if attackerPlayer != nil && targetNPC != nil {
 				// Find the new target's name
-				if newTargetNPC, err := w.GetComponent(combat.TargetID, "NPC"); err == nil {
+				newTargetID := combat.TargetID
+				if newTargetNPC, err := w.GetComponent(newTargetID, "NPC"); err == nil {
 					newNPC := newTargetNPC.(*components.NPC)
 					attackerPlayer.Broadcast(fmt.Sprintf("You turn your attention to %s!", newNPC.Name))
+				}
+			}
+			combat.Unlock()
 				}
 			}
 		} else {

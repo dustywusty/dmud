@@ -73,7 +73,11 @@ func (g *Game) HandleKillAll(player *components.Player) {
 
 	// Announce combat
 	player.Area.Broadcast(player.Name + " attacks everything in sight!")
-	player.Broadcast(fmt.Sprintf("You engage %d enemies!", len(targetEntityIDs)))
+	if len(targetEntityIDs) == 1 {
+		player.Broadcast("You engage 1 enemy!")
+	} else {
+		player.Broadcast(fmt.Sprintf("You engage %d enemies!", len(targetEntityIDs)))
+	}
 }
 
 func (g *Game) HandleKill(player *components.Player, targetName string) {
