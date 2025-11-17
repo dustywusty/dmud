@@ -54,5 +54,8 @@ func (ses *StatusEffectSystem) Update(w *ecs.World, deltaTime float64) {
 				player.Broadcast(fmt.Sprintf("The %s has worn off. (-%d HP)", effect.Name, effect.HPBonus))
 			}
 		}
+
+		// Broadcast state update after effects expire
+		player.BroadcastState(w.AsWorldLike(), entity.ID)
 	}
 }

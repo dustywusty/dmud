@@ -284,6 +284,9 @@ func (as *AISystem) guardBlessPlayers(w *ecs.World, npc *components.NPC) {
 				health.Unlock()
 			}
 
+			// Broadcast state update to player
+			player.BroadcastState(w.AsWorldLike(), playerEntity.ID)
+
 			npc.Lock()
 			npc.LastAction = time.Now()
 			npc.Unlock()
