@@ -71,7 +71,7 @@ func handleRecall(player *components.Player, args []string, game *Game) {
 	player.Area.RemovePlayer(player)
 	player.Area = game.defaultArea
 	game.defaultArea.AddPlayer(player)
-	player.Broadcast("You focus for a moment and recall to the starting area.")
+	player.Broadcast("You focus for a moment and recall to the starting area.\n")
 	player.Look(game.world.AsWorldLike())
 }
 
