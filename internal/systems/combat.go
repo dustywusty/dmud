@@ -97,6 +97,46 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 
 		performAttack(attackerPlayer, targetPlayer, attackerNPC, targetNPC,
 			attackerName, targetName, combat, targetHealth)
+
+		// Auto-retaliation: if target isn't already fighting back, make them attack the attacker
+		targetCombat, err := getCombatComponent(w, targetID)
+		if err != nil || targetCombat.TargetID == "" {
+			// Target doesn't have combat component or isn't attacking anyone
+			// Create or update combat component to attack back
+			var minDamage, maxDamage int
+
+			if targetPlayer != nil {
+				// Default player damage if not specified
+				minDamage = 10
+				maxDamage = 50
+			} else if targetNPC != nil {
+				// Use NPC's damage from template
+				if template, ok := components.NPCTemplates[targetNPC.TemplateID]; ok {
+					minDamage = template.MinDamage
+					maxDamage = template.MaxDamage
+				} else {
+					minDamage = 5
+					maxDamage = 15
+				}
+			}
+
+			retaliationCombat := &components.Combat{
+				TargetID:  attackingEntity.ID,
+				MinDamage: minDamage,
+				MaxDamage: maxDamage,
+			}
+
+			// Find the target entity to add combat component
+			targetEntities, _ := w.FindEntitiesByComponentPredicate("Health", func(i interface{}) bool {
+				return true
+			})
+			for _, te := range targetEntities {
+				if te.ID == targetID {
+					w.AddComponent(&te, retaliationCombat)
+					break
+				}
+			}
+		}
 	}
 }
 
@@ -207,8 +247,8 @@ func performAttack(attackerPlayer, targetPlayer *components.Player, attackerNPC,
 	damage := r.Intn(combat.MaxDamage-combat.MinDamage+1) + combat.MinDamage
 
 	targetHealth.Lock()
-	defer targetHealth.Unlock()
 	targetHealth.Current -= damage
+	targetHealth.Unlock()
 
 	// Send appropriate messages based on entity types
 	if attackerPlayer != nil {
