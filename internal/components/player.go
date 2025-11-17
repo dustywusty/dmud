@@ -50,7 +50,8 @@ func (p *Player) DescribeArea(w WorldLike) string {
 
 	npcs := p.Area.GetNPCs(w)
 
-	if len(otherPlayers) > 0 || len(npcs) > 0 {
+	hasEntities := len(otherPlayers) > 0 || len(npcs) > 0
+	if hasEntities {
 		b.WriteString("\n\n")
 		for _, name := range otherPlayers {
 			b.WriteString(name)
@@ -68,7 +69,12 @@ func (p *Player) DescribeArea(w WorldLike) string {
 		for i, exit := range p.Area.Exits {
 			exits[i] = exit.Direction
 		}
-		b.WriteString("\n\nExits: [")
+		if hasEntities {
+			b.WriteString("\n")
+		} else {
+			b.WriteString("\n\n")
+		}
+		b.WriteString("Exits: [")
 		b.WriteString(strings.Join(exits, ", "))
 		b.WriteString("]\n")
 	}
