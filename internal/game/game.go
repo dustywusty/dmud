@@ -52,6 +52,7 @@ func NewGame() *Game {
 	spawnSystem := systems.NewSpawnSystem()
 	aiSystem := systems.NewAISystem()
 	corpseSystem := systems.NewCorpseSystem()
+	statusEffectSystem := systems.NewStatusEffectSystem()
 
 	world := ecs.NewWorld()
 	world.AddSystem(combatSystem)
@@ -59,6 +60,7 @@ func NewGame() *Game {
 	world.AddSystem(spawnSystem)
 	world.AddSystem(aiSystem)
 	world.AddSystem(corpseSystem)
+	world.AddSystem(statusEffectSystem)
 
 	defaultAreaUntyped, err := world.GetComponent("1", "Area")
 	if err != nil {

@@ -208,7 +208,89 @@ func (as *AISystem) processGuardNPC(w *ecs.World, npcEntity ecs.Entity, npc *com
 	if as.guardIntervene(w, npcEntity, npc, combat) {
 		return
 	}
+
+	as.guardBlessPlayers(w, npc)
 	as.processFriendlyNPC(w, npcEntity, npc)
+}
+
+func (as *AISystem) guardBlessPlayers(w *ecs.World, npc *components.NPC) {
+	npc.RLock()
+	area := npc.Area
+	lastAction := npc.LastAction
+	npc.RUnlock()
+
+	if area == nil {
+		return
+	}
+
+	if time.Since(lastAction) < 10*time.Second {
+		return
+	}
+
+	area.PlayersMutex.RLock()
+	players := make([]*components.Player, len(area.Players))
+	copy(players, area.Players)
+	area.PlayersMutex.RUnlock()
+
+	for _, player := range players {
+		playerEntities, _ := w.FindEntitiesByComponentPredicate("Player", func(i interface{}) bool {
+			p, ok := i.(*components.Player)
+			return ok && p == player
+		})
+
+		if len(playerEntities) == 0 {
+			continue
+		}
+
+		playerEntity := playerEntities[0]
+
+		statusEffects, err := ecs.GetTypedComponent[*components.StatusEffects](w, playerEntity.ID, "StatusEffects")
+		if err != nil || statusEffects == nil {
+			statusEffects = components.NewStatusEffects()
+			w.AddComponent(&playerEntity, statusEffects)
+		}
+
+		if !statusEffects.HasEffect(components.StatusEffectGuardBlessing) {
+			effect := components.StatusEffect{
+				Type:      components.StatusEffectGuardBlessing,
+				Name:      "Guard's Blessing",
+				AppliedAt: time.Now(),
+				Duration:  5 * time.Minute,
+				HPBonus:   500,
+				Applied:   false,
+			}
+
+			statusEffects.AddEffect(effect)
+
+			blessings := []string{
+				"May the light protect you, traveler.",
+				"The Guard grants you their blessing.",
+				"You are under the Guard's protection.",
+				"Stay safe in these lands, friend.",
+			}
+			message := blessings[rand.Intn(len(blessings))]
+
+			area.Broadcast(fmt.Sprintf("%s says: \"%s\"", npc.Name, message))
+			player.Broadcast("You feel a surge of vitality as the guard blesses you! (+500 HP)")
+
+			health, err := ecs.GetTypedComponent[*components.Health](w, playerEntity.ID, "Health")
+			if err == nil {
+				health.Lock()
+				health.Current += 500
+				effectiveMax := health.GetEffectiveMax(500)
+				if health.Current > effectiveMax {
+					health.Current = effectiveMax
+				}
+				health.Unlock()
+			}
+
+			npc.Lock()
+			npc.LastAction = time.Now()
+			npc.Unlock()
+
+			return
+		}
+	}
 }
 
 func (as *AISystem) guardIntervene(w *ecs.World, npcEntity ecs.Entity, npc *components.NPC, combat *components.Combat) bool {

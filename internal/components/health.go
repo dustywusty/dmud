@@ -18,6 +18,10 @@ type Health struct {
 	Status  HealthStatus
 }
 
+func (hc *Health) GetEffectiveMax(bonus int) int {
+	return hc.Max + bonus
+}
+
 func (hc *Health) Heal(amount int) {
 	hc.Current += amount
 	if hc.Current > hc.Max {

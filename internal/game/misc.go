@@ -112,6 +112,47 @@ func handleExamine(player *components.Player, args []string, game *Game) {
 
 	target := strings.Join(args, " ")
 
+	// Check if examining self
+	if strings.ToLower(target) == "self" || strings.ToLower(target) == "me" || strings.ToLower(target) == player.Name {
+		game.playersMu.RLock()
+		playerEntity := game.players[player.Name]
+		game.playersMu.RUnlock()
+
+		if playerEntity != nil {
+			var msg strings.Builder
+			msg.WriteString("You examine yourself.\n")
+
+			health, err := game.world.GetComponent(playerEntity.ID, "Health")
+			if err == nil {
+				h := health.(*components.Health)
+				statusEffects, _ := game.world.GetComponent(playerEntity.ID, "StatusEffects")
+				bonus := 0
+				if statusEffects != nil {
+					se := statusEffects.(*components.StatusEffects)
+					bonus = se.GetTotalHPBonus()
+				}
+				effectiveMax := h.GetEffectiveMax(bonus)
+				msg.WriteString(fmt.Sprintf("Health: %d/%d HP\n", h.Current, effectiveMax))
+			}
+
+			statusEffects, err := game.world.GetComponent(playerEntity.ID, "StatusEffects")
+			if err == nil && statusEffects != nil {
+				se := statusEffects.(*components.StatusEffects)
+				se.RLock()
+				if len(se.Effects) > 0 {
+					msg.WriteString("\nActive Effects:\n")
+					for _, effect := range se.Effects {
+						msg.WriteString(fmt.Sprintf("  - %s (+%d HP)\n", effect.Name, effect.HPBonus))
+					}
+				}
+				se.RUnlock()
+			}
+
+			player.Broadcast(msg.String())
+			return
+		}
+	}
+
 	// Check for NPCs in the area
 	npcs := player.Area.GetNPCs(game.world.AsWorldLike())
 	for _, npc := range npcs {
