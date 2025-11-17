@@ -25,8 +25,8 @@ type Corpse struct {
 
 	Area *Area
 
-	// Future: Items that can be looted
-	// Loot []Item
+	// Items that can be looted from the corpse
+	Inventory *Inventory
 }
 
 // IsDecayed checks if the corpse should be removed
@@ -47,7 +47,7 @@ func (c *Corpse) GetDescription() string {
 	return "the corpse of " + c.VictimName
 }
 
-func NewCorpse(victimName string, victimID common.EntityID, wasPlayer bool, area *Area) *Corpse {
+func NewCorpse(victimName string, victimID common.EntityID, wasPlayer bool, area *Area, inventory *Inventory) *Corpse {
 	return &Corpse{
 		VictimName:  victimName,
 		VictimID:    victimID,
@@ -55,5 +55,6 @@ func NewCorpse(victimName string, victimID common.EntityID, wasPlayer bool, area
 		TimeOfDeath: time.Now(),
 		DecayTime:   30 * time.Minute,
 		Area:        area,
+		Inventory:   inventory,
 	}
 }

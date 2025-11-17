@@ -218,8 +218,12 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 			targetPlayer.Area.Broadcast(fmt.Sprintf("%s has been slain by %s!", targetPlayer.Name, attackerNPC.Name))
 		}
 
-		// Create player corpse
-		spawnCorpse(w, targetPlayer.Name, targetID, true, targetPlayer.Area)
+		// Create player corpse with their inventory
+		var corpseInventory *components.Inventory
+		if invComp, err := w.GetComponent(targetID, "Inventory"); err == nil {
+			corpseInventory = invComp.(*components.Inventory)
+		}
+		spawnCorpse(w, targetPlayer.Name, targetID, true, targetPlayer.Area, corpseInventory)
 
 		// TODO: Handle respawn
 		// For now, restore health
@@ -272,8 +276,12 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 			}
 		}
 
-		// Create NPC corpse before removing entity
-		spawnCorpse(w, targetNPC.Name, targetID, false, targetNPC.Area)
+		// Create NPC corpse with their inventory before removing entity
+		var corpseInventory *components.Inventory
+		if invComp, err := w.GetComponent(targetID, "Inventory"); err == nil {
+			corpseInventory = invComp.(*components.Inventory)
+		}
+		spawnCorpse(w, targetNPC.Name, targetID, false, targetNPC.Area, corpseInventory)
 
 		// Remove NPC from world (spawn system will respawn it)
 		w.RemoveEntity(targetID)
@@ -281,7 +289,7 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 }
 
 // spawnCorpse creates a corpse entity at the location of death
-func spawnCorpse(w components.WorldLike, victimName string, victimID common.EntityID, wasPlayer bool, area *components.Area) {
+func spawnCorpse(w components.WorldLike, victimName string, victimID common.EntityID, wasPlayer bool, area *components.Area, inventory *components.Inventory) {
 	if area == nil {
 		return
 	}
@@ -289,8 +297,8 @@ func spawnCorpse(w components.WorldLike, victimName string, victimID common.Enti
 	// Create corpse entity
 	corpseEntity := w.CreateEntity()
 
-	// Create and add corpse component
-	corpse := components.NewCorpse(victimName, victimID, wasPlayer, area)
+	// Create and add corpse component with inventory
+	corpse := components.NewCorpse(victimName, victimID, wasPlayer, area, inventory)
 	w.AddComponentToEntity(corpseEntity, corpse)
 
 	log.Debug().Msgf("Spawned corpse of %s (entity: %s) at area (%d,%d,%d)",

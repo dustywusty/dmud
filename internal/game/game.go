@@ -250,6 +250,28 @@ func (g *Game) initCommands() {
 		Description: "Show help information for commands.",
 	})
 	g.RegisterCommand(&Command{
+		Name:        "loot",
+		Handler:     g.handleLoot,
+		Description: "Loot items from a corpse.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "inventory",
+		Aliases:     []string{"inv", "i"},
+		Handler:     g.handleInventory,
+		Description: "View your inventory.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "get",
+		Aliases:     []string{"pickup", "take"},
+		Handler:     g.handleGet,
+		Description: "Pick up an item from the ground.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "drop",
+		Handler:     g.handleDrop,
+		Description: "Drop an item from your inventory.",
+	})
+	g.RegisterCommand(&Command{
 		Name:    "xyzzy",
 		Handler: handleXyzzy,
 		Hidden:  true,
@@ -337,6 +359,7 @@ func (g *Game) HandleConnect(c common.Client) {
 	}
 	experienceComponent := components.NewExperience()
 	healthComponent := components.NewHealth(experienceComponent.Level)
+	inventoryComponent := components.NewInventory(20) // 20 slot inventory
 
 	playerEntity := ecs.NewEntity()
 	g.world.AddEntity(playerEntity)
@@ -344,6 +367,7 @@ func (g *Game) HandleConnect(c common.Client) {
 	g.world.AddComponent(&playerEntity, playerComponent)
 	g.world.AddComponent(&playerEntity, experienceComponent)
 	g.world.AddComponent(&playerEntity, healthComponent)
+	g.world.AddComponent(&playerEntity, inventoryComponent)
 
 	g.playersMu.Lock()
 	g.players[playerComponent.Name] = &playerEntity

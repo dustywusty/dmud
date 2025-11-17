@@ -137,6 +137,10 @@ func (ss *SpawnSystem) spawnNPC(w *ecs.World, area *components.Area, config comp
 	}
 	w.AddComponent(&npcEntity, health)
 
+	// Add Inventory component with generated loot
+	inventory := components.GenerateLoot(template.ID)
+	w.AddComponent(&npcEntity, inventory)
+
 	// Add Combat component for NPCs that can fight on their own
 	if template.Behavior == components.BehaviorAggressive || template.Behavior == components.BehaviorGuard {
 		combat := &components.Combat{
