@@ -33,9 +33,8 @@ var commandHelpText = map[string]string{
 	"loot":      "Loot items from a corpse. Usage: loot <corpse_name> or loot all (to loot all corpses in the area)",
 	"get":       "Pick up an item from the ground. Usage: get <item_name> (aliases: pickup, take)",
 	"drop":      "Drop an item from your inventory onto the ground. Usage: drop <item_name>",
-	"hail":      "Hail an NPC to start a conversation. Usage: hail <npc_name>",
-	"uptime":    "Show server uptime, current players, and connection statistics.",
-	"version":   "Show server version, git commit hash, and GitHub link.",
+	"hail":   "Hail an NPC to start a conversation. Usage: hail <npc_name>",
+	"uptime": "Show server uptime, current players, and connection statistics.",
 }
 
 // handleHistory shows the player's command history
@@ -158,7 +157,6 @@ func handleHelp(player *components.Player, args []string, game *Game) {
 		b.WriteString("  suggest <partial> - Get command suggestions\n")
 		b.WriteString("  complete <partial>- Auto-complete commands\n")
 		b.WriteString("  uptime            - Show server statistics\n")
-		b.WriteString("  version           - Show version information\n")
 		b.WriteString("  exit              - Leave the game\n\n")
 
 		b.WriteString("==============================================\n")
