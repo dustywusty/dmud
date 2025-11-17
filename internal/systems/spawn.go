@@ -76,21 +76,22 @@ func (ss *SpawnSystem) processSpawn(w *ecs.World, spawnEntity ecs.Entity) {
 }
 
 func (ss *SpawnSystem) countActiveNPCs(w *ecs.World, spawn *components.Spawn, templateID string) int {
-	count := 0
-	for tid, entityID := range spawn.ActiveSpawns {
-		if tid != templateID {
-			continue
-		}
+	entityIDs, exists := spawn.ActiveSpawns[templateID]
+	if !exists {
+		return 0
+	}
 
-		// Check if entity still exists
+	// Clean up dead references and count valid ones
+	validIDs := make([]common.EntityID, 0, len(entityIDs))
+	for _, entityID := range entityIDs {
 		if _, err := w.FindEntity(entityID); err == nil {
-			count++
-		} else {
-			// Clean up dead reference
-			delete(spawn.ActiveSpawns, tid)
+			validIDs = append(validIDs, entityID)
 		}
 	}
-	return count
+
+	// Update the list with only valid IDs
+	spawn.ActiveSpawns[templateID] = validIDs
+	return len(validIDs)
 }
 
 func (ss *SpawnSystem) spawnNPC(w *ecs.World, area *components.Area, config components.SpawnConfig, spawn *components.Spawn) {
@@ -98,17 +99,6 @@ func (ss *SpawnSystem) spawnNPC(w *ecs.World, area *components.Area, config comp
 	if !exists {
 		log.Error().Msgf("NPC template not found: %s", config.TemplateID)
 		return
-	}
-
-	// Check if we've already spawned this NPC type
-	if existingID, exists := spawn.ActiveSpawns[template.ID]; exists {
-		// Verify the entity still exists
-		if _, err := w.GetComponent(common.EntityID(existingID), "NPC"); err == nil {
-			// NPC still exists, don't spawn another
-			return
-		}
-		// Entity no longer exists, remove from tracking
-		delete(spawn.ActiveSpawns, template.ID)
 	}
 
 	// Count existing NPCs of this type in the area
@@ -156,8 +146,11 @@ func (ss *SpawnSystem) spawnNPC(w *ecs.World, area *components.Area, config comp
 		w.AddComponent(&npcEntity, combat)
 	}
 
-	// Track the spawn
-	spawn.ActiveSpawns[template.ID] = npcEntity.ID
+	// Track the spawn - append to the list
+	if spawn.ActiveSpawns[template.ID] == nil {
+		spawn.ActiveSpawns[template.ID] = make([]common.EntityID, 0)
+	}
+	spawn.ActiveSpawns[template.ID] = append(spawn.ActiveSpawns[template.ID], npcEntity.ID)
 
 	// Announce spawn to area (with newline to avoid interrupting typing)
 	area.Broadcast(template.Name + " arrives.")

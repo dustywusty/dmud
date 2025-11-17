@@ -27,7 +27,7 @@ type Spawn struct {
 	sync.RWMutex
 
 	Configs      []SpawnConfig
-	ActiveSpawns map[string]common.EntityID // templateID -> entityIDs
+	ActiveSpawns map[string][]common.EntityID // templateID -> list of entityIDs
 	LastSpawn    time.Time
 	AreaID       common.EntityID
 }
@@ -35,7 +35,7 @@ type Spawn struct {
 func NewSpawn(areaID common.EntityID) *Spawn {
 	return &Spawn{
 		Configs:      make([]SpawnConfig, 0),
-		ActiveSpawns: make(map[string]common.EntityID),
+		ActiveSpawns: make(map[string][]common.EntityID),
 		AreaID:       areaID,
 		LastSpawn:    time.Now(),
 	}
