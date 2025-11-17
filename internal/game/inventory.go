@@ -123,11 +123,13 @@ func (g *Game) handleInventory(player *components.Player, args []string, game *G
 	}
 
 	var output strings.Builder
-	output.WriteString("Inventory:\n")
+	output.WriteString("==============================================\n")
+	output.WriteString("                 INVENTORY                    \n")
+	output.WriteString("==============================================\n\n")
 
 	for _, item := range items {
 		if item.Stackable && item.Quantity > 1 {
-			output.WriteString(fmt.Sprintf("  %s x%d\n", item.Name, item.Quantity))
+			output.WriteString(fmt.Sprintf("  %-30s x%d\n", item.Name, item.Quantity))
 		} else {
 			output.WriteString(fmt.Sprintf("  %s\n", item.Name))
 		}
@@ -135,9 +137,11 @@ func (g *Game) handleInventory(player *components.Player, args []string, game *G
 
 	inventory.RLock()
 	if inventory.MaxSlots > 0 {
-		output.WriteString(fmt.Sprintf("(%d/%d slots used)", len(inventory.Items), inventory.MaxSlots))
+		output.WriteString(fmt.Sprintf("\n(%d/%d slots used)\n", len(inventory.Items), inventory.MaxSlots))
 	}
 	inventory.RUnlock()
+
+	output.WriteString("==============================================\n")
 
 	player.Broadcast(output.String())
 }
