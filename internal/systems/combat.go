@@ -178,10 +178,28 @@ func isTargetDead(health *components.Health) bool {
 func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targetID common.EntityID,
 	attackerPlayer, targetPlayer *components.Player, attackerNPC, targetNPC *components.NPC) {
 
-	// Clear combat states
+	// Clear or switch to next target in queue
 	if combatComp, err := w.GetComponent(attackerID, "Combat"); err == nil {
 		combat := combatComp.(*components.Combat)
-		combat.TargetID = ""
+		combat.Lock()
+		if len(combat.TargetQueue) > 0 {
+			// Switch to next target in queue
+			combat.TargetID = combat.TargetQueue[0]
+			combat.TargetQueue = combat.TargetQueue[1:]
+			combat.Unlock()
+
+			// Announce switching targets if it's a player
+			if attackerPlayer != nil && targetNPC != nil {
+				// Find the new target's name
+				if newTargetNPC, err := w.GetComponent(combat.TargetID, "NPC"); err == nil {
+					newNPC := newTargetNPC.(*components.NPC)
+					attackerPlayer.Broadcast(fmt.Sprintf("You turn your attention to %s!", newNPC.Name))
+				}
+			}
+		} else {
+			combat.TargetID = ""
+			combat.Unlock()
+		}
 	}
 	if combatComp, err := w.GetComponent(targetID, "Combat"); err == nil {
 		combat := combatComp.(*components.Combat)

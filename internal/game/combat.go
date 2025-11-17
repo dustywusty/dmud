@@ -1,8 +1,10 @@
 package game
 
 import (
+	"dmud/internal/common"
 	"dmud/internal/components"
 	"dmud/internal/ecs"
+	"fmt"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -44,38 +46,34 @@ func (g *Game) HandleKillAll(player *components.Player) {
 	}
 
 	// Find all NPC entities in the area
-	var targetEntities []*ecs.Entity
+	var targetEntityIDs []common.EntityID
 	for _, npc := range npcs {
 		npcEntities, _ := g.world.FindEntitiesByComponentPredicate("NPC", func(i interface{}) bool {
 			n, ok := i.(*components.NPC)
 			return ok && n == npc
 		})
 		if len(npcEntities) > 0 {
-			targetEntities = append(targetEntities, &npcEntities[0])
+			targetEntityIDs = append(targetEntityIDs, npcEntities[0].ID)
 		}
 	}
 
-	if len(targetEntities) == 0 {
+	if len(targetEntityIDs) == 0 {
 		player.Broadcast("There's nothing here to attack.")
 		return
 	}
 
-	// Attack the first target, others will auto-retaliate
-	firstTarget := targetEntities[0]
+	// Set player to attack the first target, queue the rest
 	combatComponent := &components.Combat{
-		TargetID:  firstTarget.ID,
-		MinDamage: 10,
-		MaxDamage: 50,
+		TargetID:    targetEntityIDs[0],
+		TargetQueue: targetEntityIDs[1:], // Queue up the rest
+		MinDamage:   10,
+		MaxDamage:   50,
 	}
-
 	g.world.AddComponent(playerEntity, combatComponent)
 
 	// Announce combat
-	if npc, err := ecs.GetTypedComponent[*components.NPC](g.world, firstTarget.ID, "NPC"); err == nil {
-		player.Area.Broadcast(player.Name + " attacks " + npc.Name + "!")
-	}
-
-	player.Broadcast("You attack everything in sight!")
+	player.Area.Broadcast(player.Name + " attacks everything in sight!")
+	player.Broadcast(fmt.Sprintf("You engage %d enemies!", len(targetEntityIDs)))
 }
 
 func (g *Game) HandleKill(player *components.Player, targetName string) {

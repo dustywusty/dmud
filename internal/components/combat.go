@@ -8,7 +8,8 @@ import (
 type Combat struct {
 	sync.RWMutex
 
-	TargetID  common.EntityID
-	MinDamage int
-	MaxDamage int
+	TargetID    common.EntityID
+	TargetQueue []common.EntityID // Queue of additional targets to attack
+	MinDamage   int
+	MaxDamage   int
 }
