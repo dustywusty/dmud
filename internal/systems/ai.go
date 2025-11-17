@@ -244,18 +244,27 @@ func (as *AISystem) guardBlessPlayers(w *ecs.World, npc *components.NPC) {
 
 		playerEntity := playerEntities[0]
 
+		health, err := ecs.GetTypedComponent[*components.Health](w, playerEntity.ID, "Health")
+		if err != nil {
+			continue
+		}
+
 		statusEffects, err := ecs.GetTypedComponent[*components.StatusEffects](w, playerEntity.ID, "StatusEffects")
 		if err != nil || statusEffects == nil {
 			statusEffects = components.NewStatusEffects()
 			w.AddComponent(&playerEntity, statusEffects)
 		}
 
-		if !statusEffects.HasEffect(components.StatusEffectGuardBlessing) {
+		hasBlessing := statusEffects.HasEffect(components.StatusEffectGuardBlessing)
+		isInjured := health.Current < health.Max
+
+		// Heal and bless travelers who don't have the blessing
+		if !hasBlessing {
 			effect := components.StatusEffect{
 				Type:      components.StatusEffectGuardBlessing,
 				Name:      "Guard's Blessing",
 				AppliedAt: time.Now(),
-				Duration:  5 * time.Minute,
+				Duration:  10 * time.Minute,
 				HPBonus:   500,
 				Applied:   false,
 			}
@@ -271,18 +280,51 @@ func (as *AISystem) guardBlessPlayers(w *ecs.World, npc *components.NPC) {
 			message := blessings[rand.Intn(len(blessings))]
 
 			area.Broadcast(fmt.Sprintf("%s says: \"%s\"", npc.Name, message))
+
+			// Heal to full health first
+			health.Lock()
+			wasInjured := health.Current < health.Max
+			health.Current = health.Max
+			// Then add the buff HP
+			health.Current += 500
+			effectiveMax := health.GetEffectiveMax(500)
+			if health.Current > effectiveMax {
+				health.Current = effectiveMax
+			}
+			health.Unlock()
+
+			if wasInjured {
+				player.Broadcast("The guard's healing power restores you to full health!")
+			}
 			player.Broadcast("You feel a surge of vitality as the guard blesses you! (+500 HP)")
 
-			health, err := ecs.GetTypedComponent[*components.Health](w, playerEntity.ID, "Health")
-			if err == nil {
-				health.Lock()
-				health.Current += 500
-				effectiveMax := health.GetEffectiveMax(500)
-				if health.Current > effectiveMax {
-					health.Current = effectiveMax
-				}
-				health.Unlock()
+			// Broadcast state update to player
+			player.BroadcastState(w.AsWorldLike(), playerEntity.ID)
+
+			npc.Lock()
+			npc.LastAction = time.Now()
+			npc.Unlock()
+
+			return
+		}
+
+		// If they have the blessing but are injured, just heal them
+		if hasBlessing && isInjured {
+			health.Lock()
+			hpBonus := statusEffects.GetTotalHPBonus()
+			effectiveMax := health.Max + hpBonus
+			health.Current = effectiveMax
+			health.Unlock()
+
+			healings := []string{
+				"Rest easy, traveler. Your wounds are healed.",
+				"The Guard's light mends your injuries.",
+				"Be whole again, friend.",
 			}
+			message := healings[rand.Intn(len(healings))]
+
+			area.Broadcast(fmt.Sprintf("%s says: \"%s\"", npc.Name, message))
+			player.Broadcast("The guard heals your wounds completely!")
 
 			// Broadcast state update to player
 			player.BroadcastState(w.AsWorldLike(), playerEntity.ID)
