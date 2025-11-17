@@ -1,6 +1,9 @@
 package components
 
-import "sync"
+import (
+	"math"
+	"sync"
+)
 
 type HealthStatus int
 
@@ -37,5 +40,15 @@ func (hc *Health) TakeDamage(amount int) {
 		hc.Status = Dead
 	} else {
 		hc.Status = Injured
+	}
+}
+
+func NewHealth(level int) *Health {
+	baseHP := 100
+	scaledHP := int(math.Floor(float64(baseHP) * GetLevelScaling(level)))
+	return &Health{
+		Current: scaledHP,
+		Max:     scaledHP,
+		Status:  Healthy,
 	}
 }

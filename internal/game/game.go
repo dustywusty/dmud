@@ -315,15 +315,14 @@ func (g *Game) HandleConnect(c common.Client) {
 		CommandHistory: components.NewCommandHistory(),
 		AutoComplete:   util.NewAutoComplete(),
 	}
-	healthComponent := &components.Health{
-		Max:     100,
-		Current: 100,
-	}
+	experienceComponent := components.NewExperience()
+	healthComponent := components.NewHealth(experienceComponent.Level)
 
 	playerEntity := ecs.NewEntity()
 	g.world.AddEntity(playerEntity)
 
 	g.world.AddComponent(&playerEntity, playerComponent)
+	g.world.AddComponent(&playerEntity, experienceComponent)
 	g.world.AddComponent(&playerEntity, healthComponent)
 
 	g.playersMu.Lock()

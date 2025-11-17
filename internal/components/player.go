@@ -32,6 +32,19 @@ func (p *Player) BroadcastState(w WorldLike, entityID common.EntityID) {
 	}
 	h := health.(*Health)
 
+	experience, _ := w.GetComponent(entityID, "Experience")
+	level := 1
+	currentXP := 0
+	requiredXP := 100
+	if experience != nil {
+		exp := experience.(*Experience)
+		exp.RLock()
+		level = exp.Level
+		currentXP = exp.Current
+		requiredXP = CalculateRequiredXP(level)
+		exp.RUnlock()
+	}
+
 	statusEffects, _ := w.GetComponent(entityID, "StatusEffects")
 	hpBonus := 0
 	var effectsStr string
@@ -61,7 +74,7 @@ func (p *Player) BroadcastState(w WorldLike, entityID common.EntityID) {
 	maxHP := h.Max + hpBonus
 	h.RUnlock()
 
-	stateMsg := fmt.Sprintf("STATE|HP:%d/%d|AREA:%s", currentHP, maxHP, areaName)
+	stateMsg := fmt.Sprintf("STATE|HP:%d/%d|LEVEL:%d|XP:%d/%d|AREA:%s", currentHP, maxHP, level, currentXP, requiredXP, areaName)
 	if effectsStr != "" {
 		stateMsg += "|EFFECTS:" + effectsStr
 	}

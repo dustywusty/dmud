@@ -95,7 +95,7 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 			continue
 		}
 
-		performAttack(attackerPlayer, targetPlayer, attackerNPC, targetNPC,
+		performAttack(w, attackingEntity.ID, attackerPlayer, targetPlayer, attackerNPC, targetNPC,
 			attackerName, targetName, combat, targetHealth)
 
 		// Broadcast state updates to players involved in combat
@@ -218,7 +218,39 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 
 		if attackerPlayer != nil {
 			attackerPlayer.Broadcast("You have defeated " + targetNPC.Name + "!")
-			// TODO: Award experience/loot
+
+			// Award experience based on NPC level/difficulty
+			xpReward := 50
+			if template, ok := components.NPCTemplates[targetNPC.TemplateID]; ok {
+				xpReward = template.MaxDamage * 5
+			}
+
+			if expComp, err := w.GetComponent(attackerID, "Experience"); err == nil {
+				experience := expComp.(*components.Experience)
+				leveledUp, newLevel := experience.AddXP(xpReward)
+
+				attackerPlayer.Broadcast(fmt.Sprintf("You gained %d experience!", xpReward))
+
+				if leveledUp {
+					attackerPlayer.Broadcast(fmt.Sprintf("You have reached level %d!", newLevel))
+
+					// Scale up player health on level up
+					if healthComp, err := w.GetComponent(attackerID, "Health"); err == nil {
+						health := healthComp.(*components.Health)
+						health.Lock()
+						oldMax := health.Max
+						newMax := int(float64(100) * components.GetLevelScaling(newLevel))
+						hpGain := newMax - oldMax
+						health.Max = newMax
+						health.Current += hpGain
+						health.Unlock()
+						attackerPlayer.Broadcast(fmt.Sprintf("Your maximum health increased by %d!", hpGain))
+					}
+				}
+
+				// Broadcast state update to show XP and possibly level change
+				attackerPlayer.BroadcastState(w, attackerID)
+			}
 		}
 
 		// Create NPC corpse before removing entity
@@ -246,13 +278,23 @@ func spawnCorpse(w components.WorldLike, victimName string, victimID common.Enti
 		victimName, corpseEntity.GetID(), area.X, area.Y, area.Z)
 }
 
-func performAttack(attackerPlayer, targetPlayer *components.Player, attackerNPC, targetNPC *components.NPC,
+func performAttack(w *ecs.World, attackerID common.EntityID, attackerPlayer, targetPlayer *components.Player, attackerNPC, targetNPC *components.NPC,
 	attackerName, targetName string, combat *components.Combat, targetHealth *components.Health) {
 
 	s := rand.NewSource(time.Now().UnixNano())
 	r := rand.New(s)
 
-	damage := r.Intn(combat.MaxDamage-combat.MinDamage+1) + combat.MinDamage
+	baseDamage := r.Intn(combat.MaxDamage-combat.MinDamage+1) + combat.MinDamage
+	damage := baseDamage
+
+	if attackerPlayer != nil {
+		experience, _ := ecs.GetTypedComponent[*components.Experience](w, attackerID, "Experience")
+		if experience != nil {
+			level := experience.GetLevel()
+			scaling := components.GetLevelScaling(level)
+			damage = int(float64(baseDamage) * scaling)
+		}
+	}
 
 	targetHealth.Lock()
 	targetHealth.Current -= damage
