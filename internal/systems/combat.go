@@ -234,7 +234,7 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 				if leveledUp {
 					attackerPlayer.Broadcast(fmt.Sprintf("You have reached level %d!", newLevel))
 
-					// Scale up player health on level up
+					// Scale up player health on level up and heal to full
 					if healthComp, err := w.GetComponent(attackerID, "Health"); err == nil {
 						health := healthComp.(*components.Health)
 						health.Lock()
@@ -242,9 +242,9 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 						newMax := int(float64(100) * components.GetLevelScaling(newLevel))
 						hpGain := newMax - oldMax
 						health.Max = newMax
-						health.Current += hpGain
+						health.Current = newMax
 						health.Unlock()
-						attackerPlayer.Broadcast(fmt.Sprintf("Your maximum health increased by %d!", hpGain))
+						attackerPlayer.Broadcast(fmt.Sprintf("Your maximum health increased by %d and you are fully healed!", hpGain))
 					}
 				}
 
