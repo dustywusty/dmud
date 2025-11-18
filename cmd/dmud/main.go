@@ -5,6 +5,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"dmud/internal/components"
 	"dmud/internal/net"
 	"dmud/internal/util"
 
@@ -27,6 +28,9 @@ func main() {
 		Str("thread_id", util.GetGID()).
 		Logger()
 	log.Logger = logger
+
+	// Initialize quest dialogues
+	components.InitializeQuests()
 
 	port := os.Getenv("PORT")
 	if port == "" {
