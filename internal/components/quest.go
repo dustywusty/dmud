@@ -27,6 +27,7 @@ type Quest struct {
 	Requirements []QuestRequirement
 	Rewards      []QuestReward
 	NPCID        string // Which NPC offers this quest
+	Dialogue     *QuestDialogue // Dialogue tree for this quest
 }
 
 // PlayerQuest tracks a player's progress on a quest
@@ -90,7 +91,7 @@ func (pq *PlayerQuests) CompleteQuest(questID string) {
 }
 
 // QuestRegistry holds all available quests
-var QuestRegistry = map[string]Quest{
+var QuestRegistry = map[string]*Quest{
 	"goblin_ears": {
 		ID:          "goblin_ears",
 		Name:        "Goblin Menace",
