@@ -225,7 +225,7 @@ func getRealClientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		// X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
 		// The first one is the original client
-		if idx := 0; idx < len(xff); idx++ {
+		for idx := 0; idx < len(xff); idx++ {
 			if xff[idx] == ',' {
 				return xff[:idx]
 			}
