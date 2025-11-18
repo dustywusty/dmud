@@ -158,9 +158,16 @@ func (s *Server) runWebSocketServer() {
 				return
 			}
 			remoteAddr := conn.RemoteAddr().String()
-			log.Info().Msgf("Accepted WebSocket connection from %s", remoteAddr)
 
-			client := &WSClient{conn: conn, status: common.Connected, game: s.game}
+			// Extract real client IP from proxy headers
+			realIP := getRealClientIP(r)
+			if realIP != "" {
+				log.Info().Msgf("Accepted WebSocket connection from %s (real IP: %s)", remoteAddr, realIP)
+			} else {
+				log.Info().Msgf("Accepted WebSocket connection from %s", remoteAddr)
+			}
+
+			client := &WSClient{conn: conn, status: common.Connected, game: s.game, realIP: realIP}
 
 			s.connectionMu.Lock()
 			s.connections[remoteAddr] = client
@@ -209,4 +216,33 @@ func NewServer(config *ServerConfig) *Server {
 		wsPort:      config.WSPort,
 		connections: make(map[string]common.Client),
 	}
+}
+
+// getRealClientIP extracts the real client IP from proxy headers
+// Checks X-Forwarded-For, X-Real-IP, CF-Connecting-IP (Cloudflare)
+func getRealClientIP(r *http.Request) string {
+	// Try X-Forwarded-For first (most common)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
+		// The first one is the original client
+		if idx := 0; idx < len(xff); idx++ {
+			if xff[idx] == ',' {
+				return xff[:idx]
+			}
+		}
+		return xff
+	}
+
+	// Try X-Real-IP (used by some proxies)
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+
+	// Try CF-Connecting-IP (Cloudflare)
+	if cfip := r.Header.Get("CF-Connecting-IP"); cfip != "" {
+		return cfip
+	}
+
+	// No proxy headers found
+	return ""
 }

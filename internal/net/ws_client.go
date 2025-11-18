@@ -56,11 +56,12 @@ var upgrader = websocket.Upgrader{
 }
 
 type WSClient struct {
-	status  common.ConnectionStatus
-	conn    *websocket.Conn
-	game    *game.Game
-	mu      sync.Mutex
-	writeMu sync.Mutex // serialize writes; gorilla allows only one writer
+	status     common.ConnectionStatus
+	conn       *websocket.Conn
+	game       *game.Game
+	mu         sync.Mutex
+	writeMu    sync.Mutex // serialize writes; gorilla allows only one writer
+	realIP     string     // actual client IP (from proxy headers if behind proxy)
 }
 
 func (c *WSClient) SupportsPrompt() bool { return false }
@@ -158,6 +159,10 @@ func (c *WSClient) HandleRequest() {
 }
 
 func (c *WSClient) RemoteAddr() string {
+	// Return real IP if we extracted it from proxy headers, otherwise fallback to connection address
+	if c.realIP != "" {
+		return c.realIP
+	}
 	return c.conn.RemoteAddr().String()
 }
 
