@@ -68,6 +68,22 @@ func (pq *PlayerQuests) GetQuestStatus(questID string) QuestStatus {
 	return QuestStatusNotStarted
 }
 
+// GetOrCreateQuest returns the player's quest entry, creating a NotStarted entry if none exists.
+// The returned pointer is safe to read but mutations should go through PlayerQuests methods.
+func (pq *PlayerQuests) GetOrCreateQuest(questID string) *PlayerQuest {
+	pq.Lock()
+	defer pq.Unlock()
+	if quest, exists := pq.Quests[questID]; exists {
+		return quest
+	}
+	quest := &PlayerQuest{
+		QuestID: questID,
+		Status:  QuestStatusNotStarted,
+	}
+	pq.Quests[questID] = quest
+	return quest
+}
+
 func (pq *PlayerQuests) AddQuest(questID string) {
 	pq.Lock()
 	defer pq.Unlock()

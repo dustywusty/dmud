@@ -117,19 +117,8 @@ func (h *QuestDialogueHandler) processQuestDialogue(player *Player, playerEntity
 	}
 
 	// Get player quest status
-	var playerQuest *PlayerQuest
 	questID := questDef.ID
-	if quests.HasQuest(questID) {
-		playerQuest = &PlayerQuest{
-			QuestID: questID,
-			Status:  quests.GetQuestStatus(questID),
-		}
-	} else {
-		playerQuest = &PlayerQuest{
-			QuestID: questID,
-			Status:  QuestStatusNotStarted,
-		}
-	}
+	playerQuest := quests.GetOrCreateQuest(questID)
 
 	// Find matching dialogue node
 	for _, node := range questDef.Dialogue.Nodes {
