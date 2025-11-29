@@ -1,0 +1,76 @@
+[
+  {
+    "area_id": "1",
+    "spawns": [
+      {
+        "template_id": "rat",
+        "min_count": 5,
+        "max_count": 10,
+        "respawn_time_seconds": 30,
+        "chance": 1.0
+      }
+    ]
+  },
+  {
+    "area_id": "2",
+    "spawns": [
+      {
+        "template_id": "goblin",
+        "min_count": 1,
+        "max_count": 2,
+        "respawn_time_seconds": 60,
+        "chance": 0.6
+      },
+      {
+        "template_id": "rat",
+        "min_count": 2,
+        "max_count": 4,
+        "respawn_time_seconds": 30,
+        "chance": 0.9
+      }
+    ]
+  },
+  {
+    "area_id": "3",
+    "spawns": [
+      {
+        "template_id": "guard",
+        "min_count": 2,
+        "max_count": 2,
+        "respawn_time_seconds": 120,
+        "chance": 1.0
+      },
+      {
+        "template_id": "merchant",
+        "min_count": 1,
+        "max_count": 1,
+        "respawn_time_seconds": 180,
+        "chance": 1.0
+      }
+    ]
+  },
+  {
+    "area_id": "100",
+    "spawns": [
+      {
+        "template_id": "chicken",
+        "min_count": 20,
+        "max_count": 20,
+        "respawn_time_seconds": 5,
+        "chance": 1.0
+      }
+    ]
+  },
+  {
+    "area_id": "101",
+    "spawns": [
+      {
+        "template_id": "chicken",
+        "min_count": 20,
+        "max_count": 20,
+        "respawn_time_seconds": 5,
+        "chance": 1.0
+      }
+    ]
+  }
+]
