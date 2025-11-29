@@ -2,6 +2,7 @@ package components
 
 import (
 	"fmt"
+	"strings"
 
 	"dmud/internal/common"
 
@@ -306,16 +307,28 @@ func (h *QuestDialogueHandler) completeQuest(player *Player, playerEntityID comm
 	player.Broadcast(fmt.Sprintf("%s says: Excellent work! Here's your reward. Safe travels!", npc.Name))
 }
 
-// getItemName returns a friendly name for an item ID
+// getItemName returns a friendly plural name for an item ID
 func getItemName(itemID string) string {
-	if template, exists := ItemTemplates[itemID]; exists {
-		// Pluralize if needed
-		name := template.Name
-		if template.Stackable {
-			// Simple pluralization - just add 's' for now
-			name = name + "s"
-		}
-		return name
+	template, exists := ItemTemplates[itemID]
+	if !exists {
+		return itemID
 	}
-	return itemID
+
+	if !template.Stackable {
+		return template.Name
+	}
+
+	// Pluralize stackable items
+	name := template.Name
+	if strings.HasSuffix(name, "s") || strings.HasSuffix(name, "x") || strings.HasSuffix(name, "ch") || strings.HasSuffix(name, "sh") {
+		return name + "es"
+	}
+	if strings.HasSuffix(name, "y") && len(name) > 1 {
+		// Check if preceded by consonant (simplified: not a vowel)
+		prev := name[len(name)-2]
+		if prev != 'a' && prev != 'e' && prev != 'i' && prev != 'o' && prev != 'u' {
+			return name[:len(name)-1] + "ies"
+		}
+	}
+	return name + "s"
 }
