@@ -32,7 +32,6 @@ type Quest struct {
 
 // PlayerQuest tracks a player's progress on a quest
 type PlayerQuest struct {
-	sync.RWMutex
 	QuestID string
 	Status  QuestStatus
 }
@@ -64,8 +63,6 @@ func (pq *PlayerQuests) GetQuestStatus(questID string) QuestStatus {
 	pq.RLock()
 	defer pq.RUnlock()
 	if quest, exists := pq.Quests[questID]; exists {
-		quest.RLock()
-		defer quest.RUnlock()
 		return quest.Status
 	}
 	return QuestStatusNotStarted
@@ -84,9 +81,7 @@ func (pq *PlayerQuests) CompleteQuest(questID string) {
 	pq.Lock()
 	defer pq.Unlock()
 	if quest, exists := pq.Quests[questID]; exists {
-		quest.Lock()
 		quest.Status = QuestStatusCompleted
-		quest.Unlock()
 	}
 }
 
