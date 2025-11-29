@@ -124,6 +124,25 @@ func (g *Game) HandleRename(player *components.Player, newName string) {
 	g.Broadcast(fmt.Sprintf("%s has changed their name to %s", oldName, newName))
 }
 
+func handleTime(player *components.Player, args []string, game *Game) {
+	if game.dayCycleSystem == nil {
+		player.Broadcast("The flow of time seems uncertain here.")
+		return
+	}
+
+	dc := game.dayCycleSystem.GetDayCycle()
+	dc.RLock()
+	defer dc.RUnlock()
+
+	remaining := dc.GetCurrentPeriodDuration() - dc.ElapsedTime
+	mins := int(remaining.Minutes())
+	secs := int(remaining.Seconds()) % 60
+
+	player.Broadcast(fmt.Sprintf("Day %d - It is currently %s.", dc.DayNumber, dc.CurrentTime.String()))
+	player.Broadcast(dc.GetDescription())
+	player.Broadcast(fmt.Sprintf("Time until next period: %d minutes, %d seconds.", mins, secs))
+}
+
 func handleExamine(player *components.Player, args []string, game *Game) {
 	if len(args) == 0 {
 		player.Broadcast("Examine what?")

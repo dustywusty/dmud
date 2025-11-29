@@ -41,6 +41,8 @@ type Game struct {
 
 	world *ecs.World
 
+	dayCycleSystem *systems.DayCycleSystem
+
 	AddPlayerChan      chan common.Client
 	RemovePlayerChan   chan common.Client
 	ExecuteCommandChan chan ClientCommand
@@ -90,6 +92,13 @@ func NewGame() *Game {
 		UniqueIPs:          make(map[string]bool),
 		TotalConnects:      0,
 	}
+
+	// Create day cycle system with broadcast callback
+	dayCycleSystem := systems.NewDayCycleSystem(func(msg string) {
+		game.Broadcast(msg)
+	})
+	world.AddSystem(dayCycleSystem)
+	game.dayCycleSystem = dayCycleSystem
 
 	game.initCommands()
 	game.initializeSpawns()
@@ -190,6 +199,11 @@ func (g *Game) initCommands() {
 		Aliases:     []string{"ex", "exa"},
 		Handler:     handleExamine,
 		Description: "Examine something or someone in detail.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "time",
+		Handler:     handleTime,
+		Description: "Check the current time of day.",
 	})
 	g.RegisterCommand(&Command{
 		Name:        "history",
