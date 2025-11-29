@@ -1,0 +1,92 @@
+[
+  {
+    "id": "rat",
+    "name": "a small rat",
+    "description": "A small, scurrying rat with beady eyes and a twitching nose.",
+    "health": 20,
+    "min_damage": 1,
+    "max_damage": 5,
+    "behavior": "passive",
+    "dialogue": ["*squeaks*", "*scurries around*"],
+    "respawn_time_seconds": 30,
+    "loot_table": [
+      {"item_id": "rat_fur", "chance": 0.5, "min_count": 1, "max_count": 2},
+      {"item_id": "rat_tail", "chance": 0.3, "min_count": 1, "max_count": 1}
+    ]
+  },
+  {
+    "id": "goblin",
+    "name": "a sneaky goblin",
+    "description": "A small, green-skinned goblin with sharp teeth and cunning eyes.",
+    "health": 50,
+    "min_damage": 5,
+    "max_damage": 15,
+    "behavior": "aggressive",
+    "dialogue": ["Grrr!", "Me smash you!", "Give shinies!"],
+    "respawn_time_seconds": 60,
+    "loot_table": [
+      {"item_id": "goblin_ear", "chance": 0.7, "min_count": 1, "max_count": 2},
+      {"item_id": "rusty_dagger", "chance": 0.4, "min_count": 1, "max_count": 1},
+      {"item_id": "gold_coin", "chance": 0.9, "min_count": 1, "max_count": 5}
+    ]
+  },
+  {
+    "id": "guard",
+    "name": "a town guard",
+    "description": "A stern-looking guard in chainmail armor, watching for trouble.",
+    "health": 150,
+    "min_damage": 10,
+    "max_damage": 25,
+    "behavior": "guard",
+    "dialogue": ["Move along, citizen.", "No trouble here!", "Keep the peace."],
+    "respawn_time_seconds": 120,
+    "loot_table": [
+      {"item_id": "gold_coin", "chance": 1.0, "min_count": 5, "max_count": 15}
+    ]
+  },
+  {
+    "id": "merchant",
+    "name": "a traveling merchant",
+    "description": "A portly merchant with a warm smile and keen eyes for business.",
+    "health": 80,
+    "min_damage": 5,
+    "max_damage": 10,
+    "behavior": "merchant",
+    "dialogue": ["Fine wares for sale!", "Come, see my goods!", "Best prices in town!"],
+    "respawn_time_seconds": 180,
+    "loot_table": [
+      {"item_id": "gold_coin", "chance": 1.0, "min_count": 10, "max_count": 30}
+    ]
+  },
+  {
+    "id": "chicken",
+    "name": "a chicken",
+    "description": "A plump chicken pecking at the ground, oblivious to its surroundings.",
+    "health": 20,
+    "min_damage": 1,
+    "max_damage": 2,
+    "behavior": "passive",
+    "dialogue": ["*cluck cluck*", "*bawk!*"],
+    "respawn_time_seconds": 15,
+    "stationary": true,
+    "loot_table": [
+      {"item_id": "chicken_feather", "chance": 0.8, "min_count": 1, "max_count": 3},
+      {"item_id": "raw_chicken", "chance": 1.0, "min_count": 1, "max_count": 1}
+    ]
+  },
+  {
+    "id": "skeleton",
+    "name": "a shambling skeleton",
+    "description": "A reanimated skeleton, its bones held together by dark magic. Empty eye sockets glow with an eerie light.",
+    "health": 60,
+    "min_damage": 8,
+    "max_damage": 18,
+    "behavior": "aggressive",
+    "dialogue": ["*bones rattle*", "*jaw clacks menacingly*"],
+    "respawn_time_seconds": 45,
+    "loot_table": [
+      {"item_id": "bone", "chance": 0.8, "min_count": 1, "max_count": 3},
+      {"item_id": "gold_coin", "chance": 0.5, "min_count": 1, "max_count": 10}
+    ]
+  }
+]

@@ -21,6 +21,7 @@ type SpawnConfig struct {
 	MaxCount    int           // Maximum number allowed
 	RespawnTime time.Duration // Time before respawning
 	Chance      float64       // Spawn chance (0.0 to 1.0)
+	NightOnly   bool          // If true, only spawns at night and despawns at dawn
 }
 
 type Spawn struct {

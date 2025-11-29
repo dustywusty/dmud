@@ -11,13 +11,20 @@ import (
 )
 
 type SpawnSystem struct {
-	lastCheck time.Time
+	lastCheck    time.Time
+	dayCycle     *components.DayCycle
+	wasNightTime bool // Track if it was night last check (for despawn on dawn)
 }
 
 func NewSpawnSystem() *SpawnSystem {
 	return &SpawnSystem{
-		lastCheck: time.Now(),
+		lastCheck:    time.Now(),
+		wasNightTime: false,
 	}
+}
+
+func (ss *SpawnSystem) SetDayCycle(dc *components.DayCycle) {
+	ss.dayCycle = dc
 }
 
 func (ss *SpawnSystem) Update(w *ecs.World, deltaTime float64) {
@@ -26,6 +33,13 @@ func (ss *SpawnSystem) Update(w *ecs.World, deltaTime float64) {
 		return
 	}
 	ss.lastCheck = time.Now()
+
+	// Check for night->day transition to despawn night creatures
+	isNightNow := ss.isNightTime()
+	if ss.wasNightTime && !isNightNow {
+		ss.despawnNightCreatures(w)
+	}
+	ss.wasNightTime = isNightNow
 
 	// Find all entities with Spawn components
 	spawnEntities, err := w.FindEntitiesByComponentPredicate("Spawn", func(i interface{}) bool {
@@ -39,6 +53,58 @@ func (ss *SpawnSystem) Update(w *ecs.World, deltaTime float64) {
 	for _, entity := range spawnEntities {
 		ss.processSpawn(w, entity)
 	}
+}
+
+func (ss *SpawnSystem) isNightTime() bool {
+	if ss.dayCycle == nil {
+		return false
+	}
+	return ss.dayCycle.IsDark()
+}
+
+func (ss *SpawnSystem) despawnNightCreatures(w *ecs.World) {
+	// Find all spawn components
+	spawnEntities, err := w.FindEntitiesByComponentPredicate("Spawn", func(i interface{}) bool {
+		return true
+	})
+	if err != nil {
+		return
+	}
+
+	for _, spawnEntity := range spawnEntities {
+		spawn, err := ecs.GetTypedComponent[*components.Spawn](w, spawnEntity.ID, "Spawn")
+		if err != nil {
+			continue
+		}
+
+		area, err := ecs.GetTypedComponent[*components.Area](w, spawnEntity.ID, "Area")
+		if err != nil {
+			continue
+		}
+
+		spawn.Lock()
+		for _, config := range spawn.Configs {
+			if !config.NightOnly {
+				continue
+			}
+
+			// Despawn all night-only creatures of this type
+			entityIDs := spawn.ActiveSpawns[config.TemplateID]
+			for _, entityID := range entityIDs {
+				// Get NPC name for announcement
+				npcComp, err := w.GetComponent(entityID, "NPC")
+				if err == nil {
+					npc := npcComp.(*components.NPC)
+					area.Broadcast(npc.Name + " crumbles to dust as the sun rises.")
+				}
+				w.RemoveEntity(entityID)
+			}
+			spawn.ActiveSpawns[config.TemplateID] = nil
+		}
+		spawn.Unlock()
+	}
+
+	log.Info().Msg("Despawned night creatures at dawn")
 }
 
 func (ss *SpawnSystem) processSpawn(w *ecs.World, spawnEntity ecs.Entity) {
@@ -60,6 +126,11 @@ func (ss *SpawnSystem) processSpawn(w *ecs.World, spawnEntity ecs.Entity) {
 	for _, config := range spawn.Configs {
 		if config.Type != components.SpawnTypeNPC {
 			continue // For now, only handle NPCs
+		}
+
+		// Skip night-only spawns during the day
+		if config.NightOnly && !ss.isNightTime() {
+			continue
 		}
 
 		// Count active spawns of this type

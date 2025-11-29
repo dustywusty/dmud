@@ -101,6 +101,15 @@ var ItemTemplates = map[string]Item{
 		Stackable:   false,
 		Quantity:    1,
 	},
+	"bone": {
+		ID:          "bone",
+		Name:        "Bone",
+		Description: "A weathered bone from some unfortunate creature.",
+		Type:        ItemTypeMisc,
+		Value:       3,
+		Stackable:   true,
+		Quantity:    1,
+	},
 }
 
 // CreateItem creates a new item from a template with the specified quantity

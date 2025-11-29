@@ -29,6 +29,11 @@ func main() {
 		Logger()
 	log.Logger = logger
 
+	// Load NPC templates from JSON
+	if err := components.LoadNPCTemplates("./resources/npcs.json"); err != nil {
+		log.Fatal().Err(err).Msg("Failed to load NPC templates")
+	}
+
 	// Initialize quest dialogues
 	components.InitializeQuests()
 

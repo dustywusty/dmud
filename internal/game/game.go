@@ -100,6 +100,9 @@ func NewGame() *Game {
 	world.AddSystem(dayCycleSystem)
 	game.dayCycleSystem = dayCycleSystem
 
+	// Give spawn system access to day cycle for night-only spawns
+	spawnSystem.SetDayCycle(dayCycleSystem.GetDayCycle())
+
 	game.initCommands()
 	game.initializeSpawns()
 
@@ -114,6 +117,7 @@ type spawnConfigJSON struct {
 	MaxCount           int     `json:"max_count"`
 	RespawnTimeSeconds int     `json:"respawn_time_seconds"`
 	Chance             float64 `json:"chance"`
+	NightOnly          bool    `json:"night_only,omitempty"`
 }
 
 type areaSpawnJSON struct {
@@ -138,6 +142,7 @@ func (g *Game) initializeSpawns() {
 				MaxCount:    s.MaxCount,
 				RespawnTime: time.Duration(s.RespawnTimeSeconds) * time.Second,
 				Chance:      s.Chance,
+				NightOnly:   s.NightOnly,
 			})
 		}
 

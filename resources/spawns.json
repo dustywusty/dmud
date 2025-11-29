@@ -8,6 +8,14 @@
         "max_count": 10,
         "respawn_time_seconds": 30,
         "chance": 1.0
+      },
+      {
+        "template_id": "skeleton",
+        "min_count": 2,
+        "max_count": 4,
+        "respawn_time_seconds": 45,
+        "chance": 1.0,
+        "night_only": true
       }
     ]
   },
@@ -27,6 +35,14 @@
         "max_count": 4,
         "respawn_time_seconds": 30,
         "chance": 0.9
+      },
+      {
+        "template_id": "skeleton",
+        "min_count": 1,
+        "max_count": 3,
+        "respawn_time_seconds": 45,
+        "chance": 1.0,
+        "night_only": true
       }
     ]
   },
