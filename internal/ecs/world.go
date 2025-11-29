@@ -81,9 +81,8 @@ func (w *World) FindEntity(id common.EntityID) (Entity, error) {
 	defer w.entityMutex.RUnlock()
 
 	entity, ok := w.entities[id]
-
 	if !ok {
-		return Entity{}, nil
+		return Entity{}, fmt.Errorf("entity %s not found", id)
 	}
 
 	return entity, nil
