@@ -14,6 +14,5 @@
 *.idea/*
 *.vscode/*
 
-*.json
 *.log
 tmp/build-errors.log
