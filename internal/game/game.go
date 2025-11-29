@@ -99,85 +99,46 @@ func NewGame() *Game {
 	return game
 }
 
+type spawnConfigJSON struct {
+	TemplateID         string  `json:"template_id"`
+	MinCount           int     `json:"min_count"`
+	MaxCount           int     `json:"max_count"`
+	RespawnTimeSeconds int     `json:"respawn_time_seconds"`
+	Chance             float64 `json:"chance"`
+}
+
+type areaSpawnJSON struct {
+	AreaID string            `json:"area_id"`
+	Spawns []spawnConfigJSON `json:"spawns"`
+}
+
 func (g *Game) initializeSpawns() {
-	// Add spawns to specific areas
-	spawns := map[string][]components.SpawnConfig{
-		"1": { // Starting area
-			{
-				Type:        components.SpawnTypeNPC,
-				TemplateID:  "rat",
-				MinCount:    5,
-				MaxCount:    10,
-				RespawnTime: 30 * time.Second,
-				Chance:      1,
-			},
-		},
-		"2": { // Another area
-			{
-				Type:        components.SpawnTypeNPC,
-				TemplateID:  "goblin",
-				MinCount:    1,
-				MaxCount:    2,
-				RespawnTime: 60 * time.Second,
-				Chance:      0.6,
-			},
-			{
-				Type:        components.SpawnTypeNPC,
-				TemplateID:  "rat",
-				MinCount:    2,
-				MaxCount:    4,
-				RespawnTime: 30 * time.Second,
-				Chance:      0.9,
-			},
-		},
-		"3": { // Town square
-			{
-				Type:        components.SpawnTypeNPC,
-				TemplateID:  "guard",
-				MinCount:    2,
-				MaxCount:    2,
-				RespawnTime: 120 * time.Second,
-				Chance:      1.0,
-			},
-			{
-				Type:        components.SpawnTypeNPC,
-				TemplateID:  "merchant",
-				MinCount:    1,
-				MaxCount:    1,
-				RespawnTime: 180 * time.Second,
-				Chance:      1.0,
-			},
-		},
-		"100": { // Chicken farm west
-			{
-				Type:        components.SpawnTypeNPC,
-				TemplateID:  "chicken",
-				MinCount:    20,
-				MaxCount:    20,
-				RespawnTime: 5 * time.Second,
-				Chance:      1.0,
-			},
-		},
-		"101": { // Chicken farm east
-			{
-				Type:        components.SpawnTypeNPC,
-				TemplateID:  "chicken",
-				MinCount:    20,
-				MaxCount:    20,
-				RespawnTime: 5 * time.Second,
-				Chance:      1.0,
-			},
-		},
+	var areaSpawns []areaSpawnJSON
+	if err := util.ParseJSON("./resources/spawns.json", &areaSpawns); err != nil {
+		log.Error().Err(err).Msg("Failed to load spawns.json")
+		return
 	}
 
-	for areaID, configs := range spawns {
-		spawn := components.NewSpawn(common.EntityID(areaID))
+	for _, areaSpawn := range areaSpawns {
+		var configs []components.SpawnConfig
+		for _, s := range areaSpawn.Spawns {
+			configs = append(configs, components.SpawnConfig{
+				Type:        components.SpawnTypeNPC,
+				TemplateID:  s.TemplateID,
+				MinCount:    s.MinCount,
+				MaxCount:    s.MaxCount,
+				RespawnTime: time.Duration(s.RespawnTimeSeconds) * time.Second,
+				Chance:      s.Chance,
+			})
+		}
+
+		spawn := components.NewSpawn(common.EntityID(areaSpawn.AreaID))
 		spawn.Configs = configs
 
-		entity, err := g.world.FindEntity(common.EntityID(areaID))
+		entity, err := g.world.FindEntity(common.EntityID(areaSpawn.AreaID))
 		if err == nil {
 			g.world.AddComponent(&entity, spawn)
-			log.Info().Msgf("Added spawn component to area %s with %d configs", areaID, len(configs))
+			log.Info().Msgf("Added spawn component to area %s with %d configs", areaSpawn.AreaID, len(configs))
 		}
 	}
 }
