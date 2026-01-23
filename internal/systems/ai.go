@@ -148,7 +148,7 @@ func (as *AISystem) attemptWander(_ *ecs.World, _ ecs.Entity, npc *components.NP
 		return
 	}
 
-	if rand.Float64() > 0.5 {
+	if rand.Float64() > 0.25 {
 		return
 	}
 

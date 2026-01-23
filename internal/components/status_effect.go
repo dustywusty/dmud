@@ -12,12 +12,12 @@ const (
 )
 
 type StatusEffect struct {
-	Type       StatusEffectType
-	Name       string
-	AppliedAt  time.Time
-	Duration   time.Duration
-	HPBonus    int
-	Applied    bool
+	Type      StatusEffectType
+	Name      string
+	AppliedAt time.Time
+	Duration  time.Duration
+	HPBonus   int
+	Applied   bool
 }
 
 type StatusEffects struct {

@@ -43,7 +43,7 @@ func main() {
 
 	}
 	server := net.NewServer(&net.ServerConfig{
-		WSHost: "0.0.0.0", WSPort: port,
+		WSHost: "127.0.0.1", WSPort: port,
 	})
 
 	go server.Run()

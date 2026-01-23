@@ -28,17 +28,21 @@ var upgrader = websocket.Upgrader{
 			log.Error().Err(err).Str("origin", o).Msg("bad Origin")
 			return false
 		}
-		oh := strings.ToLower(u.Host)
-		rh := strings.ToLower(r.Host) // includes host[:port]
-		// strip port from r.Host for comparison
+
+		oh := strings.ToLower(u.Hostname())
+		rh := strings.ToLower(r.Host)
 		if i := strings.IndexByte(rh, ':'); i >= 0 {
 			rh = rh[:i]
 		}
 
-		// Same-origin?
 		if oh == rh {
 			return true
 		}
+
+		if oh == "localhost" || oh == "127.0.0.1" {
+			return true
+		}
+
 		// Cloud Run default domains
 		if strings.HasSuffix(oh, ".run.app") || strings.HasSuffix(oh, ".a.run.app") {
 			return true
@@ -56,12 +60,12 @@ var upgrader = websocket.Upgrader{
 }
 
 type WSClient struct {
-	status     common.ConnectionStatus
-	conn       *websocket.Conn
-	game       *game.Game
-	mu         sync.Mutex
-	writeMu    sync.Mutex // serialize writes; gorilla allows only one writer
-	realIP     string     // actual client IP (from proxy headers if behind proxy)
+	status  common.ConnectionStatus
+	conn    *websocket.Conn
+	game    *game.Game
+	mu      sync.Mutex
+	writeMu sync.Mutex // serialize writes; gorilla allows only one writer
+	realIP  string     // actual client IP (from proxy headers if behind proxy)
 }
 
 func (c *WSClient) SupportsPrompt() bool { return false }

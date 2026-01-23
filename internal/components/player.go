@@ -11,14 +11,11 @@ import (
 type Player struct {
 	sync.RWMutex
 
-	Client common.Client
-
-	Name string
-	Area *Area
-
-	// Command history and auto-complete
-	CommandHistory *CommandHistory
+	Area           *Area
 	AutoComplete   *util.AutoComplete
+	Client         common.Client
+	CommandHistory *CommandHistory
+	Name           string
 }
 
 func (p *Player) Broadcast(msg string) {

@@ -5,7 +5,6 @@ import (
 	"time"
 )
 
-// TimeOfDay represents the current period of the day
 type TimeOfDay int
 
 const (
@@ -36,20 +35,21 @@ func (t TimeOfDay) String() string {
 // - Day:   50 minutes (3000s) - 41.7%
 // - Dusk:  10 minutes (600s)  - 8.3%
 // - Night: 50 minutes (3000s) - 41.7%
+
 type DayCycle struct {
 	sync.RWMutex
-	CurrentTime   TimeOfDay
-	ElapsedTime   time.Duration // Time elapsed in current period
-	CycleStart    time.Time     // When the current full cycle started
-	DayNumber     int           // How many full days have passed
+	CurrentTime TimeOfDay
+	ElapsedTime time.Duration // Time elapsed in current period
+	CycleStart  time.Time     // When the current full cycle started
+	DayNumber   int           // How many full days have passed
 }
 
 // Period durations
 const (
-	DawnDuration  = 10 * time.Minute
-	DayDuration   = 50 * time.Minute
-	DuskDuration  = 10 * time.Minute
-	NightDuration = 50 * time.Minute
+	DawnDuration    = 10 * time.Minute
+	DayDuration     = 50 * time.Minute
+	DuskDuration    = 10 * time.Minute
+	NightDuration   = 50 * time.Minute
 	FullDayDuration = DawnDuration + DayDuration + DuskDuration + NightDuration // 2 hours
 )
 

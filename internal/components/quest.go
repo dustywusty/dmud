@@ -26,7 +26,7 @@ type Quest struct {
 	Description  string
 	Requirements []QuestRequirement
 	Rewards      []QuestReward
-	NPCID        string // Which NPC offers this quest
+	NPCID        string         // Which NPC offers this quest
 	Dialogue     *QuestDialogue // Dialogue tree for this quest
 }
 
