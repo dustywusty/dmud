@@ -3,6 +3,7 @@ package systems
 import (
 	"dmud/internal/components"
 	"dmud/internal/ecs"
+	"dmud/internal/util"
 
 	"github.com/rs/zerolog/log"
 )
@@ -37,7 +38,7 @@ func (cs *CorpseSystem) Update(w *ecs.World, deltaTime float64) {
 
 			// Broadcast decay message to area
 			if area != nil {
-				area.Broadcast("The corpse of " + victimName + " crumbles to dust.")
+				area.Broadcast(util.TagMessage("STATUS", "The corpse of "+victimName+" crumbles to dust."))
 			}
 
 			// Remove corpse entity from world

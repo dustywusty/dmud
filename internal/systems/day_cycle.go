@@ -65,14 +65,14 @@ func (dcs *DayCycleSystem) announceTransition(from, to components.TimeOfDay) {
 	var message string
 	switch to {
 	case components.Dawn:
-		message = "\n[The first rays of sunlight peek over the horizon. A new day begins.]\n"
+		message = "[The first rays of sunlight peek over the horizon. A new day begins.]\n"
 		log.Info().Msgf("Day %d has begun", dcs.dayCycle.DayNumber)
 	case components.Day:
-		message = "\n[The sun rises fully into the sky. It is now daytime.]\n"
+		message = "[The sun rises fully into the sky. It is now daytime.]\n"
 	case components.Dusk:
-		message = "\n[The sun begins to set, casting long shadows across the land.]\n"
+		message = "[The sun begins to set, casting long shadows across the land.]\n"
 	case components.Night:
-		message = "\n[Darkness falls as night takes hold. The stars emerge overhead.]\n"
+		message = "[Darkness falls as night takes hold. The stars emerge overhead.]\n"
 	}
 
 	if dcs.broadcast != nil && message != "" {

@@ -4,6 +4,7 @@ import (
 	"dmud/internal/common"
 	"dmud/internal/components"
 	"dmud/internal/ecs"
+	"dmud/internal/util"
 	"fmt"
 	"math/rand"
 	"time"
@@ -193,7 +194,7 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 				newTargetID := combat.TargetID
 				if newTargetNPC, err := w.GetComponent(newTargetID, "NPC"); err == nil {
 					newNPC := newTargetNPC.(*components.NPC)
-					attackerPlayer.Broadcast(fmt.Sprintf("You turn your attention to %s!", newNPC.Name))
+					attackerPlayer.Broadcast(util.TagMessage("DMG", fmt.Sprintf("You turn your attention to %s!", newNPC.Name)))
 				}
 			}
 			combat.Unlock()
@@ -210,12 +211,12 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 	// Handle different death scenarios
 	if targetPlayer != nil {
 		// Player died
-		targetPlayer.Broadcast("You have died!")
+		targetPlayer.Broadcast(util.TagMessageWithStatus("DMG", "DEATH", "You have died!"))
 		if attackerPlayer != nil {
-			attackerPlayer.Broadcast(fmt.Sprintf("You killed %s!", targetPlayer.Name))
-			targetPlayer.Area.Broadcast(fmt.Sprintf("%s has been slain by %s!", targetPlayer.Name, attackerPlayer.Name))
+			attackerPlayer.Broadcast(util.TagMessage("DMG", fmt.Sprintf("You killed %s!", targetPlayer.Name)))
+			targetPlayer.Area.Broadcast(util.TagMessageWithStatus("DMG", "DEATH", fmt.Sprintf("%s has been slain by %s!", targetPlayer.Name, attackerPlayer.Name)))
 		} else if attackerNPC != nil {
-			targetPlayer.Area.Broadcast(fmt.Sprintf("%s has been slain by %s!", targetPlayer.Name, attackerNPC.Name))
+			targetPlayer.Area.Broadcast(util.TagMessageWithStatus("DMG", "DEATH", fmt.Sprintf("%s has been slain by %s!", targetPlayer.Name, attackerNPC.Name)))
 		}
 
 		// Create player corpse with their inventory
@@ -236,11 +237,11 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 	} else if targetNPC != nil {
 		// NPC died
 		if targetNPC.Area != nil {
-			targetNPC.Area.Broadcast(targetNPC.Name + " has been slain!")
+			targetNPC.Area.Broadcast(util.TagMessageWithStatus("DMG", "DEATH", targetNPC.Name+" has been slain!"))
 		}
 
 		if attackerPlayer != nil {
-			attackerPlayer.Broadcast("You have defeated " + targetNPC.Name + "!")
+			attackerPlayer.Broadcast(util.TagMessage("DMG", "You have defeated "+targetNPC.Name+"!"))
 
 			// Award experience based on NPC level/difficulty
 			xpReward := 50
@@ -252,10 +253,10 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 				experience := expComp.(*components.Experience)
 				leveledUp, newLevel := experience.AddXP(xpReward)
 
-				attackerPlayer.Broadcast(fmt.Sprintf("You gained %d experience!", xpReward))
+				attackerPlayer.Broadcast(util.TagMessage("STATUS", fmt.Sprintf("You gained %d experience!", xpReward)))
 
 				if leveledUp {
-					attackerPlayer.Broadcast(fmt.Sprintf("You have reached level %d!", newLevel))
+					attackerPlayer.Broadcast(util.TagMessage("STATUS", fmt.Sprintf("You have reached level %d!", newLevel)))
 
 					// Scale up player health on level up and heal to full
 					if healthComp, err := w.GetComponent(attackerID, "Health"); err == nil {
@@ -329,11 +330,11 @@ func performAttack(w *ecs.World, attackerID common.EntityID, attackerPlayer, tar
 
 	// Send appropriate messages based on entity types
 	if attackerPlayer != nil {
-		attackerPlayer.Broadcast(fmt.Sprintf("You attacked %s for %d damage!", targetName, damage))
+		attackerPlayer.Broadcast(util.TagMessage("DMG", fmt.Sprintf("You attacked %s for %d damage!", targetName, damage)))
 	}
 
 	if targetPlayer != nil {
-		targetPlayer.Broadcast(fmt.Sprintf("%s attacked you for %d damage!", attackerName, damage))
+		targetPlayer.Broadcast(util.TagMessage("DMG", fmt.Sprintf("%s attacked you for %d damage!", attackerName, damage)))
 	}
 
 	log.Trace().Msg(fmt.Sprintf("%s attacked %s for %d damage!", attackerName, targetName, damage))

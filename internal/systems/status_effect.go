@@ -44,7 +44,6 @@ func (ses *StatusEffectSystem) Update(w *ecs.World, deltaTime float64) {
 			continue
 		}
 
-		hasHPChange := false
 		for _, effect := range removed {
 			if effect.HPBonus > 0 {
 				health.Lock()
@@ -55,14 +54,13 @@ func (ses *StatusEffectSystem) Update(w *ecs.World, deltaTime float64) {
 				health.Unlock()
 
 				player.Broadcast(fmt.Sprintf("The %s has worn off. (-%d HP)", effect.Name, effect.HPBonus))
-				hasHPChange = true
+			} else {
+				player.Broadcast(fmt.Sprintf("The %s has worn off.", effect.Name))
 			}
 		}
 
-		// Broadcast state update after effects expire
-		if hasHPChange {
-			log.Debug().Msgf("Broadcasting state update for %s after effect expiration", player.Name)
-			player.BroadcastState(w.AsWorldLike(), entity.ID)
-		}
+		// Always broadcast state update when effects are removed
+		log.Debug().Msgf("Broadcasting state update for %s after effect expiration", player.Name)
+		player.BroadcastState(w.AsWorldLike(), entity.ID)
 	}
 }

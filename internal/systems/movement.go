@@ -72,5 +72,7 @@ func HandleMovement(w *ecs.World, movingEntity ecs.Entity) {
 	movingPlayer.Area = exit.Area
 	movingPlayer.Area.AddPlayer(movingPlayer)
 	movingPlayer.Look(w.AsWorldLike())
+
+	log.Debug().Msgf("Moving player %s to %s. Broadcasting state.", movingPlayer.Name, movingPlayer.Area.Description)
 	movingPlayer.BroadcastState(w.AsWorldLike(), movingEntity.ID)
 }
