@@ -32,9 +32,16 @@ var commandHelpText = map[string]string{
 	"inventory": "View your inventory and see what items you are carrying. Usage: inventory (aliases: inv, i)",
 	"loot":      "Loot items from a corpse. Usage: loot <corpse_name> or loot all (to loot all corpses in the area)",
 	"get":       "Pick up an item from the ground. Usage: get <item_name> (aliases: pickup, take)",
-	"drop":      "Drop an item from your inventory onto the ground. Usage: drop <item_name>",
-	"hail":   "Hail an NPC to start a conversation. Usage: hail <npc_name>",
-	"uptime": "Show server uptime, current players, and connection statistics.",
+	"drop":      "Drop items matching a pattern. Usage: drop <pattern>",
+	"dropall":   "Drop all items (optionally matching a pattern). Usage: dropall [pattern]",
+	"sacrifice": "Destroy an item on the ground. Usage: sacrifice <item> or sacrifice all (aliases: sac)",
+	"sacall":    "Destroy all items on the ground (optionally matching a pattern). Usage: sacall [pattern]",
+	"login":     "Associate this session with a UUID. Usage: login <uuid>",
+	"save":      "Save your character and receive a UUID for login. Usage: save",
+	"cast":      "Cast a spell. Usage: cast heal [target]",
+	"summon":    "Summon a player to your location. Admins can always summon. Usage: summon <player>",
+	"hail":      "Hail an NPC to start a conversation. Usage: hail <npc_name>",
+	"uptime":    "Show server uptime, current players, and connection statistics.",
 }
 
 // handleHistory shows the player's command history
@@ -144,11 +151,15 @@ func handleHelp(player *components.Player, args []string, game *Game) {
 		b.WriteString("  loot <corpse>     - Loot items from a corpse\n")
 		b.WriteString("  loot all          - Loot all corpses in the area\n")
 		b.WriteString("  get <item>        - Pick up an item (aliases: pickup, take)\n")
-		b.WriteString("  drop <item>       - Drop an item\n\n")
+		b.WriteString("  drop <pattern>    - Drop items by pattern (supports * or regex)\n")
+		b.WriteString("  dropall [pattern] - Drop all items (optionally matching)\n\n")
 
 		b.WriteString("CHARACTER\n")
 		b.WriteString("  name <new_name>   - Change your name\n")
+		b.WriteString("  login <uuid>      - Link this session to a UUID\n")
+		b.WriteString("  save              - Save your character and get a UUID\n")
 		b.WriteString("  recall            - Return to starting area\n\n")
+		b.WriteString("  cast <spell> [target] - Cast a spell (heal)\n\n")
 
 		b.WriteString("UTILITY\n")
 		b.WriteString("  help [command]    - Show help information\n")
@@ -156,6 +167,7 @@ func handleHelp(player *components.Player, args []string, game *Game) {
 		b.WriteString("  clear             - Clear command history\n")
 		b.WriteString("  suggest <partial> - Get command suggestions\n")
 		b.WriteString("  complete <partial>- Auto-complete commands\n")
+		b.WriteString("  summon <player>   - Summon a player to your location\n")
 		b.WriteString("  uptime            - Show server statistics\n")
 		b.WriteString("  exit              - Leave the game\n\n")
 
