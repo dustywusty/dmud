@@ -16,9 +16,17 @@ type Player struct {
 	Client         common.Client
 	CommandHistory *CommandHistory
 	Name           string
+	IsAdmin        bool
+	EnteredWorld   bool
 }
 
 func (p *Player) Broadcast(msg string) {
+	if !p.Client.SupportsTags() {
+		if util.IsStateMessage(msg) {
+			return
+		}
+		msg = util.StripTag(msg)
+	}
 	p.Client.SendMessage(msg)
 }
 
@@ -60,7 +68,7 @@ func (p *Player) BroadcastState(w WorldLike, entityID common.EntityID) {
 
 	areaName := "Unknown"
 	if p.Area != nil {
-		areaName = p.Area.Description
+		areaName = strings.TrimSpace(p.Area.Description)
 		if len(areaName) > 50 {
 			areaName = areaName[:50] + "..."
 		}
@@ -75,7 +83,8 @@ func (p *Player) BroadcastState(w WorldLike, entityID common.EntityID) {
 	if effectsStr != "" {
 		stateMsg += "|EFFECTS:" + effectsStr
 	}
-	p.Client.SendMessage(stateMsg)
+	// log.Debug().Msgf("Broadcasting state for %s: %s", p.Name, stateMsg)
+	p.Broadcast(stateMsg)
 }
 
 func (p *Player) Look(w WorldLike) {
@@ -91,7 +100,7 @@ func (p *Player) DescribeArea(w WorldLike) string {
 
 	var b strings.Builder
 
-	b.WriteString(p.Area.Description)
+	b.WriteString(strings.TrimSpace(p.Area.Description))
 
 	p.Area.PlayersMutex.RLock()
 	var otherPlayers []string
@@ -104,10 +113,14 @@ func (p *Player) DescribeArea(w WorldLike) string {
 
 	npcs := p.Area.GetNPCs(w)
 	corpses := p.Area.GetCorpses(w)
+	items := p.Area.GetItems()
 
-	hasEntities := len(otherPlayers) > 0 || len(npcs) > 0 || len(corpses) > 0
+	hasEntities := len(otherPlayers) > 0 || len(npcs) > 0 || len(corpses) > 0 || len(items) > 0
 	if hasEntities {
 		b.WriteString("\n\n")
+
+		hasCharacters := len(otherPlayers) > 0 || len(npcs) > 0
+
 		for _, name := range otherPlayers {
 			b.WriteString(name)
 			b.WriteString(" is here.\n")
@@ -118,9 +131,30 @@ func (p *Player) DescribeArea(w WorldLike) string {
 			b.WriteString(" is here.\n")
 		}
 
-		for _, corpse := range corpses {
-			b.WriteString(corpse.GetDescription())
-			b.WriteString(" is here.\n")
+		hasCorpses := len(corpses) > 0
+
+		if hasCorpses {
+			if hasCharacters {
+				b.WriteString("\n")
+			}
+			for _, corpse := range corpses {
+				b.WriteString(corpse.GetDescription())
+				b.WriteString(" is here.\n")
+			}
+		}
+
+		if len(items) > 0 {
+			if hasCharacters || hasCorpses {
+				b.WriteString("\n")
+			}
+			for _, item := range items {
+				if item.Stackable && item.Quantity > 1 {
+					b.WriteString(fmt.Sprintf("%s x%d is here.\n", item.Name, item.Quantity))
+				} else {
+					b.WriteString(item.Name)
+					b.WriteString(" is here.\n")
+				}
+			}
 		}
 	}
 
