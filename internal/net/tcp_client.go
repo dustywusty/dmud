@@ -18,6 +18,8 @@ type TCPClient struct {
 
 func (c *TCPClient) SupportsPrompt() bool { return true }
 
+func (c *TCPClient) SupportsTags() bool { return false }
+
 var _ common.Client = (*TCPClient)(nil)
 
 func (c *TCPClient) CloseConnection() error {

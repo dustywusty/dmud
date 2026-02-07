@@ -70,6 +70,8 @@ type WSClient struct {
 
 func (c *WSClient) SupportsPrompt() bool { return false }
 
+func (c *WSClient) SupportsTags() bool { return true }
+
 var _ common.Client = (*WSClient)(nil)
 
 func (c *WSClient) CloseConnection() error {
