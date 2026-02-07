@@ -1,7 +1,9 @@
 package game
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -9,6 +11,7 @@ import (
 	"dmud/internal/common"
 	"dmud/internal/components"
 	"dmud/internal/ecs"
+	"dmud/internal/persistence"
 	"dmud/internal/systems"
 	"dmud/internal/util"
 
@@ -42,6 +45,16 @@ type Game struct {
 	world *ecs.World
 
 	dayCycleSystem *systems.DayCycleSystem
+
+	store          persistence.Store
+	persistenceErr error
+	adminKeys      map[string]bool
+
+	sessionKeys   map[common.Client]string
+	sessionKeysMu sync.RWMutex
+
+	lastAutosave     time.Time
+	autosaveInterval time.Duration
 
 	AddPlayerChan      chan common.Client
 	RemovePlayerChan   chan common.Client
@@ -81,6 +94,14 @@ func NewGame() *Game {
 		log.Fatal().Msg("Failed to cast default area to *components.Area")
 	}
 
+	store, err := persistence.NewStoreFromEnv()
+	var persistenceErr error
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to initialize persistence store")
+		persistenceErr = err
+		store = &persistence.NoopStore{}
+	}
+
 	game := &Game{
 		defaultArea:        defaultArea,
 		players:            make(map[string]*ecs.Entity),
@@ -91,6 +112,11 @@ func NewGame() *Game {
 		StartTime:          time.Now(),
 		UniqueIPs:          make(map[string]bool),
 		TotalConnects:      0,
+		store:              store,
+		persistenceErr:     persistenceErr,
+		adminKeys:          parseAdminUUIDs(os.Getenv("DMUD_ADMIN_UUIDS")),
+		sessionKeys:        make(map[common.Client]string),
+		autosaveInterval:   500 * time.Millisecond,
 	}
 
 	// Create day cycle system with broadcast callback
@@ -105,6 +131,7 @@ func NewGame() *Game {
 
 	game.initCommands()
 	game.initializeSpawns()
+	game.loadWorldState()
 
 	go game.loop()
 
@@ -177,6 +204,32 @@ func (g *Game) initCommands() {
 		Name:        "name",
 		Handler:     handleName,
 		Description: "Change your player name.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "login",
+		Handler:     handleLogin,
+		Description: "Link this session to a UUID.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "save",
+		Handler:     handleSave,
+		Description: "Save your character and get a UUID.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "summon",
+		Handler:     handleSummon,
+		Description: "Summon a player to your location.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "cast",
+		Handler:     handleCast,
+		Description: "Cast a spell.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "adminstats",
+		Handler:     handleAdminStats,
+		Description: "Show admin entity counts.",
+		Hidden:      true,
 	})
 	g.RegisterCommand(&Command{
 		Name:        "recall",
@@ -260,6 +313,23 @@ func (g *Game) initCommands() {
 		Name:        "drop",
 		Handler:     g.handleDrop,
 		Description: "Drop an item from your inventory.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "dropall",
+		Handler:     g.handleDropAll,
+		Description: "Drop all items (optionally matching a pattern).",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "sacrifice",
+		Handler:     g.handleSacrifice,
+		Aliases:     []string{"sac"},
+		Description: "Destroy an item on the ground.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "sacall",
+		Handler:     g.handleSacrificeAll,
+		Aliases:     []string{"sacrificeall"},
+		Description: "Destroy all items on the ground (optionally matching a pattern).",
 	})
 	g.RegisterCommand(&Command{
 		Name:        "hail",
@@ -350,16 +420,34 @@ func (g *Game) handleCommand(c ClientCommand) {
 }
 
 func (g *Game) HandleConnect(c common.Client) {
+	deferSpawn := c.SupportsTags()
+
+	loadedState, _ := g.loadPlayerState(c)
+	playerName := util.GenerateRandomName()
+	if loadedState != nil && strings.TrimSpace(loadedState.Name) != "" {
+		if _, exists := g.players[loadedState.Name]; !exists {
+			playerName = loadedState.Name
+		}
+	}
+
+	playerArea := g.defaultArea
+	if loadedState != nil {
+		if area := g.resolveArea(loadedState.AreaID); area != nil {
+			playerArea = area
+		}
+	}
+
 	playerComponent := &components.Player{
 		Client:         c,
-		Name:           util.GenerateRandomName(),
-		Area:           g.defaultArea,
+		Name:           playerName,
+		Area:           playerArea,
 		CommandHistory: components.NewCommandHistory(),
 		AutoComplete:   util.NewAutoComplete(),
+		EnteredWorld:   !deferSpawn,
 	}
 	experienceComponent := components.NewExperience()
 	healthComponent := components.NewHealth(experienceComponent.Level)
-	inventoryComponent := components.NewInventory(20) // 20 slot inventory
+	inventoryComponent := components.NewInventory(0) // unlimited inventory
 	questsComponent := components.NewPlayerQuests()
 
 	playerEntity := ecs.NewEntity()
@@ -371,6 +459,10 @@ func (g *Game) HandleConnect(c common.Client) {
 	g.world.AddComponent(&playerEntity, inventoryComponent)
 	g.world.AddComponent(&playerEntity, questsComponent)
 
+	if loadedState != nil {
+		g.applyPlayerState(playerEntity.ID, playerComponent, loadedState)
+	}
+
 	g.playersMu.Lock()
 	g.players[playerComponent.Name] = &playerEntity
 	g.playersMu.Unlock()
@@ -381,32 +473,59 @@ func (g *Game) HandleConnect(c common.Client) {
 	g.TotalConnectMu.Unlock()
 
 	// Track unique IPs (strip port from address)
-	remoteAddr := c.RemoteAddr()
-	// Extract just the IP part (before the colon)
-	ipAddr := remoteAddr
-	if idx := strings.LastIndex(remoteAddr, ":"); idx != -1 {
-		ipAddr = remoteAddr[:idx]
-	}
-	// Strip IPv6 brackets if present
-	ipAddr = strings.Trim(ipAddr, "[]")
+	ipAddr := extractClientIP(c.RemoteAddr())
 
 	g.UniqueIPsMu.Lock()
 	g.UniqueIPs[ipAddr] = true
 	g.UniqueIPsMu.Unlock()
 
-	g.defaultArea.AddPlayer(playerComponent)
+	if !deferSpawn {
+		playerComponent.Area.AddPlayer(playerComponent)
 
-	playerComponent.Broadcast(util.WelcomeBanner)
-	playerComponent.Look(g.world.AsWorldLike())
-	playerComponent.BroadcastState(g.world.AsWorldLike(), playerEntity.ID)
+		playerComponent.Broadcast(util.WelcomeBanner)
+		playerComponent.Look(g.world.AsWorldLike())
+		playerComponent.BroadcastState(g.world.AsWorldLike(), playerEntity.ID)
 
-	g.Broadcast(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
+		g.Broadcast(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
 
-	// Send initial prompt
-	if c.SupportsPrompt() {
-		c.SendMessage("> ")
+		// Send initial prompt
+		if c.SupportsPrompt() {
+			c.SendMessage("> ")
+		} else {
+			c.SendMessage("\n") // spacer after the welcome text
+		}
 	} else {
-		c.SendMessage("\n") // spacer after the welcome text
+		go func() {
+			const loginGrace = 750 * time.Millisecond
+			time.Sleep(loginGrace)
+
+			player, err := g.getPlayer(c)
+			if err != nil {
+				return
+			}
+
+			player.Lock()
+			if player.EnteredWorld {
+				player.Unlock()
+				return
+			}
+			player.EnteredWorld = true
+			if player.Area == nil {
+				player.Area = g.defaultArea
+			}
+			area := player.Area
+			player.Unlock()
+
+			area.AddPlayer(player)
+
+			player.Broadcast(util.WelcomeBanner)
+			player.Look(g.world.AsWorldLike())
+			if entityID, err := g.getPlayerEntity(player); err == nil {
+				player.BroadcastState(g.world.AsWorldLike(), entityID)
+			}
+
+			g.Broadcast(util.TagMessage("STATUS", fmt.Sprintf("%s has joined the game.", player.Name)), c)
+		}()
 	}
 
 	go c.HandleRequest()
@@ -425,12 +544,17 @@ func (g *Game) HandleDisconnect(c common.Client) {
 		log.Error().Msg("Player entity was nil")
 		return
 	}
+	g.playersMu.Unlock()
+
+	g.clearClientPersistenceKey(c)
+
+	g.playersMu.Lock()
 	g.world.RemoveEntity(playerEntity.ID)
 	delete(g.players, player.Name)
 	g.playersMu.Unlock()
 
 	c.CloseConnection()
-	g.Broadcast(fmt.Sprintf("%s has left the game.", player.Name), c)
+	g.Broadcast(util.TagMessage("STATUS", fmt.Sprintf("%s has left the game.", player.Name)), c)
 }
 
 func (g *Game) getPlayer(c common.Client) (*components.Player, error) {
@@ -492,6 +616,74 @@ func (g *Game) loop() {
 			g.handleCommand(command)
 		case <-updateTicker.C:
 			g.world.Update()
+			g.autosaveTick()
 		}
 	}
+}
+
+func parseAdminUUIDs(value string) map[string]bool {
+	result := make(map[string]bool)
+	for _, raw := range strings.Split(value, ",") {
+		candidate := strings.TrimSpace(raw)
+		if candidate == "" {
+			continue
+		}
+		result[candidate] = true
+	}
+	return result
+}
+
+func (g *Game) isAdminUUID(uuid string) bool {
+	uuid = strings.TrimSpace(uuid)
+	if uuid == "" {
+		return false
+	}
+	return g.adminKeys[uuid]
+}
+
+func (g *Game) resolveAdminStatus(uuid string) bool {
+	if g.isAdminUUID(uuid) {
+		return true
+	}
+	if !g.persistenceEnabled() {
+		return false
+	}
+	isAdmin, err := g.store.IsAdmin(context.Background(), uuid)
+	if err != nil {
+		log.Warn().Err(err).Msg("Failed to check admin flag")
+		return false
+	}
+	return isAdmin
+}
+
+func (g *Game) countByComponent(componentName string) int {
+	entities, err := g.world.FindEntitiesByComponentPredicate(componentName, func(i interface{}) bool {
+		return true
+	})
+	if err != nil {
+		return 0
+	}
+	return len(entities)
+}
+
+func (g *Game) countRoomsAndExits() (int, int) {
+	areas, err := g.world.FindEntitiesByComponentPredicate("Area", func(i interface{}) bool {
+		return true
+	})
+	if err != nil {
+		return 0, 0
+	}
+	exitCount := 0
+	for _, entity := range areas {
+		areaComp, err := g.world.GetComponent(entity.ID, "Area")
+		if err != nil {
+			continue
+		}
+		area, ok := areaComp.(*components.Area)
+		if !ok || area == nil {
+			continue
+		}
+		exitCount += len(area.Exits)
+	}
+	return len(areas), exitCount
 }
