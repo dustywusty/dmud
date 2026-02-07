@@ -35,7 +35,7 @@ var ItemTemplates = map[string]Item{
 		Description: "A crude, rusty dagger that's seen better days.",
 		Type:        ItemTypeWeapon,
 		Value:       10,
-		Stackable:   false,
+		Stackable:   true,
 		Quantity:    1,
 	},
 	"gold_coin": {

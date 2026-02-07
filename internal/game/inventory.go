@@ -4,6 +4,7 @@ import (
 	"dmud/internal/common"
 	"dmud/internal/components"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -76,16 +77,15 @@ func (g *Game) handleLoot(player *components.Player, args []string, game *Game) 
 		return
 	}
 
-	targetCorpse.Inventory.Lock()
-	defer targetCorpse.Inventory.Unlock()
-
-	if len(targetCorpse.Inventory.Items) == 0 {
+	items := targetCorpse.Inventory.GetItems()
+	if len(items) == 0 {
 		player.Broadcast("The corpse has nothing to loot.")
 		return
 	}
 
 	lootedItems := make([]string, 0)
-	for _, item := range targetCorpse.Inventory.Items {
+	lootedItemDetails := make([]*components.Item, 0)
+	for _, item := range items {
 		if playerInventory.IsFull() {
 			player.Broadcast("Your inventory is full!")
 			break
@@ -93,11 +93,13 @@ func (g *Game) handleLoot(player *components.Player, args []string, game *Game) 
 
 		if playerInventory.AddItem(item.Clone()) {
 			lootedItems = append(lootedItems, item.Name)
+			lootedItemDetails = append(lootedItemDetails, item)
 		}
 	}
 
-	// Clear corpse inventory
-	targetCorpse.Inventory.Items = make([]*components.Item, 0)
+	for _, item := range lootedItemDetails {
+		targetCorpse.Inventory.RemoveItem(item.ID, item.Quantity)
+	}
 
 	if len(lootedItems) > 0 {
 		player.Broadcast(fmt.Sprintf("You looted: %s", strings.Join(lootedItems, ", ")))
@@ -152,18 +154,16 @@ func (g *Game) handleLootAll(player *components.Player, game *Game) {
 			continue
 		}
 
-		corpse.Inventory.Lock()
-
-		if len(corpse.Inventory.Items) == 0 {
-			corpse.Inventory.Unlock()
+		items := corpse.Inventory.GetItems()
+		if len(items) == 0 {
 			continue
 		}
 
 		// Loot items from this corpse
 		lootedFromCorpse := false
-		for _, item := range corpse.Inventory.Items {
+		lootedItemDetails := make([]*components.Item, 0)
+		for _, item := range items {
 			if playerInventory.IsFull() {
-				corpse.Inventory.Unlock()
 				player.Broadcast("Your inventory is full!")
 				goto done
 			}
@@ -171,12 +171,13 @@ func (g *Game) handleLootAll(player *components.Player, game *Game) {
 			if playerInventory.AddItem(item.Clone()) {
 				totalLootedItems = append(totalLootedItems, item.Name)
 				lootedFromCorpse = true
+				lootedItemDetails = append(lootedItemDetails, item)
 			}
 		}
 
-		// Clear this corpse's inventory
-		corpse.Inventory.Items = make([]*components.Item, 0)
-		corpse.Inventory.Unlock()
+		for _, item := range lootedItemDetails {
+			corpse.Inventory.RemoveItem(item.ID, item.Quantity)
+		}
 
 		if lootedFromCorpse {
 			corpsesLooted++
@@ -231,6 +232,23 @@ func (g *Game) handleInventory(player *components.Player, args []string, game *G
 	inventory.RLock()
 	if inventory.MaxSlots > 0 {
 		output.WriteString(fmt.Sprintf("\n(%d/%d slots used)\n", len(inventory.Items), inventory.MaxSlots))
+	} else {
+		totalItems := 0
+		for _, item := range inventory.Items {
+			if item == nil {
+				continue
+			}
+			item.RLock()
+			qty := item.Quantity
+			stackable := item.Stackable
+			item.RUnlock()
+			if stackable && qty > 1 {
+				totalItems += qty
+			} else {
+				totalItems += 1
+			}
+		}
+		output.WriteString(fmt.Sprintf("\n(Bag of holding: %d items across %d stacks)\n", totalItems, len(inventory.Items)))
 	}
 	inventory.RUnlock()
 
@@ -240,16 +258,109 @@ func (g *Game) handleInventory(player *components.Player, args []string, game *G
 }
 
 func (g *Game) handleGet(player *components.Player, args []string, game *Game) {
-	player.Broadcast("Item pickup from ground not yet implemented. Use 'loot' for corpses.")
+	if len(args) == 0 {
+		player.Broadcast("Get what? Usage: get <item> [quantity]")
+		return
+	}
+
+	argName, quantity := parseArgsWithQuantity(args)
+	itemName := strings.ToLower(argName)
+
+	if player.Area == nil {
+		player.Broadcast("You are nowhere.")
+		return
+	}
+
+	items := player.Area.GetItems()
+	var targetItem *components.Item
+	for _, item := range items {
+		if strings.Contains(strings.ToLower(item.Name), itemName) {
+			targetItem = item
+			break
+		}
+	}
+
+	if targetItem == nil {
+		player.Broadcast("You don't see that here.")
+		return
+	}
+
+	playerEntity, err := g.getPlayerEntity(player)
+	if err != nil {
+		log.Error().Err(err).Msg("Error getting player entity")
+		return
+	}
+
+	invComp, err := g.world.GetComponent(playerEntity, "Inventory")
+	if err != nil {
+		player.Broadcast("You don't have an inventory!")
+		return
+	}
+
+	inventory := invComp.(*components.Inventory)
+	if inventory.IsFull() {
+		player.Broadcast("Your inventory is full!")
+		return
+	}
+
+	takeQuantity := targetItem.Quantity
+	if quantity != -1 {
+		if quantity > targetItem.Quantity {
+			takeQuantity = targetItem.Quantity
+		} else {
+			takeQuantity = quantity
+		}
+	} else if !targetItem.Stackable {
+		takeQuantity = 1
+	}
+
+	removed := player.Area.RemoveItem(targetItem.ID, takeQuantity)
+	if removed == nil {
+		player.Broadcast("You don't see that here.")
+		return
+	}
+
+	if !inventory.AddItem(removed.Clone()) {
+		player.Area.AddItem(removed)
+		player.Broadcast("Your inventory is full!")
+		return
+	}
+
+	if removed.Quantity > 1 {
+		player.Broadcast(fmt.Sprintf("You pick up %s x%d.", removed.Name, removed.Quantity))
+		player.Area.Broadcast(fmt.Sprintf("%s picks up %s x%d.", player.Name, removed.Name, removed.Quantity), player)
+	} else {
+		player.Broadcast(fmt.Sprintf("You pick up %s.", removed.Name))
+		player.Area.Broadcast(fmt.Sprintf("%s picks up %s.", player.Name, removed.Name), player)
+	}
+}
+
+func parseArgsWithQuantity(args []string) (string, int) {
+	if len(args) == 0 {
+		return "", 0
+	}
+	last := args[len(args)-1]
+	if qty, err := strconv.Atoi(last); err == nil && qty > 0 {
+		return strings.Join(args[:len(args)-1], " "), qty
+	}
+	return strings.Join(args, " "), -1 // -1 means "all"
 }
 
 func (g *Game) handleDrop(player *components.Player, args []string, game *Game) {
 	if len(args) == 0 {
-		player.Broadcast("Drop what? Usage: drop <item>")
+		player.Broadcast("Drop what? Usage: drop <item> [quantity]")
 		return
 	}
 
-	itemName := strings.ToLower(strings.Join(args, " "))
+	itemName, quantity := parseArgsWithQuantity(args)
+	matcher, _, isPattern, err := buildItemMatcher(itemName)
+	if err != nil {
+		player.Broadcast("Invalid pattern.")
+		return
+	}
+	if strings.ContainsAny(itemName, "*?") || strings.ContainsAny(normalizePattern(itemName), "*?") {
+		isPattern = true
+	}
 
 	playerEntity, err := g.getPlayerEntity(player)
 	if err != nil {
@@ -265,35 +376,288 @@ func (g *Game) handleDrop(player *components.Player, args []string, game *Game) 
 
 	inventory := invComp.(*components.Inventory)
 	items := inventory.GetItems()
-
-	// Find matching item
-	var targetItem *components.Item
-	for _, item := range items {
-		if strings.Contains(strings.ToLower(item.Name), itemName) {
-			targetItem = item
-			break
-		}
-	}
-
-	if targetItem == nil {
-		player.Broadcast("You don't have that item.")
+	if len(items) == 0 {
+		player.Broadcast("Your inventory is empty.")
 		return
 	}
 
-	// Remove item from inventory (quantity 1 if stackable)
-	quantity := 1
-	if !targetItem.Stackable {
-		quantity = targetItem.Quantity
+	dropped, droppedNames := dropMatchingItems(player, inventory, matcher, quantity)
+	if dropped == 0 {
+		if isPattern {
+			player.Broadcast("No items matched that pattern.")
+		} else {
+			player.Broadcast("You don't have that item.")
+		}
+		return
+	}
+	player.Broadcast(fmt.Sprintf("You dropped %s.", strings.Join(droppedNames, ", ")))
+	if player.Area != nil {
+		player.Area.Broadcast(fmt.Sprintf("%s dropped some items.", player.Name), player)
+	}
+}
+
+func (g *Game) handleDropAll(player *components.Player, args []string, game *Game) {
+	playerEntity, err := g.getPlayerEntity(player)
+	if err != nil {
+		log.Error().Err(err).Msg("Error getting player entity")
+		return
 	}
 
-	removed := inventory.RemoveItem(targetItem.ID, quantity)
-	if removed != nil {
-		player.Broadcast(fmt.Sprintf("You dropped %s.", removed.Name))
-		player.Area.Broadcast(fmt.Sprintf("%s dropped %s.", player.Name, removed.Name), player)
-		// TODO: Add item to ground/area when we have ground items system
-	} else {
-		player.Broadcast("Failed to drop item.")
+	invComp, err := g.world.GetComponent(playerEntity, "Inventory")
+	if err != nil {
+		player.Broadcast("You don't have an inventory!")
+		return
 	}
+
+	inventory := invComp.(*components.Inventory)
+	items := inventory.GetItems()
+	if len(items) == 0 {
+		player.Broadcast("Your inventory is empty.")
+		return
+	}
+
+	matcher := func(name string) bool { return true }
+	if len(args) > 0 {
+		pattern := strings.TrimSpace(strings.Join(args, " "))
+		parsed, _, _, err := buildItemMatcher(pattern)
+		if err != nil {
+			player.Broadcast("Invalid pattern.")
+			return
+		}
+		matcher = parsed
+	}
+
+	dropped, droppedNames := dropMatchingItems(player, inventory, matcher, -1)
+	if dropped == 0 {
+		player.Broadcast("No items matched that pattern.")
+		return
+	}
+	player.Broadcast(fmt.Sprintf("You dropped %s.", strings.Join(droppedNames, ", ")))
+	if player.Area != nil {
+		player.Area.Broadcast(fmt.Sprintf("%s dropped some items.", player.Name), player)
+	}
+}
+
+func dropMatchingItems(player *components.Player, inventory *components.Inventory, matcher func(string) bool, limit int) (int, []string) {
+	items := inventory.GetItems()
+	if len(items) == 0 {
+		return 0, nil
+	}
+
+	type dropSpec struct {
+		name      string
+		quantity  int
+		stackable bool
+	}
+
+	byID := make(map[string]*dropSpec)
+
+	// Collect items to drop
+	remainingLimit := limit
+
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		if !itemMatches(matcher, item) {
+			continue
+		}
+
+		toDrop := item.Quantity
+		if remainingLimit != -1 {
+			if remainingLimit <= 0 {
+				break
+			}
+			if toDrop > remainingLimit {
+				toDrop = remainingLimit
+			}
+		}
+
+		spec, ok := byID[item.ID]
+		if !ok {
+			spec = &dropSpec{name: item.Name, stackable: item.Stackable}
+			byID[item.ID] = spec
+		}
+
+		spec.quantity += toDrop
+
+		if remainingLimit != -1 {
+			remainingLimit -= toDrop
+		}
+	}
+
+	if len(byID) == 0 {
+		return 0, nil
+	}
+
+	if player.Area == nil {
+		player.Broadcast("You are nowhere.")
+		return 0, nil
+	}
+
+	var droppedNames []string
+	droppedCount := 0
+	for id, spec := range byID {
+		if spec.quantity <= 0 {
+			continue
+		}
+
+		if spec.stackable {
+			removed := inventory.RemoveItem(id, spec.quantity)
+			if removed != nil {
+				removed.Quantity = spec.quantity
+				player.Area.AddItem(removed)
+				droppedCount++
+				if spec.quantity > 1 {
+					droppedNames = append(droppedNames, fmt.Sprintf("%s x%d", spec.name, spec.quantity))
+				} else {
+					droppedNames = append(droppedNames, spec.name)
+				}
+			}
+			continue
+		}
+
+		for i := 0; i < spec.quantity; i++ {
+			removed := inventory.RemoveItem(id, 1)
+			if removed == nil {
+				break
+			}
+			player.Area.AddItem(removed)
+			droppedCount++
+		}
+		if spec.quantity > 1 {
+			droppedNames = append(droppedNames, fmt.Sprintf("%s x%d", spec.name, spec.quantity))
+		} else {
+			droppedNames = append(droppedNames, spec.name)
+		}
+	}
+
+	return droppedCount, droppedNames
+}
+
+func itemMatches(matcher func(string) bool, item *components.Item) bool {
+	if matcher(item.Name) {
+		return true
+	}
+	if item.ID == "" {
+		return false
+	}
+	lookup := strings.ReplaceAll(item.ID, "_", " ")
+	return matcher(lookup)
+}
+
+func (g *Game) handleSacrifice(player *components.Player, args []string, game *Game) {
+	if len(args) == 0 {
+		player.Broadcast("Sacrifice what? Usage: sacrifice <item> or sacrifice all")
+		return
+	}
+
+	arg := strings.TrimSpace(strings.Join(args, " "))
+	if strings.ToLower(arg) == "all" {
+		g.handleSacrificeAll(player, nil, game)
+		return
+	}
+
+	if player.Area == nil {
+		player.Broadcast("You are nowhere.")
+		return
+	}
+
+	matcher, _, isPattern, err := buildItemMatcher(arg)
+	if err != nil {
+		player.Broadcast("Invalid pattern.")
+		return
+	}
+	if strings.ContainsAny(arg, "*?") || strings.ContainsAny(normalizePattern(arg), "*?") {
+		isPattern = true
+	}
+
+	sacrificedCount, sacrificedNames := sacrificeMatchingItems(player, matcher)
+
+	if sacrificedCount == 0 {
+		if isPattern {
+			player.Broadcast("No items matched that pattern.")
+		} else {
+			player.Broadcast("You don't see that here.")
+		}
+		return
+	}
+
+	player.Broadcast(fmt.Sprintf("You sacrificed %s.", strings.Join(sacrificedNames, ", ")))
+	player.Area.Broadcast(fmt.Sprintf("%s sacrificed %s to the void.", player.Name, strings.Join(sacrificedNames, ", ")), player)
+}
+
+func (g *Game) handleSacrificeAll(player *components.Player, args []string, game *Game) {
+	if player.Area == nil {
+		player.Broadcast("You are nowhere.")
+		return
+	}
+
+	matcher := func(name string) bool { return true }
+	if len(args) > 0 {
+		pattern := strings.TrimSpace(strings.Join(args, " "))
+		parsed, _, _, err := buildItemMatcher(pattern)
+		if err != nil {
+			player.Broadcast("Invalid pattern.")
+			return
+		}
+		matcher = parsed
+	}
+
+	sacrificedCount, sacrificedNames := sacrificeMatchingItems(player, matcher)
+
+	if sacrificedCount == 0 {
+		player.Broadcast("There is nothing here to sacrifice.")
+		return
+	}
+
+	player.Broadcast(fmt.Sprintf("You sacrificed %s.", strings.Join(sacrificedNames, ", ")))
+	player.Area.Broadcast(fmt.Sprintf("%s sacrificed everything to the void.", player.Name), player)
+}
+
+func sacrificeMatchingItems(player *components.Player, matcher func(string) bool) (int, []string) {
+	items := player.Area.GetItems()
+	if len(items) == 0 {
+		return 0, nil
+	}
+
+	type sacReport struct {
+		name     string
+		quantity int
+	}
+	reports := make(map[string]*sacReport)
+	sacrificedCount := 0
+
+	for _, item := range items {
+		if !itemMatches(matcher, item) {
+			continue
+		}
+
+		removed := player.Area.RemoveItem(item.ID, item.Quantity)
+		if removed != nil {
+			sacrificedCount++
+			if rep, ok := reports[item.ID]; ok {
+				rep.quantity += removed.Quantity
+			} else {
+				reports[item.ID] = &sacReport{name: removed.Name, quantity: removed.Quantity}
+			}
+		}
+	}
+
+	if sacrificedCount == 0 {
+		return 0, nil
+	}
+
+	var sacrificedNames []string
+	for _, rep := range reports {
+		if rep.quantity > 1 {
+			sacrificedNames = append(sacrificedNames, fmt.Sprintf("%s x%d", rep.name, rep.quantity))
+		} else {
+			sacrificedNames = append(sacrificedNames, rep.name)
+		}
+	}
+
+	return sacrificedCount, sacrificedNames
 }
 
 func (g *Game) getPlayerEntity(player *components.Player) (common.EntityID, error) {
