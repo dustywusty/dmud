@@ -3,6 +3,7 @@ package components
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"dmud/internal/common"
 
@@ -140,6 +141,8 @@ func (h *QuestDialogueHandler) processQuestDialogue(player *Player, playerEntity
 		if node.Condition != nil && !node.Condition(player, playerQuest) {
 			continue
 		}
+
+		npc.HoldConversation(60 * time.Second)
 
 		// Show text if available
 		if node.Text != "" {

@@ -4,6 +4,7 @@ import (
 	"dmud/internal/components"
 	"fmt"
 	"strings"
+	"time"
 )
 
 func (g *Game) handleHail(player *components.Player, args []string, game *Game) {
@@ -27,6 +28,7 @@ func (g *Game) handleHail(player *components.Player, args []string, game *Game) 
 }
 
 func (g *Game) handleNPCHail(player *components.Player, npc *components.NPC) {
+	npc.HoldConversation(60 * time.Second)
 	// Check if this NPC offers any quests with dialogue
 	for _, quest := range components.QuestRegistry {
 		if quest.NPCID == npc.TemplateID && quest.Dialogue != nil {

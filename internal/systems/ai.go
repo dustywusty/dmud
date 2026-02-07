@@ -4,12 +4,14 @@ import (
 	"dmud/internal/common"
 	"dmud/internal/components"
 	"dmud/internal/ecs"
+	"dmud/internal/util"
 	"fmt"
 	"math/rand"
 	"time"
 )
 
-const wanderMinimumInterval = 20 * time.Second
+const wanderMinimumInterval = 60 * time.Second
+const wanderChance = 0.15
 
 type AISystem struct {
 	lastUpdate time.Time
@@ -119,6 +121,10 @@ func (as *AISystem) processAggressiveNPC(w *ecs.World, npcEntity ecs.Entity, npc
 }
 
 func (as *AISystem) attemptWander(_ *ecs.World, _ ecs.Entity, npc *components.NPC, combat *components.Combat) {
+	if npc.IsInConversation() {
+		return
+	}
+
 	if combat != nil {
 		combat.RLock()
 		inCombat := combat.TargetID != ""
@@ -148,7 +154,7 @@ func (as *AISystem) attemptWander(_ *ecs.World, _ ecs.Entity, npc *components.NP
 		return
 	}
 
-	if rand.Float64() > 0.25 {
+	if rand.Float64() > wanderChance {
 		return
 	}
 
@@ -163,7 +169,7 @@ func (as *AISystem) attemptWander(_ *ecs.World, _ ecs.Entity, npc *components.NP
 		return
 	}
 
-	currentArea.Broadcast(name + " wanders " + chosenExit.Direction + ".")
+	currentArea.Broadcast(util.TagMessage("STATUS", name+" wanders "+chosenExit.Direction+"."))
 
 	npc.Lock()
 	if npc.Area != currentArea {
@@ -174,7 +180,7 @@ func (as *AISystem) attemptWander(_ *ecs.World, _ ecs.Entity, npc *components.NP
 	npc.LastMovement = time.Now()
 	npc.Unlock()
 
-	destination.Broadcast(name + " wanders in.")
+	destination.Broadcast(util.TagMessage("STATUS", name+" wanders in."))
 }
 
 func regionExits(area *components.Area) []components.Exit {
