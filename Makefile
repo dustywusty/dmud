@@ -21,6 +21,11 @@ connect:
 run: build
 	./$(BINARY_PATH)$(BINARY_NAME)
 
-# go install github.com/cosmtrek/air@latest
+race:
+	$(GO) run -race ./cmd/dmud
+
+# go install github.com/air-verse/air@latest
+AIR := $(shell go env GOPATH)/bin/air
+
 watch:
-	@$(shell go env GOPATH)/bin/air -c .air.toml
+	@$(AIR) -c .air.toml
