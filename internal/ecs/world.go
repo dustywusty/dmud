@@ -62,6 +62,11 @@ func (w *World) AddSystem(system System) {
 	w.systems = append(w.systems, system)
 }
 
+func (w *World) EntityCount() int {
+	w.entityMutex.RLock()
+	defer w.entityMutex.RUnlock()
+	return len(w.entities)
+}
 
 func (w *World) FindEntity(id common.EntityID) (Entity, error) {
 	w.entityMutex.RLock()
