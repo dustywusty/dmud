@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"dmud/internal/components"
@@ -21,8 +22,15 @@ func main() {
 	// Int("pid", os.Getpid()).
 	// Str("go_version", runtime.Version()).
 
+	level := zerolog.InfoLevel
+	if raw := strings.TrimSpace(os.Getenv("DMUD_LOG_LEVEL")); raw != "" {
+		if parsed, err := zerolog.ParseLevel(strings.ToLower(raw)); err == nil {
+			level = parsed
+		}
+	}
+
 	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05.000"}).
-		Level(zerolog.TraceLevel).
+		Level(level).
 		With().
 		Timestamp().
 		Str("thread_id", util.GetGID()).
