@@ -4,6 +4,7 @@ import (
 	"dmud/internal/common"
 	"dmud/internal/components"
 	"dmud/internal/ecs"
+	"dmud/internal/util"
 	"fmt"
 	"strings"
 
@@ -72,11 +73,11 @@ func (g *Game) HandleKillAll(player *components.Player) {
 	g.world.AddComponent(playerEntity, combatComponent)
 
 	// Announce combat
-	player.Area.Broadcast(player.Name + " attacks everything in sight!")
+	player.Area.Broadcast(util.TagMessage("DMG", player.Name+" attacks everything in sight!"))
 	if len(targetEntityIDs) == 1 {
-		player.Broadcast("You engage 1 enemy!")
+		player.Broadcast(util.TagMessage("DMG", "You engage 1 enemy!"))
 	} else {
-		player.Broadcast(fmt.Sprintf("You engage %d enemies!", len(targetEntityIDs)))
+		player.Broadcast(util.TagMessage("DMG", fmt.Sprintf("You engage %d enemies!", len(targetEntityIDs))))
 	}
 }
 
@@ -91,10 +92,18 @@ func (g *Game) HandleKill(player *components.Player, targetName string) {
 	playerEntity := g.players[player.Name]
 
 	if targetEntity == nil {
+		matcher, _, isPattern, err := buildItemMatcher(targetName)
+		if err != nil {
+			player.Broadcast(fmt.Sprintf("Invalid target: %v", err))
+			return
+		}
+
+		var targetEntityIDs []common.EntityID
+
 		// Check for NPCs
 		npcs := player.Area.GetNPCs(g.world.AsWorldLike())
 		for _, npc := range npcs {
-			if strings.Contains(strings.ToLower(npc.Name), strings.ToLower(targetName)) {
+			if matcher(npc.Name) {
 				// Find NPC entity
 				npcEntities, _ := g.world.FindEntitiesByComponentPredicate("NPC", func(i interface{}) bool {
 					n, ok := i.(*components.NPC)
@@ -102,16 +111,58 @@ func (g *Game) HandleKill(player *components.Player, targetName string) {
 				})
 
 				if len(npcEntities) > 0 {
-					targetEntity = &npcEntities[0]
-					break
+					targetEntityIDs = append(targetEntityIDs, npcEntities[0].ID)
+					// If it's not a pattern (wildcard/regex), we only want one target
+					if !isPattern {
+						break
+					}
 				}
 			}
 		}
 
-		if targetEntity == nil {
+		if len(targetEntityIDs) == 0 {
 			player.Broadcast("They aren't here.")
 			return
 		}
+
+		// Use the first found entity as the primary target
+		// We need to fetch the pointer to the entity for the logic below that expects 'targetEntity'
+		// Note: This logic for 'targetEntity' variable is a bit mixed now because we have IDs.
+		// However, the combat component needs IDs.
+		// We can refactor the construction of the Combat component to use the IDs directly.
+
+		combatComponent := &components.Combat{
+			TargetID:  targetEntityIDs[0],
+			MinDamage: 10,
+			MaxDamage: 50,
+		}
+
+		if len(targetEntityIDs) > 1 {
+			combatComponent.TargetQueue = targetEntityIDs[1:]
+			player.Broadcast(util.TagMessage("DMG", fmt.Sprintf("You engage %d enemies!", len(targetEntityIDs))))
+		}
+
+		g.world.AddComponent(playerEntity, combatComponent)
+
+		// Announce combat for the prime target
+		// We can skip the generic announce code below or modify it.
+		// For now, let's just let the rest of the function run if we have a single target,
+		// or return early if we've handled the "group" case.
+
+		if len(targetEntityIDs) > 1 {
+			// Announce mass attack
+			player.Area.Broadcast(util.TagMessage("DMG", player.Name+" attacks multiple enemies!"))
+			return
+		}
+
+		// Set targetEntity for the single-target fallback logic below
+		ent, err := g.world.FindEntity(targetEntityIDs[0])
+		if err != nil {
+			log.Error().Err(err).Msgf("Failed to find entity %s after initial discovery", targetEntityIDs[0])
+			player.Broadcast("Something went wrong targeting that.")
+			return
+		}
+		targetEntity = &ent
 	}
 
 	if playerEntity == nil {
@@ -129,6 +180,6 @@ func (g *Game) HandleKill(player *components.Player, targetName string) {
 
 	// Announce combat
 	if npc, err := ecs.GetTypedComponent[*components.NPC](g.world, targetEntity.ID, "NPC"); err == nil {
-		player.Area.Broadcast(player.Name + " attacks " + npc.Name + "!")
+		player.Area.Broadcast(util.TagMessage("DMG", player.Name+" attacks "+npc.Name+"!"))
 	}
 }
