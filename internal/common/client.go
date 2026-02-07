@@ -22,4 +22,5 @@ type Client interface {
 	SendMessage(msg string)
 	RemoteAddr() string
 	SupportsPrompt() bool
+	SupportsTags() bool
 }
