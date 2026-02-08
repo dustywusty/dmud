@@ -12,10 +12,22 @@ Deploys happen on push via Cloud Build and I have a very basic client talking vi
 
 ```
 find internal -type f -name '*.go' -exec sh -c 'echo "=== {} ==="; cat {}' \;
-
-make
-make watch # requires air
 ```
+
+| Target | What it does |
+|---|---|
+| `make` | Build the binary to `bin/dmud` |
+| `make run` | Build and run locally |
+| `make watch` | Hot-reload dev server (requires `air`) |
+| `make test` | Run tests |
+| `make test-race` | Run tests with race detector |
+| `make vet` | Run `go vet` |
+| `make race` | Run with race detector |
+| `make clean` | Remove build artifacts |
+| `make docker-build` | Build Docker image (`dmud:latest`) |
+| `make docker-run` | Build and run in Docker (port 8080) |
+| `make docker-stop` | Stop running dmud containers |
+| `make docker-clean` | Remove the dmud image |
 
 
 

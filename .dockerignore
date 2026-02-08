@@ -1,0 +1,12 @@
+.git
+.github
+bin/
+tmp/
+dmud
+*.exe
+*.test
+*.out
+*.log
+.air.toml
+.idea
+.vscode

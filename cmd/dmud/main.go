@@ -50,8 +50,13 @@ func main() {
 		port = "8080"
 
 	}
+	wsHost := os.Getenv("DMUD_WS_HOST")
+	if wsHost == "" {
+		wsHost = "0.0.0.0"
+	}
+
 	server := net.NewServer(&net.ServerConfig{
-		WSHost: "127.0.0.1", WSPort: port,
+		WSHost: wsHost, WSPort: port,
 	})
 
 	go server.Run()
