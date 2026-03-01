@@ -18,16 +18,16 @@ clean:
 	rm -rf $(BINARY_PATH)
 
 test:
-	$(GO) test -v ./...
+	$(GO) test -v -timeout 120s ./...
+
+test-integration:
+	$(GO) test -v -timeout 120s ./test/integration/
 
 test-race:
-	$(GO) test -race -v ./...
+	$(GO) test -race -v -timeout 120s ./...
 
 vet:
 	$(GO) vet ./...
-
-connect:
-	while true; do nc localhost 3333 || sleep 10; done
 
 run: build
 	./$(BINARY_PATH)$(BINARY_NAME)
@@ -55,5 +55,5 @@ docker-stop:
 docker-clean:
 	docker rmi $(IMAGE_NAME):$(IMAGE_TAG) 2>/dev/null || true
 
-.PHONY: default prep build clean test test-race vet connect run race watch \
+.PHONY: default prep build clean test test-integration test-race vet run race watch \
 	docker-build docker-run docker-stop docker-clean

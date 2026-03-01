@@ -97,9 +97,31 @@ func handleCast(player *components.Player, args []string, game *Game) {
 	switch spell {
 	case "heal", "healing":
 		castHeal(player, args[1:], game)
+	case "charm":
+		castCharm(player, args[1:], game)
 	default:
 		player.Broadcast("You don't know that spell.")
 	}
+}
+
+func castCharm(caster *components.Player, args []string, game *Game) {
+	targetName := strings.ToLower(strings.TrimSpace(strings.Join(args, " ")))
+	if targetName == "" {
+		caster.Broadcast("Cast charm on what?")
+		return
+	}
+	if caster.Area == nil {
+		caster.Broadcast("You are nowhere.")
+		return
+	}
+	npcs := caster.Area.GetNPCs(game.world.AsWorldLike())
+	for _, npc := range npcs {
+		if strings.Contains(strings.ToLower(npc.Name), targetName) {
+			caster.Broadcast(fmt.Sprintf("Your charm spell washes over %s.", npc.Name))
+			return
+		}
+	}
+	caster.Broadcast("You don't see that here.")
 }
 
 func castHeal(caster *components.Player, args []string, game *Game) {

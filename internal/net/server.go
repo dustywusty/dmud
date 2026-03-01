@@ -138,9 +138,7 @@ func (s *Server) runTCPListener() {
 	<-done
 }
 
-func (s *Server) runWebSocketServer() {
-	done := make(chan bool)
-
+func (s *Server) initWSMux() {
 	s.wsMuxOnce.Do(func() {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -187,6 +185,21 @@ func (s *Server) runWebSocketServer() {
 		})
 		s.wsMux = mux
 	})
+}
+
+// RunWithListener starts the game + WS server on a caller-owned listener.
+// Intended for tests. Call Shutdown() to stop.
+func (s *Server) RunWithListener(l net.Listener) {
+	s.game = game.NewGame()
+	s.initWSMux()
+	s.wsServer = &http.Server{Handler: s.wsMux}
+	go s.wsServer.Serve(l) //nolint:errcheck
+}
+
+func (s *Server) runWebSocketServer() {
+	done := make(chan bool)
+
+	s.initWSMux()
 
 	s.wsServer = &http.Server{
 		Addr:    fmt.Sprintf("%s:%s", s.wsHost, s.wsPort),
