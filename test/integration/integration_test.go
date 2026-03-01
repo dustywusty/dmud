@@ -150,12 +150,18 @@ func parseFirstExit(msgs []string) string {
 }
 
 // parseNPCName extracts the first NPC name from lines of the form "<Name> is here."
+// NPC names always start with "a " or "an " (e.g. "a small rat", "a town guard").
+// This distinguishes them from player names (hyphenated words) and items.
 func parseNPCName(msgs []string) string {
 	for _, msg := range msgs {
 		for _, line := range strings.Split(msg, "\n") {
 			line = strings.TrimSpace(line)
 			if strings.HasSuffix(line, " is here.") {
-				return strings.TrimSuffix(line, " is here.")
+				name := strings.TrimSuffix(line, " is here.")
+				lower := strings.ToLower(name)
+				if strings.HasPrefix(lower, "a ") || strings.HasPrefix(lower, "an ") {
+					return name
+				}
 			}
 		}
 	}
