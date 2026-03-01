@@ -1,7 +1,7 @@
 package components
 
 // ItemTemplates defines all available items in the game
-var ItemTemplates = map[string]Item{
+var ItemTemplates = map[string]*Item{
 	"rat_fur": {
 		ID:          "rat_fur",
 		Name:        "Rat Fur",
@@ -122,4 +122,5 @@ func CreateItem(itemID string, quantity int) *Item {
 	item := template.Clone()
 	item.Quantity = quantity
 	return item
+
 }
