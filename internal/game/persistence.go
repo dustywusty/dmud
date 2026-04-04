@@ -195,12 +195,15 @@ func (g *Game) buildPlayerState(entityID common.EntityID, player *components.Pla
 			state.StatusEffects = make([]persistence.StatusEffectState, 0, len(effects.Effects))
 			for _, effect := range effects.Effects {
 				state.StatusEffects = append(state.StatusEffects, persistence.StatusEffectState{
-					Type:           effect.Type,
-					Name:           effect.Name,
-					AppliedAtUnix:  effect.AppliedAt.Unix(),
-					DurationSecond: int64(effect.Duration.Seconds()),
-					HPBonus:        effect.HPBonus,
-					Applied:        effect.Applied,
+					Type:                effect.Type,
+					Name:                effect.Name,
+					AppliedAtUnix:       effect.AppliedAt.Unix(),
+					DurationSecond:      int64(effect.Duration.Seconds()),
+					HPBonus:             effect.HPBonus,
+					Applied:             effect.Applied,
+					SourceEntityID:      string(effect.SourceEntityID),
+					SuppressAggro:       effect.SuppressAggro,
+					SuppressRetaliation: effect.SuppressRetaliation,
 				})
 			}
 			effects.RUnlock()
@@ -277,12 +280,15 @@ func (g *Game) applyPlayerState(entityID common.EntityID, player *components.Pla
 				continue
 			}
 			effects.Effects = append(effects.Effects, components.StatusEffect{
-				Type:      saved.Type,
-				Name:      saved.Name,
-				AppliedAt: appliedAt,
-				Duration:  duration,
-				HPBonus:   saved.HPBonus,
-				Applied:   saved.Applied,
+				Type:                saved.Type,
+				Name:                saved.Name,
+				AppliedAt:           appliedAt,
+				Duration:            duration,
+				HPBonus:             saved.HPBonus,
+				Applied:             saved.Applied,
+				SourceEntityID:      common.EntityID(saved.SourceEntityID),
+				SuppressAggro:       saved.SuppressAggro,
+				SuppressRetaliation: saved.SuppressRetaliation,
 			})
 		}
 		if len(effects.Effects) > 0 {

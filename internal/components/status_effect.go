@@ -1,6 +1,7 @@
 package components
 
 import (
+	"dmud/internal/common"
 	"sync"
 	"time"
 )
@@ -9,6 +10,8 @@ type StatusEffectType int
 
 const (
 	StatusEffectGuardBlessing StatusEffectType = iota
+	StatusEffectControlledUndead
+	StatusEffectCharmed
 )
 
 type StatusEffect struct {
@@ -18,6 +21,10 @@ type StatusEffect struct {
 	Duration  time.Duration
 	HPBonus   int
 	Applied   bool
+
+	SourceEntityID      common.EntityID
+	SuppressAggro       bool
+	SuppressRetaliation bool
 }
 
 type StatusEffects struct {
@@ -57,16 +64,16 @@ func (se *StatusEffects) HasEffect(effectType StatusEffectType) bool {
 	return false
 }
 
-func (se *StatusEffects) GetEffect(effectType StatusEffectType) (*StatusEffect, bool) {
+func (se *StatusEffects) GetEffect(effectType StatusEffectType) (StatusEffect, bool) {
 	se.RLock()
 	defer se.RUnlock()
 
 	for i := range se.Effects {
 		if se.Effects[i].Type == effectType && !se.isExpired(se.Effects[i]) {
-			return &se.Effects[i], true
+			return se.Effects[i], true
 		}
 	}
-	return nil, false
+	return StatusEffect{}, false
 }
 
 func (se *StatusEffects) RemoveExpired() []StatusEffect {
@@ -106,4 +113,46 @@ func (se *StatusEffects) GetTotalHPBonus() int {
 		}
 	}
 	return total
+}
+
+func (se *StatusEffects) HasSuppressedAggro() bool {
+	se.RLock()
+	defer se.RUnlock()
+
+	for _, effect := range se.Effects {
+		if !se.isExpired(effect) && effect.SuppressAggro {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (se *StatusEffects) HasSuppressedRetaliation() bool {
+	se.RLock()
+	defer se.RUnlock()
+
+	for _, effect := range se.Effects {
+		if !se.isExpired(effect) && effect.SuppressRetaliation {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (se *StatusEffects) GetActiveSuppressionEffect() (StatusEffect, bool) {
+	se.RLock()
+	defer se.RUnlock()
+
+	for _, effect := range se.Effects {
+		if se.isExpired(effect) {
+			continue
+		}
+		if effect.SuppressAggro || effect.SuppressRetaliation {
+			return effect, true
+		}
+	}
+
+	return StatusEffect{}, false
 }
