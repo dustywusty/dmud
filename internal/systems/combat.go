@@ -50,6 +50,14 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 			continue
 		}
 
+		if attackerNPC != nil && hasSuppressedAggro(w, attackingEntity.ID) {
+			combat.Lock()
+			combat.TargetID = ""
+			combat.TargetQueue = nil
+			combat.Unlock()
+			continue
+		}
+
 		// Get target info (could be player or NPC)
 		targetID := common.EntityID(combat.TargetID)
 		var targetName string
@@ -109,6 +117,15 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 
 		// Auto-retaliation: if target isn't already fighting back, make them attack the attacker
 		targetCombat, err := getCombatComponent(w, targetID)
+		if targetNPC != nil && hasSuppressedRetaliation(w, targetID) {
+			if err == nil {
+				targetCombat.Lock()
+				targetCombat.TargetID = ""
+				targetCombat.TargetQueue = nil
+				targetCombat.Unlock()
+			}
+			continue
+		}
 		if err != nil || targetCombat.TargetID == "" {
 			// Target doesn't have combat component or isn't attacking anyone
 			// Create or update combat component to attack back
@@ -170,6 +187,22 @@ func getNPCComponent(w *ecs.World, entityID common.EntityID) (*components.NPC, e
 
 func getHealthComponent(w *ecs.World, entityID common.EntityID) (*components.Health, error) {
 	return ecs.GetTypedComponent[*components.Health](w, entityID, "Health")
+}
+
+func hasSuppressedAggro(w *ecs.World, entityID common.EntityID) bool {
+	statusEffects, err := ecs.GetTypedComponent[*components.StatusEffects](w, entityID, "StatusEffects")
+	if err != nil || statusEffects == nil {
+		return false
+	}
+	return statusEffects.HasSuppressedAggro()
+}
+
+func hasSuppressedRetaliation(w *ecs.World, entityID common.EntityID) bool {
+	statusEffects, err := ecs.GetTypedComponent[*components.StatusEffects](w, entityID, "StatusEffects")
+	if err != nil || statusEffects == nil {
+		return false
+	}
+	return statusEffects.HasSuppressedRetaliation()
 }
 
 func isTargetDead(health *components.Health) bool {
