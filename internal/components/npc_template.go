@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math/rand"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -36,18 +37,49 @@ type LootDrop struct {
 	MaxCount int
 }
 
+type CreatureType int
+
+const (
+	CreatureTypeUnknown CreatureType = iota
+	CreatureTypeHumanoid
+	CreatureTypeBeast
+	CreatureTypeUndead
+)
+
+var creatureTypeFromString = map[string]CreatureType{
+	"":         CreatureTypeHumanoid,
+	"unknown":  CreatureTypeUnknown,
+	"humanoid": CreatureTypeHumanoid,
+	"beast":    CreatureTypeBeast,
+	"undead":   CreatureTypeUndead,
+}
+
+func (c CreatureType) String() string {
+	switch c {
+	case CreatureTypeHumanoid:
+		return "humanoid"
+	case CreatureTypeBeast:
+		return "beast"
+	case CreatureTypeUndead:
+		return "undead"
+	default:
+		return "unknown"
+	}
+}
+
 type NPCTemplate struct {
-	ID          string
-	Name        string
-	Description string
-	Health      int
-	MinDamage   int
-	MaxDamage   int
-	Behavior    NPCBehavior
-	Dialogue    []string // Random things they might say
-	RespawnTime time.Duration
-	Stationary  bool       // If true, NPC will not wander between areas
-	LootTable   []LootDrop // Possible items this NPC can drop
+	ID           string
+	Name         string
+	Description  string
+	Health       int
+	MinDamage    int
+	MaxDamage    int
+	CreatureType CreatureType
+	Behavior     NPCBehavior
+	Dialogue     []string // Random things they might say
+	RespawnTime  time.Duration
+	Stationary   bool       // If true, NPC will not wander between areas
+	LootTable    []LootDrop // Possible items this NPC can drop
 }
 
 // JSON structs for loading
@@ -65,6 +97,7 @@ type npcTemplateJSON struct {
 	Health             int            `json:"health"`
 	MinDamage          int            `json:"min_damage"`
 	MaxDamage          int            `json:"max_damage"`
+	CreatureType       string         `json:"creature_type,omitempty"`
 	Behavior           string         `json:"behavior"`
 	Dialogue           []string       `json:"dialogue"`
 	RespawnTimeSeconds int            `json:"respawn_time_seconds"`
@@ -102,18 +135,25 @@ func LoadNPCTemplates(filename string) error {
 			behavior = BehaviorPassive
 		}
 
+		creatureType, ok := creatureTypeFromString[strings.ToLower(strings.TrimSpace(t.CreatureType))]
+		if !ok {
+			log.Warn().Msgf("Unknown creature_type '%s' for NPC '%s', defaulting to humanoid", t.CreatureType, t.ID)
+			creatureType = CreatureTypeHumanoid
+		}
+
 		NPCTemplates[t.ID] = NPCTemplate{
-			ID:          t.ID,
-			Name:        t.Name,
-			Description: t.Description,
-			Health:      t.Health,
-			MinDamage:   t.MinDamage,
-			MaxDamage:   t.MaxDamage,
-			Behavior:    behavior,
-			Dialogue:    t.Dialogue,
-			RespawnTime: time.Duration(t.RespawnTimeSeconds) * time.Second,
-			Stationary:  t.Stationary,
-			LootTable:   lootTable,
+			ID:           t.ID,
+			Name:         t.Name,
+			Description:  t.Description,
+			Health:       t.Health,
+			MinDamage:    t.MinDamage,
+			MaxDamage:    t.MaxDamage,
+			CreatureType: creatureType,
+			Behavior:     behavior,
+			Dialogue:     t.Dialogue,
+			RespawnTime:  time.Duration(t.RespawnTimeSeconds) * time.Second,
+			Stationary:   t.Stationary,
+			LootTable:    lootTable,
 		}
 	}
 

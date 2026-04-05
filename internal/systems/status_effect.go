@@ -4,8 +4,7 @@ import (
 	"dmud/internal/components"
 	"dmud/internal/ecs"
 	"fmt"
-
-	"github.com/rs/zerolog/log"
+	"strings"
 )
 
 type StatusEffectSystem struct{}
@@ -34,33 +33,58 @@ func (ses *StatusEffectSystem) Update(w *ecs.World, deltaTime float64) {
 			continue
 		}
 
-		player, err := ecs.GetTypedComponent[*components.Player](w, entity.ID, "Player")
-		if err != nil {
-			continue
-		}
-
-		health, err := ecs.GetTypedComponent[*components.Health](w, entity.ID, "Health")
-		if err != nil {
-			continue
-		}
+		player, _ := ecs.GetTypedComponent[*components.Player](w, entity.ID, "Player")
+		npc, _ := ecs.GetTypedComponent[*components.NPC](w, entity.ID, "NPC")
+		health, _ := ecs.GetTypedComponent[*components.Health](w, entity.ID, "Health")
 
 		for _, effect := range removed {
-			if effect.HPBonus > 0 {
+			if effect.HPBonus > 0 && health != nil {
 				health.Lock()
 				health.Current -= effect.HPBonus
 				if health.Current < 1 {
 					health.Current = 1
 				}
 				health.Unlock()
+			}
 
-				player.Broadcast(fmt.Sprintf("The %s has worn off. (-%d HP)", effect.Name, effect.HPBonus))
-			} else {
-				player.Broadcast(fmt.Sprintf("The %s has worn off.", effect.Name))
+			if player != nil {
+				if effect.HPBonus > 0 {
+					player.Broadcast(fmt.Sprintf("The %s has worn off. (-%d HP)", effect.Name, effect.HPBonus))
+				} else {
+					player.Broadcast(fmt.Sprintf("The %s has worn off.", effect.Name))
+				}
+				continue
+			}
+
+			if npc != nil {
+				npc.RLock()
+				npcArea := npc.Area
+				npcName := npc.Name
+				npc.RUnlock()
+				if npcArea == nil {
+					continue
+				}
+
+				if effect.Type == components.StatusEffectControlledUndead {
+					npcArea.Broadcast(fmt.Sprintf("%s shudders as necromantic control fades.", npcName))
+					continue
+				}
+				if effect.Type == components.StatusEffectCharmed {
+					npcArea.Broadcast(fmt.Sprintf("%s blinks and regains free will.", npcName))
+					continue
+				}
+
+				effectName := strings.TrimSpace(strings.ToLower(effect.Name))
+				if effectName == "" {
+					effectName = "a lingering effect"
+				}
+				npcArea.Broadcast(fmt.Sprintf("%s is no longer affected by %s.", npcName, effectName))
 			}
 		}
 
-		// Always broadcast state update when effects are removed
-		log.Debug().Msgf("Broadcasting state update for %s after effect expiration", player.Name)
-		player.BroadcastState(w.AsWorldLike(), entity.ID)
+		if player != nil {
+			// Broadcast state update when player effects are removed.
+			player.BroadcastState(w.AsWorldLike(), entity.ID)
+		}
 	}
 }

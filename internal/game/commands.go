@@ -38,7 +38,7 @@ var commandHelpText = map[string]string{
 	"sacall":    "Destroy all items on the ground (optionally matching a pattern). Usage: sacall [pattern]",
 	"login":     "Associate this session with a UUID. Usage: login <uuid>",
 	"save":      "Save your character and receive a UUID for login. Usage: save",
-	"cast":      "Cast a spell. Usage: cast heal [target]",
+	"cast":      "Cast a spell. Usage: cast <spell> [target] (known: heal, charm, control undead)",
 	"summon":    "Summon a player to your location. Admins can always summon. Usage: summon <player>",
 	"hail":      "Hail an NPC to start a conversation. Usage: hail <npc_name>",
 	"uptime":    "Show server uptime, current players, and connection statistics.",
@@ -159,7 +159,7 @@ func handleHelp(player *components.Player, args []string, game *Game) {
 		b.WriteString("  login <uuid>      - Link this session to a UUID\n")
 		b.WriteString("  save              - Save your character and get a UUID\n")
 		b.WriteString("  recall            - Return to starting area\n\n")
-		b.WriteString("  cast <spell> [target] - Cast a spell (heal)\n\n")
+		b.WriteString("  cast <spell> [target] - Cast a spell (heal, charm, control undead)\n\n")
 
 		b.WriteString("UTILITY\n")
 		b.WriteString("  help [command]    - Show help information\n")

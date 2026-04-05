@@ -77,6 +77,14 @@ func (as *AISystem) processAggressiveNPC(w *ecs.World, npcEntity ecs.Entity, npc
 		return
 	}
 
+	if as.npcAggroSuppressed(w, npcEntity.ID) {
+		combat.Lock()
+		combat.TargetID = ""
+		combat.TargetQueue = nil
+		combat.Unlock()
+		return
+	}
+
 	combat.RLock()
 	hasTarget := combat.TargetID != ""
 	minDamage := combat.MinDamage
@@ -118,6 +126,14 @@ func (as *AISystem) processAggressiveNPC(w *ecs.World, npcEntity ecs.Entity, npc
 			}
 		}
 	}
+}
+
+func (as *AISystem) npcAggroSuppressed(w *ecs.World, npcID common.EntityID) bool {
+	statusEffects, err := ecs.GetTypedComponent[*components.StatusEffects](w, npcID, "StatusEffects")
+	if err != nil || statusEffects == nil {
+		return false
+	}
+	return statusEffects.HasSuppressedAggro()
 }
 
 func (as *AISystem) attemptWander(_ *ecs.World, _ ecs.Entity, npc *components.NPC, combat *components.Combat) {

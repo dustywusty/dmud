@@ -90,16 +90,18 @@ func handleSave(player *components.Player, args []string, game *Game) {
 func handleCast(player *components.Player, args []string, game *Game) {
 	if len(args) == 0 {
 		player.Broadcast("Usage: cast <spell> [target]")
+		player.Broadcast("Known spells: " + strings.Join(listKnownSpells(), ", "))
 		return
 	}
 
-	spell := strings.ToLower(strings.TrimSpace(args[0]))
-	switch spell {
-	case "heal", "healing":
-		castHeal(player, args[1:], game)
-	default:
+	spell, consumed := resolveSpellFromArgs(args)
+	if spell == nil {
 		player.Broadcast("You don't know that spell.")
+		player.Broadcast("Known spells: " + strings.Join(listKnownSpells(), ", "))
+		return
 	}
+
+	spell.Handler(player, args[consumed:], game)
 }
 
 func castHeal(caster *components.Player, args []string, game *Game) {

@@ -68,12 +68,15 @@ type QuestStatusRecord struct {
 }
 
 type StatusEffectState struct {
-	Type           components.StatusEffectType `json:"type"`
-	Name           string                      `json:"name"`
-	AppliedAtUnix  int64                       `json:"applied_at_unix"`
-	DurationSecond int64                       `json:"duration_seconds"`
-	HPBonus        int                         `json:"hp_bonus"`
-	Applied        bool                        `json:"applied"`
+	Type                components.StatusEffectType `json:"type"`
+	Name                string                      `json:"name"`
+	AppliedAtUnix       int64                       `json:"applied_at_unix"`
+	DurationSecond      int64                       `json:"duration_seconds"`
+	HPBonus             int                         `json:"hp_bonus"`
+	Applied             bool                        `json:"applied"`
+	SourceEntityID      string                      `json:"source_entity_id,omitempty"`
+	SuppressAggro       bool                        `json:"suppress_aggro,omitempty"`
+	SuppressRetaliation bool                        `json:"suppress_retaliation,omitempty"`
 }
 
 type WorldState struct {

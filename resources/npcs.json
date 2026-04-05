@@ -78,6 +78,7 @@
     "id": "skeleton",
     "name": "a shambling skeleton",
     "description": "A reanimated skeleton, its bones held together by dark magic. Empty eye sockets glow with an eerie light.",
+    "creature_type": "undead",
     "health": 60,
     "min_damage": 8,
     "max_damage": 18,
