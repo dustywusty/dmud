@@ -7,14 +7,14 @@ tmp_dir = "tmp"
   bin = "./bin/dmud"
   cmd = "go build -race -o ./bin/dmud -v ./cmd/dmud"
   delay = 1000
-  exclude_dir = ["assets", "tmp", "vendor", "testdata"]
+  exclude_dir = ["assets", "tmp", "vendor", "testdata", "data"]
   exclude_file = []
   exclude_regex = ["_test.go"]
   exclude_unchanged = false
   follow_symlink = false
   full_bin = ""
   include_dir = []
-  include_ext = ["go", "tpl", "tmpl", "html"]
+  include_ext = ["go", "tpl", "tmpl", "html", "json"]
   include_file = []
   kill_delay = 1000
   log = "build-errors.log"
@@ -40,5 +40,5 @@ tmp_dir = "tmp"
   clean_on_exit = false
 
 [screen]
-  clear_on_rebuild = false
+  clear_on_rebuild = true
   keep_scroll = true

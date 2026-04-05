@@ -22,6 +22,7 @@ type StoreConfig struct {
 	RedisURL  string
 	KeyPrefix string
 	TTL       time.Duration
+	DataDir   string
 }
 
 type PlayerState struct {

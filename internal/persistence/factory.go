@@ -13,8 +13,10 @@ const (
 	envRedisURL2     = "REDIS_URL"
 	envKeyPrefix     = "DMUD_PERSIST_PREFIX"
 	envTTL           = "DMUD_PERSIST_TTL"
+	envDataDir       = "DMUD_DATA_DIR"
 	defaultRedisURL  = "redis://dmud:password@127.0.0.1:6379/0"
 	defaultKeyPrefix = "dmud"
+	defaultDataDir   = "data"
 )
 
 func NewStoreFromEnv() (Store, error) {
@@ -27,6 +29,7 @@ func NewStoreFromEnv() (Store, error) {
 		Driver:    driver,
 		RedisURL:  firstNonEmpty(os.Getenv(envRedisURL), os.Getenv(envRedisURL2)),
 		KeyPrefix: os.Getenv(envKeyPrefix),
+		DataDir:   os.Getenv(envDataDir),
 		TTL:       0,
 	}
 
@@ -56,6 +59,12 @@ func NewStore(config StoreConfig) (Store, error) {
 			KeyPrefix: config.KeyPrefix,
 			TTL:       config.TTL,
 		})
+	case "file":
+		dir := config.DataDir
+		if dir == "" {
+			dir = defaultDataDir
+		}
+		return NewFileStore(dir)
 	case "memory":
 		return NewMemoryStore(), nil
 	case "none", "off", "":
