@@ -1,0 +1,27 @@
+services:
+  dmud:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - DMUD_LOG_LEVEL=debug
+      - DMUD_PERSISTENCE=${DMUD_PERSISTENCE:-none}
+      - DMUD_REDIS_URL=redis://dmud:password@redis:6379/0
+      - PORT=8080
+    volumes:
+      - ./resources:/app/resources
+    depends_on:
+      redis:
+        condition: service_started
+        required: false
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass password
+    ports:
+      - "6379:6379"
+    profiles:
+      - redis
