@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel in-progress runs for the same branch/PR when new commits land.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: build & test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: make build
+
+      # Full suite (no race). The integration tests chdir to the repo root to
+      # load ./resources/*.json, so they work from a clean checkout.
+      - name: Test
+        run: make test
+
+      # The bot smoke test specifically under the race detector — proves the
+      # game loop's actor model stays race-free under concurrent bot churn.
+      - name: Smoke test (race)
+        run: make smoke
+
+  # Known-issue checks that aren't green yet (copylocks in vet; the dual-locking
+  # data race the concurrency remediation targets). Kept visible but
+  # non-blocking — promote to a required job once those land.
+  known-issues:
+    name: vet & full race (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Vet
+        run: make vet
+
+      - name: Test (full race)
+        run: make test-race
