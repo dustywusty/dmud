@@ -145,10 +145,8 @@ func castHeal(caster *components.Player, args []string, game *Game) {
 	}
 	health := healthComp.(*components.Health)
 
-	health.Lock()
 	missing := health.Max - health.Current
 	if missing <= 0 {
-		health.Unlock()
 		if target == caster {
 			caster.Broadcast("You are already at full health.")
 		} else {
@@ -160,7 +158,6 @@ func castHeal(caster *components.Player, args []string, game *Game) {
 		healAmount = missing
 	}
 	health.Current += healAmount
-	health.Unlock()
 
 	if target == caster {
 		caster.Broadcast(fmt.Sprintf("You cast heal and restore %d health.", healAmount))

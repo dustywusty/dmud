@@ -51,10 +51,8 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 		}
 
 		if attackerNPC != nil && hasSuppressedAggro(w, attackingEntity.ID) {
-			combat.Lock()
 			combat.TargetID = ""
 			combat.TargetQueue = nil
-			combat.Unlock()
 			continue
 		}
 
@@ -119,10 +117,8 @@ func (cs *CombatSystem) Update(w *ecs.World, deltaTime float64) {
 		targetCombat, err := getCombatComponent(w, targetID)
 		if targetNPC != nil && hasSuppressedRetaliation(w, targetID) {
 			if err == nil {
-				targetCombat.Lock()
 				targetCombat.TargetID = ""
 				targetCombat.TargetQueue = nil
-				targetCombat.Unlock()
 			}
 			continue
 		}
@@ -215,7 +211,6 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 	// Clear or switch to next target in queue
 	if combatComp, err := w.GetComponent(attackerID, "Combat"); err == nil {
 		combat := combatComp.(*components.Combat)
-		combat.Lock()
 		if len(combat.TargetQueue) > 0 {
 			// Switch to next target in queue
 			combat.TargetID = combat.TargetQueue[0]
@@ -230,10 +225,8 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 					attackerPlayer.Broadcast(util.TagMessage("DMG", fmt.Sprintf("You turn your attention to %s!", newNPC.Name)))
 				}
 			}
-			combat.Unlock()
 		} else {
 			combat.TargetID = ""
-			combat.Unlock()
 		}
 	}
 	if combatComp, err := w.GetComponent(targetID, "Combat"); err == nil {
@@ -294,13 +287,11 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 					// Scale up player health on level up and heal to full
 					if healthComp, err := w.GetComponent(attackerID, "Health"); err == nil {
 						health := healthComp.(*components.Health)
-						health.Lock()
 						oldMax := health.Max
 						newMax := int(float64(100) * components.GetLevelScaling(newLevel))
 						hpGain := newMax - oldMax
 						health.Max = newMax
 						health.Current = newMax
-						health.Unlock()
 						attackerPlayer.Broadcast(fmt.Sprintf("Your maximum health increased by %d and you are fully healed!", hpGain))
 					}
 				}
@@ -357,9 +348,7 @@ func performAttack(w *ecs.World, attackerID common.EntityID, attackerPlayer, tar
 		}
 	}
 
-	targetHealth.Lock()
 	targetHealth.Current -= damage
-	targetHealth.Unlock()
 
 	// Send appropriate messages based on entity types
 	if attackerPlayer != nil {

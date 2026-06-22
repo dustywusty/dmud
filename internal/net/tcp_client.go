@@ -41,7 +41,9 @@ func (c *TCPClient) HandleRequest() {
 		message, err := r.ReadString('\n')
 		if err != nil {
 			log.Error().Err(err).Msg("Error reading string from TCPClient")
-			g.HandleDisconnect(c)
+			// Route disconnect through the loop (like the WS client) so all
+			// world-state mutation happens on the game loop goroutine.
+			g.RemovePlayerChan <- c
 			return
 		}
 

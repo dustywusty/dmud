@@ -74,10 +74,8 @@ func (p *Player) BroadcastState(w WorldLike, entityID common.EntityID) {
 		}
 	}
 
-	h.RLock()
 	currentHP := h.Current
 	maxHP := h.Max + hpBonus
-	h.RUnlock()
 
 	stateMsg := fmt.Sprintf("STATE|HP:%d/%d|LEVEL:%d|XP:%d/%d|AREA:%s", currentHP, maxHP, level, currentXP, requiredXP, areaName)
 	if effectsStr != "" {
