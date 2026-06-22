@@ -50,7 +50,7 @@ test-race:
 
 ## smoke: Run the bot smoke test under the race detector (verbose transcript)
 smoke:
-	$(GO) test -race -v -run TestServer_BotsSmoke ./internal/game/
+	$(GO) test -race -v -count=1 -run TestServer_BotsSmoke ./internal/game/
 
 ## vet: Run go vet
 vet:

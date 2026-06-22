@@ -214,12 +214,16 @@ func TestServer_BotsSmoke(t *testing.T) {
 	}
 	wg.Wait()
 
-	// 5) Liveness: after all that churn the loop must still answer. A fresh
-	//    `look` should advance the bot's message count; if it doesn't, the loop
-	//    has stalled or deadlocked.
-	before := bots[0].messageCount()
-	g.ExecuteCommandChan <- smokeCmd(bots[0], "look")
-	if !waitFor(func() bool { return bots[0].messageCount() > before }, 2*time.Second) {
+	// 5) Liveness: after all that churn the loop must still answer. Probe with a
+	//    `say` carrying a unique nonce and wait for that exact echo. A plain
+	//    message-count bump is not enough: ExecuteCommandChan is buffered, so the
+	//    loop may still be draining the churn backlog when we send this — an
+	//    earlier command's response could satisfy the wait before the probe is
+	//    ever processed. Echoing a unique string proves the loop reached *this*
+	//    command, not a stale one still in the queue.
+	const probe = "liveness-probe-9f3a2b"
+	g.ExecuteCommandChan <- smokeCmd(bots[0], "say "+probe)
+	if !waitFor(func() bool { return bots[0].hasMessageContaining("You say: " + probe) }, 2*time.Second) {
 		t.Fatal("game loop stopped responding after the bot churn (possible deadlock)")
 	}
 
