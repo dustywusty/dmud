@@ -1,7 +1,8 @@
 package components
 
-// ItemTemplates defines all available items in the game
-var ItemTemplates = map[string]Item{
+// ItemTemplates defines all available items in the game. Values are pointers so
+// lookups don't copy the embedded sync.RWMutex (which go vet flags as copylocks).
+var ItemTemplates = map[string]*Item{
 	"rat_fur": {
 		ID:          "rat_fur",
 		Name:        "Rat Fur",
