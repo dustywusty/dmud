@@ -56,10 +56,7 @@ func (a *Area) GetNPCs(w WorldLike) []*NPC {
 		if !ok {
 			return false
 		}
-		npc.RLock()
-		sameArea := npc.Area == a
-		npc.RUnlock()
-		return sameArea
+		return npc.Area == a
 	})
 
 	if err != nil {

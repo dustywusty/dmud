@@ -89,9 +89,7 @@ func (as *AISystem) processAggressiveNPC(w *ecs.World, npcEntity ecs.Entity, npc
 
 	// If not in combat, look for targets
 	if !hasTarget {
-		npc.RLock()
 		area := npc.Area
-		npc.RUnlock()
 
 		if area != nil && len(area.Players) > 0 {
 			// Pick a random player to attack
@@ -143,12 +141,10 @@ func (as *AISystem) attemptWander(_ *ecs.World, _ ecs.Entity, npc *components.NP
 		}
 	}
 
-	npc.RLock()
 	currentArea := npc.Area
 	lastMovement := npc.LastMovement
 	name := npc.Name
 	templateID := npc.TemplateID
-	npc.RUnlock()
 
 	// Check if this NPC is stationary
 	if template, ok := components.NPCTemplates[templateID]; ok && template.Stationary {
@@ -180,14 +176,11 @@ func (as *AISystem) attemptWander(_ *ecs.World, _ ecs.Entity, npc *components.NP
 
 	currentArea.Broadcast(util.TagMessage("STATUS", name+" wanders "+chosenExit.Direction+"."))
 
-	npc.Lock()
 	if npc.Area != currentArea {
-		npc.Unlock()
 		return
 	}
 	npc.Area = destination
 	npc.LastMovement = time.Now()
-	npc.Unlock()
 
 	destination.Broadcast(util.TagMessage("STATUS", name+" wanders in."))
 }
@@ -217,8 +210,6 @@ func (as *AISystem) processFriendlyNPC(_ *ecs.World, npcEntity ecs.Entity, npc *
 		dialogue := npc.GetRandomDialogue()
 		if dialogue != "" && npc.Area != nil {
 			npc.Area.Broadcast(npc.Name + " says: " + dialogue)
-			npc.Lock()
-			defer npc.Unlock()
 			npc.LastAction = time.Now()
 		}
 	}
@@ -235,10 +226,8 @@ func (as *AISystem) processGuardNPC(w *ecs.World, npcEntity ecs.Entity, npc *com
 }
 
 func (as *AISystem) guardBlessPlayers(w *ecs.World, npc *components.NPC) {
-	npc.RLock()
 	area := npc.Area
 	lastAction := npc.LastAction
-	npc.RUnlock()
 
 	if area == nil {
 		return
@@ -320,9 +309,7 @@ func (as *AISystem) guardBlessPlayers(w *ecs.World, npc *components.NPC) {
 			// Broadcast state update to player
 			player.BroadcastState(w.AsWorldLike(), playerEntity.ID)
 
-			npc.Lock()
 			npc.LastAction = time.Now()
-			npc.Unlock()
 
 			return
 		}
@@ -346,9 +333,7 @@ func (as *AISystem) guardBlessPlayers(w *ecs.World, npc *components.NPC) {
 			// Broadcast state update to player
 			player.BroadcastState(w.AsWorldLike(), playerEntity.ID)
 
-			npc.Lock()
 			npc.LastAction = time.Now()
-			npc.Unlock()
 
 			return
 		}
@@ -356,9 +341,7 @@ func (as *AISystem) guardBlessPlayers(w *ecs.World, npc *components.NPC) {
 }
 
 func (as *AISystem) guardIntervene(w *ecs.World, npcEntity ecs.Entity, npc *components.NPC, combat *components.Combat) bool {
-	npc.RLock()
 	area := npc.Area
-	npc.RUnlock()
 
 	if area == nil {
 		return false
@@ -507,8 +490,6 @@ func (as *AISystem) processPassiveNPC(w *ecs.World, npcEntity ecs.Entity, npc *c
 		dialogue := npc.GetRandomDialogue()
 		if dialogue != "" && npc.Area != nil {
 			npc.Area.Broadcast(npc.Name + " " + dialogue)
-			npc.Lock()
-			defer npc.Unlock()
 			npc.LastAction = time.Now()
 		}
 	}

@@ -225,10 +225,8 @@ func castNPCControlSpell(caster *components.Player, args []string, game *Game, s
 		return
 	}
 
-	npc.RLock()
 	npcName := npc.Name
 	npcTemplateID := npc.TemplateID
-	npc.RUnlock()
 
 	template, ok := components.NPCTemplates[npcTemplateID]
 	if !ok {
