@@ -427,7 +427,6 @@ func (g *Game) buildWorldState() *persistence.WorldState {
 		if !ok || npc == nil {
 			continue
 		}
-		npc.RLock()
 		areaID := g.getAreaID(npc.Area)
 		name := npc.Name
 		description := npc.Description
@@ -435,7 +434,6 @@ func (g *Game) buildWorldState() *persistence.WorldState {
 		lastAction := npc.LastAction.Unix()
 		lastMovement := npc.LastMovement.Unix()
 		templateID := npc.TemplateID
-		npc.RUnlock()
 
 		var health persistence.HealthState
 		if healthComp, err := g.world.GetComponent(entity.ID, "Health"); err == nil {
@@ -744,10 +742,8 @@ func (g *Game) rebuildSpawnTracking() {
 			if !ok || npc == nil {
 				continue
 			}
-			npc.RLock()
 			matchesArea := npc.Area == area
 			templateID := npc.TemplateID
-			npc.RUnlock()
 			if !matchesArea {
 				continue
 			}

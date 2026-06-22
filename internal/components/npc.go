@@ -3,13 +3,15 @@ package components
 import (
 	"dmud/internal/common"
 	"math/rand"
-	"sync"
 	"time"
 )
 
+// NPC carries no mutex: all NPC state is read and written exclusively on the
+// game-loop goroutine (AI/combat/status systems via world.Update, and command
+// handlers, all of which run on the loop), so the actor model already
+// serializes access. See the actor-model commitment proven by
+// TestGameLoop_ConcurrentClients_NoRace.
 type NPC struct {
-	sync.RWMutex
-
 	Area              *Area
 	Behavior          NPCBehavior
 	Description       string
@@ -23,8 +25,6 @@ type NPC struct {
 }
 
 func (n *NPC) GetRandomDialogue() string {
-	n.RLock()
-	defer n.RUnlock()
 	if len(n.Dialogue) == 0 {
 		return ""
 	}
@@ -40,16 +40,12 @@ func (n *NPC) HoldConversation(duration time.Duration) {
 		return
 	}
 
-	n.Lock()
 	if n.ConversationUntil.Before(until) {
 		n.ConversationUntil = until
 	}
-	n.Unlock()
 }
 
 func (n *NPC) IsInConversation() bool {
-	n.RLock()
 	until := n.ConversationUntil
-	n.RUnlock()
 	return !until.IsZero() && time.Now().Before(until)
 }

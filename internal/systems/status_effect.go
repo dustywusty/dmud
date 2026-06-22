@@ -55,10 +55,8 @@ func (ses *StatusEffectSystem) Update(w *ecs.World, deltaTime float64) {
 			}
 
 			if npc != nil {
-				npc.RLock()
 				npcArea := npc.Area
 				npcName := npc.Name
-				npc.RUnlock()
 				if npcArea == nil {
 					continue
 				}
