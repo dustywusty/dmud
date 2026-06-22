@@ -39,12 +39,10 @@ func (ses *StatusEffectSystem) Update(w *ecs.World, deltaTime float64) {
 
 		for _, effect := range removed {
 			if effect.HPBonus > 0 && health != nil {
-				health.Lock()
 				health.Current -= effect.HPBonus
 				if health.Current < 1 {
 					health.Current = 1
 				}
-				health.Unlock()
 			}
 
 			if player != nil {

@@ -310,10 +310,8 @@ func castNPCControlSpell(caster *components.Player, args []string, game *Game, s
 	})
 
 	if combat, err := ecs.GetTypedComponent[*components.Combat](game.world, npcEntityID, "Combat"); err == nil {
-		combat.Lock()
 		combat.TargetID = ""
 		combat.TargetQueue = nil
-		combat.Unlock()
 	}
 
 	if spec.CasterMessage != nil {

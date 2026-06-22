@@ -78,18 +78,14 @@ func (as *AISystem) processAggressiveNPC(w *ecs.World, npcEntity ecs.Entity, npc
 	}
 
 	if as.npcAggroSuppressed(w, npcEntity.ID) {
-		combat.Lock()
 		combat.TargetID = ""
 		combat.TargetQueue = nil
-		combat.Unlock()
 		return
 	}
 
-	combat.RLock()
 	hasTarget := combat.TargetID != ""
 	minDamage := combat.MinDamage
 	maxDamage := combat.MaxDamage
-	combat.RUnlock()
 
 	// If not in combat, look for targets
 	if !hasTarget {
@@ -142,10 +138,7 @@ func (as *AISystem) attemptWander(_ *ecs.World, _ ecs.Entity, npc *components.NP
 	}
 
 	if combat != nil {
-		combat.RLock()
-		inCombat := combat.TargetID != ""
-		combat.RUnlock()
-		if inCombat {
+		if combat.TargetID != "" {
 			return
 		}
 	}
@@ -310,7 +303,6 @@ func (as *AISystem) guardBlessPlayers(w *ecs.World, npc *components.NPC) {
 			area.Broadcast(fmt.Sprintf("%s says: \"%s\"", npc.Name, message))
 
 			// Heal to full health first
-			health.Lock()
 			wasInjured := health.Current < health.Max
 			health.Current = health.Max
 			// Then add the buff HP
@@ -319,7 +311,6 @@ func (as *AISystem) guardBlessPlayers(w *ecs.World, npc *components.NPC) {
 			if health.Current > effectiveMax {
 				health.Current = effectiveMax
 			}
-			health.Unlock()
 
 			if wasInjured {
 				player.Broadcast("The guard's healing power restores you to full health!")
@@ -338,11 +329,9 @@ func (as *AISystem) guardBlessPlayers(w *ecs.World, npc *components.NPC) {
 
 		// If they have the blessing but are injured, just heal them
 		if hasBlessing && isInjured {
-			health.Lock()
 			hpBonus := statusEffects.GetTotalHPBonus()
 			effectiveMax := health.Max + hpBonus
 			health.Current = effectiveMax
-			health.Unlock()
 
 			healings := []string{
 				"Rest easy, traveler. Your wounds are healed.",
@@ -376,11 +365,7 @@ func (as *AISystem) guardIntervene(w *ecs.World, npcEntity ecs.Entity, npc *comp
 	}
 
 	if combat != nil {
-		combat.RLock()
-		hasTarget := combat.TargetID != ""
-		combat.RUnlock()
-
-		if hasTarget {
+		if combat.TargetID != "" {
 			return true
 		}
 	}
@@ -405,9 +390,7 @@ func (as *AISystem) guardIntervene(w *ecs.World, npcEntity ecs.Entity, npc *comp
 		w.AddComponent(&npcEntity, combat)
 	}
 
-	combat.Lock()
 	combat.TargetID = aggressorID
-	combat.Unlock()
 
 	area.Broadcast(fmt.Sprintf("%s shouts, \"Keep the peace!\" and attacks %s!", npc.Name, aggressorName))
 
@@ -484,9 +467,7 @@ func getCombatTargetInfo(w *ecs.World, entityID common.EntityID) (common.EntityI
 		return "", nil, nil
 	}
 
-	combatComp.RLock()
 	targetID := combatComp.TargetID
-	combatComp.RUnlock()
 
 	if targetID == "" {
 		return "", nil, nil

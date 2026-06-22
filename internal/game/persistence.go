@@ -148,13 +148,11 @@ func (g *Game) buildPlayerState(entityID common.EntityID, player *components.Pla
 
 	if healthComp, err := g.world.GetComponent(entityID, "Health"); err == nil {
 		if health, ok := healthComp.(*components.Health); ok {
-			health.RLock()
 			state.Health = persistence.HealthState{
 				Current: health.Current,
 				Max:     health.Max,
 				Status:  health.Status,
 			}
-			health.RUnlock()
 		}
 	}
 
@@ -221,11 +219,9 @@ func (g *Game) applyPlayerState(entityID common.EntityID, player *components.Pla
 	if state.Health.Max > 0 {
 		if healthComp, err := g.world.GetComponent(entityID, "Health"); err == nil {
 			if health, ok := healthComp.(*components.Health); ok {
-				health.Lock()
 				health.Max = state.Health.Max
 				health.Current = state.Health.Current
 				health.Status = state.Health.Status
-				health.Unlock()
 			}
 		}
 	}
@@ -444,9 +440,7 @@ func (g *Game) buildWorldState() *persistence.WorldState {
 		var health persistence.HealthState
 		if healthComp, err := g.world.GetComponent(entity.ID, "Health"); err == nil {
 			if h, ok := healthComp.(*components.Health); ok {
-				h.RLock()
 				health = persistence.HealthState{Current: h.Current, Max: h.Max, Status: h.Status}
-				h.RUnlock()
 			}
 		}
 

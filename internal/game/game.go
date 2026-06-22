@@ -59,6 +59,7 @@ type Game struct {
 	AddPlayerChan      chan common.Client
 	RemovePlayerChan   chan common.Client
 	ExecuteCommandChan chan ClientCommand
+	enterWorldChan     chan common.Client
 
 	// Server stats
 	StartTime      time.Time
@@ -109,6 +110,7 @@ func NewGame() *Game {
 		AddPlayerChan:      make(chan common.Client, 64),
 		RemovePlayerChan:   make(chan common.Client, 64),
 		ExecuteCommandChan: make(chan ClientCommand, 256),
+		enterWorldChan:     make(chan common.Client, 64),
 		StartTime:          time.Now(),
 		UniqueIPs:          make(map[string]bool),
 		TotalConnects:      0,
@@ -495,40 +497,45 @@ func (g *Game) HandleConnect(c common.Client) {
 			c.SendMessage("\n") // spacer after the welcome text
 		}
 	} else {
-		go func() {
-			const loginGrace = 750 * time.Millisecond
-			time.Sleep(loginGrace)
-
-			player, err := g.getPlayer(c)
-			if err != nil {
-				return
-			}
-
-			player.Lock()
-			if player.EnteredWorld {
-				player.Unlock()
-				return
-			}
-			player.EnteredWorld = true
-			if player.Area == nil {
-				player.Area = g.defaultArea
-			}
-			area := player.Area
-			player.Unlock()
-
-			area.AddPlayer(player)
-
-			player.Broadcast(util.WelcomeBanner)
-			player.Look(g.world.AsWorldLike())
-			if entityID, err := g.getPlayerEntity(player); err == nil {
-				player.BroadcastState(g.world.AsWorldLike(), entityID)
-			}
-
-			g.Broadcast(util.TagMessage("STATUS", fmt.Sprintf("%s has joined the game.", player.Name)), c)
-		}()
+		const loginGrace = 750 * time.Millisecond
+		// Defer world entry briefly so a deferred-spawn (web) client can send
+		// `login <uuid>` to retrieve a saved character first. The timer only
+		// enqueues onto enterWorldChan; the actual state change happens on the
+		// game loop in enterWorld, keeping all world mutation single-threaded.
+		time.AfterFunc(loginGrace, func() {
+			g.enterWorldChan <- c
+		})
 	}
 
 	go c.HandleRequest()
+}
+
+// enterWorld completes a deferred spawn once the login grace elapses. It runs
+// on the game loop goroutine (via enterWorldChan), serialized against commands
+// and systems, so it requires no locking and cannot race the `login` command.
+func (g *Game) enterWorld(c common.Client) {
+	player, err := g.getPlayer(c)
+	if err != nil {
+		return // client disconnected during the login grace
+	}
+
+	if player.EnteredWorld {
+		return // already entered the world (e.g. via `login` / character retrieval)
+	}
+	player.EnteredWorld = true
+	if player.Area == nil {
+		player.Area = g.defaultArea
+	}
+
+	player.Area.AddPlayer(player)
+
+	player.Broadcast(util.WelcomeBanner)
+	player.Look(g.world.AsWorldLike())
+	if entityID, err := g.getPlayerEntity(player); err == nil {
+		player.BroadcastState(g.world.AsWorldLike(), entityID)
+	}
+
+	g.Broadcast(util.TagMessage("STATUS", fmt.Sprintf("%s has joined the game.", player.Name)), c)
 }
 
 func (g *Game) HandleDisconnect(c common.Client) {
@@ -612,6 +619,8 @@ func (g *Game) loop() {
 			g.HandleConnect(client)
 		case client := <-g.RemovePlayerChan:
 			g.HandleDisconnect(client)
+		case client := <-g.enterWorldChan:
+			g.enterWorld(client)
 		case command := <-g.ExecuteCommandChan:
 			g.handleCommand(command)
 		case <-updateTicker.C:

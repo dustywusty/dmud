@@ -2,7 +2,6 @@ package components
 
 import (
 	"math"
-	"sync"
 )
 
 type HealthStatus int
@@ -13,9 +12,9 @@ const (
 	Dead
 )
 
+// Health is accessed only on the game loop goroutine (systems, command
+// handlers, and the on-loop autosave), so it carries no mutex.
 type Health struct {
-	sync.RWMutex
-
 	Current int
 	Max     int
 	Status  HealthStatus
