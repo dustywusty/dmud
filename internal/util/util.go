@@ -17,24 +17,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var lastTime time.Time
-
 func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
 type EntityID string
-
-func CalculateDeltaTime() float64 {
-	if lastTime.IsZero() {
-		lastTime = time.Now()
-		return 0
-	}
-	currentTime := time.Now()
-	deltaTime := currentTime.Sub(lastTime).Seconds()
-	lastTime = currentTime
-	return deltaTime
-}
 
 func ContainsClient(clients []common.Client, client common.Client) bool {
 	for _, c := range clients {

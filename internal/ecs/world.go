@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"dmud/internal/common"
 	"dmud/internal/components"
@@ -20,6 +21,7 @@ type World struct {
 	entityMutex sync.RWMutex
 
 	elapsedTime float64
+	lastTick    time.Time
 
 	systems []System
 }
@@ -176,7 +178,7 @@ func (w *World) RemoveEntity(entityID common.EntityID) {
 }
 
 func (w *World) Update() {
-	deltaTime := util.CalculateDeltaTime()
+	deltaTime := w.calculateDeltaTime()
 
 	w.elapsedTime += deltaTime
 
@@ -187,6 +189,22 @@ func (w *World) Update() {
 
 		w.elapsedTime = 0
 	}
+}
+
+// calculateDeltaTime returns the seconds elapsed since the previous tick. The
+// state is per-World (rather than a package global) so that multiple worlds —
+// e.g. concurrent tests each running their own game loop — cannot race on
+// shared delta-time state. It is only called from Update on the loop goroutine,
+// so it needs no locking under the actor model.
+func (w *World) calculateDeltaTime() float64 {
+	now := time.Now()
+	if w.lastTick.IsZero() {
+		w.lastTick = now
+		return 0
+	}
+	delta := now.Sub(w.lastTick).Seconds()
+	w.lastTick = now
+	return delta
 }
 
 func NewWorld() *World {
