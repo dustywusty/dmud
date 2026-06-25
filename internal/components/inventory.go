@@ -56,28 +56,13 @@ func (inv *Inventory) RemoveItem(itemID string, quantity int) *Item {
 			if item.Stackable && item.Quantity > quantity {
 				// Partial removal from stack
 				item.Quantity -= quantity
-				removed := &Item{
-					ID:          item.ID,
-					Name:        item.Name,
-					Description: item.Description,
-					Type:        item.Type,
-					Value:       item.Value,
-					Stackable:   item.Stackable,
-					Quantity:    quantity,
-				}
+				removed := item.cloneLocked()
+				removed.Quantity = quantity
 				item.Unlock()
 				return removed
 			} else {
 				// Remove entire item/stack
-				removed := &Item{
-					ID:          item.ID,
-					Name:        item.Name,
-					Description: item.Description,
-					Type:        item.Type,
-					Value:       item.Value,
-					Stackable:   item.Stackable,
-					Quantity:    item.Quantity,
-				}
+				removed := item.cloneLocked()
 				item.Unlock()
 				inv.Items = append(inv.Items[:i], inv.Items[i+1:]...)
 				return removed

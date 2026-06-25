@@ -100,6 +100,13 @@ func (p *Player) BroadcastState(w WorldLike, entityID common.EntityID) {
 		}
 	}
 
+	// Worn gear raises the HP ceiling alongside stats and blessings.
+	if eqComp, err := w.GetComponent(entityID, "Equipment"); err == nil {
+		if eq, ok := eqComp.(*Equipment); ok {
+			hpBonus += eq.HPBonus()
+		}
+	}
+
 	// A beast form shows up as an effect tag (e.g. "Bear Form").
 	if shComp, err := w.GetComponent(entityID, "Shift"); err == nil {
 		if sh, ok := shComp.(*Shift); ok && sh.Form != "" {

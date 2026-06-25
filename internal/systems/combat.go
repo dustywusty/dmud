@@ -246,11 +246,12 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 			targetPlayer.Area.Broadcast(util.TagMessageWithStatus("DMG", "DEATH", fmt.Sprintf("%s has been slain by %s!", targetPlayer.Name, attackerNPC.Name)))
 		}
 
-		// Create player corpse with their inventory
+		// Create player corpse with their inventory (worn gear drops too)
 		var corpseInventory *components.Inventory
 		if invComp, err := w.GetComponent(targetID, "Inventory"); err == nil {
 			corpseInventory = invComp.(*components.Inventory)
 		}
+		dropEquipmentInto(w, targetID, corpseInventory)
 		spawnCorpse(w, targetPlayer.Name, targetID, true, targetPlayer.Area, corpseInventory)
 
 		// TODO: Handle respawn
@@ -302,15 +303,37 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 			}
 		}
 
-		// Create NPC corpse with their inventory before removing entity
+		// Create NPC corpse with their inventory before removing entity (gear drops)
 		var corpseInventory *components.Inventory
 		if invComp, err := w.GetComponent(targetID, "Inventory"); err == nil {
 			corpseInventory = invComp.(*components.Inventory)
 		}
+		dropEquipmentInto(w, targetID, corpseInventory)
 		spawnCorpse(w, targetNPC.Name, targetID, false, targetNPC.Area, corpseInventory)
 
 		// Remove NPC from world (spawn system will respawn it)
 		w.RemoveEntity(targetID)
+	}
+}
+
+// dropEquipmentInto moves a dying creature's worn gear into the corpse inventory
+// so it can be looted, just like carried items.
+func dropEquipmentInto(w components.WorldLike, entityID common.EntityID, inv *components.Inventory) {
+	if inv == nil {
+		return
+	}
+	eqComp, err := w.GetComponent(entityID, "Equipment")
+	if err != nil {
+		return
+	}
+	eq, ok := eqComp.(*components.Equipment)
+	if !ok {
+		return
+	}
+	for _, slot := range []components.EquipSlot{components.SlotWeapon, components.SlotArmor, components.SlotShield} {
+		if it := eq.Remove(slot); it != nil {
+			inv.AddItem(it)
+		}
 	}
 }
 
@@ -359,6 +382,20 @@ func performAttack(w *ecs.World, attackerID common.EntityID, attackerPlayer, tar
 	if attackerNPC != nil {
 		if stats, err := ecs.GetTypedComponent[*components.Stats](w, attackerID, "Stats"); err == nil && stats != nil {
 			damage = int(float64(damage) * stats.MeleeFactor())
+		}
+	}
+
+	// Equipped weapon adds to the swing; the target's worn armor soaks part of it.
+	if eq, e := ecs.GetTypedComponent[*components.Equipment](w, attackerID, "Equipment"); e == nil && eq != nil {
+		if lo, hi := eq.WeaponDamage(); hi > 0 && hi >= lo {
+			damage += lo + r.Intn(hi-lo+1)
+		}
+	}
+	if eq, e := ecs.GetTypedComponent[*components.Equipment](w, combat.TargetID, "Equipment"); e == nil && eq != nil {
+		if armor := eq.ArmorValue(); armor > 0 {
+			if damage -= armor; damage < 1 {
+				damage = 1
+			}
 		}
 	}
 

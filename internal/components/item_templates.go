@@ -36,8 +36,11 @@ var ItemTemplates = map[string]*Item{
 		Description: "A crude, rusty dagger that's seen better days.",
 		Type:        ItemTypeWeapon,
 		Value:       10,
-		Stackable:   true,
+		Stackable:   false,
 		Quantity:    1,
+		Slot:        SlotWeapon,
+		DamageMin:   2,
+		DamageMax:   5,
 	},
 	"gold_coin": {
 		ID:          "gold_coin",
@@ -110,6 +113,9 @@ var ItemTemplates = map[string]*Item{
 		Value:       75,
 		Stackable:   false,
 		Quantity:    1,
+		Slot:        SlotArmor,
+		Armor:       3,
+		HPBonus:     15,
 	},
 	"leather_legs": {
 		ID:          "leather_legs",

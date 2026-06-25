@@ -379,6 +379,24 @@ func (g *Game) initCommands() {
 		Description: "Drop all items (optionally matching a pattern).",
 	})
 	g.RegisterCommand(&Command{
+		Name:        "equip",
+		Aliases:     []string{"wield", "wear"},
+		Handler:     g.handleEquip,
+		Description: "Wield or wear an item from your inventory.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "remove",
+		Aliases:     []string{"unequip", "unwield"},
+		Handler:     g.handleRemove,
+		Description: "Take off equipped gear (by item or slot: weapon/armor/shield).",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "equipment",
+		Aliases:     []string{"eq", "worn"},
+		Handler:     g.handleEquipment,
+		Description: "Show what you have equipped.",
+	})
+	g.RegisterCommand(&Command{
 		Name:        "eat",
 		Aliases:     []string{"drink", "quaff", "consume", "use"},
 		Handler:     g.handleConsume,
