@@ -21,6 +21,8 @@ type damageSpellSpec struct {
 	lifesteal      float64 // fraction of damage healed back to the caster (0 = none)
 	hitLine        string  // fmt args: targetName, damage
 	areaVerb       string  // fmt args: casterName, targetName
+	burnHP         int     // if >0, leaves a Burning DoT dealing this much HP per tick
+	burnTicks      int     // number of burn ticks (with burnHP > 0)
 }
 
 // makeDamageSpell builds a SpellHandler for a damage spell from its spec.
@@ -83,6 +85,25 @@ func (g *Game) castDamageSpell(caster *components.Player, args []string, spec da
 
 	caster.Broadcast(fmt.Sprintf(spec.hitLine, targetNPC.Name, dealt))
 	caster.Area.Broadcast(fmt.Sprintf(spec.areaVerb, caster.Name, targetNPC.Name), caster)
+
+	// Fire spells leave the target Burning (a DoT) if it survived the hit.
+	if spec.burnHP > 0 && spec.burnTicks > 0 {
+		if hp, e := ecs.GetTypedComponent[*components.Health](g.world, targetID, "Health"); e == nil && hp != nil && hp.Current > 0 {
+			if se, e2 := g.getOrCreateStatusEffects(targetID); e2 == nil && se != nil {
+				const burnInterval = 2 * time.Second
+				se.AddEffect(components.StatusEffect{
+					Type:           components.StatusEffectBurning,
+					Name:           "Burning",
+					AppliedAt:      time.Now(),
+					Duration:       time.Duration(spec.burnTicks) * burnInterval,
+					TickHP:         -spec.burnHP,
+					TickInterval:   burnInterval,
+					SourceEntityID: casterID,
+				})
+				caster.Broadcast(fmt.Sprintf("%s is wreathed in clinging flames.", targetNPC.Name))
+			}
+		}
+	}
 
 	// Life-drain spells heal the caster for a fraction of the damage dealt.
 	if spec.lifesteal > 0 && dealt > 0 {
@@ -325,6 +346,11 @@ func registerPyromancy() {
 	}
 	for _, s := range ladder {
 		spec := damageSpellSpec{minDmg: s.minDmg, maxDmg: s.maxDmg, scaleStat: components.INT, hitLine: s.hitLine, areaVerb: s.areaVerb}
+		// Firebolt and up leave a lingering burn scaled to the spell's power.
+		if s.minLevel >= 3 {
+			spec.burnHP = s.minDmg / 5
+			spec.burnTicks = 3
+		}
 		registerSpell(&SpellDefinition{
 			Name:        s.name,
 			Aliases:     s.aliases,

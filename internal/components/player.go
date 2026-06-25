@@ -20,7 +20,8 @@ type charVitals struct {
 	XP      int            `json:"xp"`
 	ReqXP   int            `json:"req_xp"`
 	Area    string         `json:"area"`
-	Effects []string       `json:"effects,omitempty"`
+	Effects []string       `json:"effects,omitempty"` // names only (legacy)
+	Fx      []EffectView   `json:"fx,omitempty"`      // structured: kind + remaining + magnitude
 	Mount   string         `json:"mount,omitempty"`
 	Stats   map[string]int `json:"stats,omitempty"`
 	Race    string         `json:"race,omitempty"`
@@ -72,9 +73,11 @@ func (p *Player) BroadcastState(w WorldLike, entityID common.EntityID) {
 	statusEffects, _ := w.GetComponent(entityID, "StatusEffects")
 	hpBonus := 0
 	var effectNames []string
+	var fx []EffectView
 	if statusEffects != nil {
 		se := statusEffects.(*StatusEffects)
 		hpBonus = se.GetTotalHPBonus()
+		fx = se.Snapshot()
 		se.RLock()
 		for _, effect := range se.Effects {
 			effectNames = append(effectNames, effect.Name)
@@ -129,7 +132,7 @@ func (p *Player) BroadcastState(w WorldLike, entityID common.EntityID) {
 	// Authoritative status push for event-aware clients (replaces STATE|).
 	vitals := charVitals{
 		Type: "char.vitals", HP: h.Current, MaxHP: h.Max + hpBonus, EP: ep, MaxEP: maxEP, Level: level,
-		XP: currentXP, ReqXP: requiredXP, Area: areaTitle, Effects: effectNames, Mount: mountName,
+		XP: currentXP, ReqXP: requiredXP, Area: areaTitle, Effects: effectNames, Fx: fx, Mount: mountName,
 		Stats: statsMap, Race: raceName,
 	}
 	if data, err := json.Marshal(vitals); err == nil {
