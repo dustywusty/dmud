@@ -37,6 +37,26 @@ dev-redis: prep
 run: build
 	./$(BINARY_PATH)$(BINARY_NAME)
 
+## client: Build and run the terminal client (WebSocket localhost:8080; pass ARGS="-tcp")
+client: prep
+	$(GO) build -o $(BINARY_PATH)dmud-client ./cmd/client
+	./$(BINARY_PATH)dmud-client $(ARGS)
+
+## client-build: Compile the terminal client to bin/dmud-client
+client-build: prep
+	$(GO) build -o $(BINARY_PATH)dmud-client -v ./cmd/client
+
+## web: Serve the static web client at http://localhost:8090 (server must run on :8080)
+web:
+	@echo "Open http://localhost:8090/?ws=ws://localhost:8080/ws"
+	@python3 -m http.server 8090 -d web
+
+## webtty: Run the real TUI client in a browser via a PTY→xterm.js bridge (http://localhost:8091; server on :8080)
+webtty: prep client-build
+	$(GO) build -o $(BINARY_PATH)webtty ./cmd/webtty
+	@echo "Open http://localhost:8091  (local/dev only — see cmd/webtty/main.go)"
+	./$(BINARY_PATH)webtty -listen :8091 -client $(BINARY_PATH)dmud-client -mud localhost:8080
+
 ## watch: Hot-reload dev server (alias for dev)
 watch: dev
 
@@ -105,6 +125,6 @@ dc-logs:
 help:
 	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/^## //' | column -t -s ':'
 
-.PHONY: default setup prep build dev dev-persist dev-redis run watch test test-race vet race clean connect \
+.PHONY: default setup prep build client client-build web dev dev-persist dev-redis run watch test test-race vet race clean connect \
 	docker-build docker-run docker-stop docker-clean \
 	dc-up dc-down dc-logs help
