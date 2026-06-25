@@ -20,13 +20,20 @@ prep:
 build: prep
 	$(GO) build -o $(BINARY_PATH)$(BINARY_NAME) -v ./cmd/dmud
 
-## dev: Start dev server with hot reload (no persistence)
-dev: prep
-	@$(AIR) -c .air.toml
+## docs: Regenerate docs/ from the content registries (spells, races, classes, …)
+docs:
+	$(GO) run ./cmd/gendocs
 
-## dev-persist: Start dev server with file persistence (data saved to data/)
-dev-persist: prep
-	DMUD_PERSISTENCE=file DMUD_LOG_LEVEL=debug $(AIR) -c .air.toml
+## dev: Start dev server with hot reload + file persistence (saves to data/)
+dev: prep
+	@DMUD_PERSISTENCE=file $(AIR) -c .air.toml
+
+## dev-persist: Alias for `make dev` (file persistence); kept for muscle memory
+dev-persist: dev
+
+## dev-nopersist: Start dev server with hot reload and NO persistence
+dev-nopersist: prep
+	@DMUD_PERSISTENCE=none $(AIR) -c .air.toml
 
 ## dev-redis: Start Redis via Docker Compose, then dev server connected to it
 dev-redis: prep
@@ -105,6 +112,6 @@ dc-logs:
 help:
 	@grep -E '^## ' $(MAKEFILE_LIST) | sed 's/^## //' | column -t -s ':'
 
-.PHONY: default setup prep build dev dev-persist dev-redis run watch test test-race vet race clean connect \
+.PHONY: default setup prep build dev dev-persist dev-nopersist dev-redis run watch test test-race vet race clean connect \
 	docker-build docker-run docker-stop docker-clean \
 	dc-up dc-down dc-logs help

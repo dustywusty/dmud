@@ -5,6 +5,7 @@ import (
 	"dmud/internal/components"
 	"dmud/internal/ecs"
 	"dmud/internal/util"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"time"
@@ -325,6 +326,9 @@ func spawnCorpse(w components.WorldLike, victimName string, victimID common.Enti
 	// Create and add corpse component with inventory
 	corpse := components.NewCorpse(victimName, victimID, wasPlayer, area, inventory)
 	w.AddComponentToEntity(corpseEntity, corpse)
+	if area != nil {
+		area.MarkDirty()
+	}
 
 	log.Debug().Msgf("Spawned corpse of %s (entity: %s) at area (%d,%d,%d)",
 		victimName, corpseEntity.GetID(), area.X, area.Y, area.Z)
@@ -346,6 +350,16 @@ func performAttack(w *ecs.World, attackerID common.EntityID, attackerPlayer, tar
 			scaling := components.GetLevelScaling(level)
 			damage = int(float64(baseDamage) * scaling)
 		}
+		if stats, err := ecs.GetTypedComponent[*components.Stats](w, attackerID, "Stats"); err == nil && stats != nil {
+			damage = int(float64(damage) * stats.MeleeFactor()) // Strength hits harder
+		}
+	}
+
+	// NPCs are statted too: a brawny ogre hits harder than its base damage.
+	if attackerNPC != nil {
+		if stats, err := ecs.GetTypedComponent[*components.Stats](w, attackerID, "Stats"); err == nil && stats != nil {
+			damage = int(float64(damage) * stats.MeleeFactor())
+		}
 	}
 
 	targetHealth.Current -= damage
@@ -353,13 +367,72 @@ func performAttack(w *ecs.World, attackerID common.EntityID, attackerPlayer, tar
 	// Send appropriate messages based on entity types
 	if attackerPlayer != nil {
 		attackerPlayer.Broadcast(util.TagMessage("DMG", fmt.Sprintf("You attacked %s for %d damage!", targetName, damage)))
+		emitCombatEvent(attackerPlayer, targetName, damage, targetHealth)
+		if stats, err := ecs.GetTypedComponent[*components.Stats](w, attackerID, "Stats"); err == nil {
+			components.TrainStat(attackerPlayer, stats, components.STR) // swinging trains Strength
+		}
 	}
 
 	if targetPlayer != nil {
 		targetPlayer.Broadcast(util.TagMessage("DMG", fmt.Sprintf("%s attacked you for %d damage!", attackerName, damage)))
+		if stats, err := ecs.GetTypedComponent[*components.Stats](w, combat.TargetID, "Stats"); err == nil {
+			components.TrainStat(targetPlayer, stats, components.CON) // taking hits trains Constitution
+		}
 	}
 
 	log.Trace().Msg(fmt.Sprintf("%s attacked %s for %d damage!", attackerName, targetName, damage))
+}
+
+// emitCombatEvent sends the structured combat event to a player attacker so the
+// client can draw the target's HP bar. Shared by melee and spell damage.
+func emitCombatEvent(attacker *components.Player, targetName string, damage int, targetHealth *components.Health) {
+	if attacker == nil {
+		return
+	}
+	hp := targetHealth.Current
+	if hp < 0 {
+		hp = 0
+	}
+	ev, _ := json.Marshal(struct {
+		Type      string `json:"type"`
+		Target    string `json:"target"`
+		Damage    int    `json:"damage"`
+		TargetHP  int    `json:"target_hp"`
+		TargetMax int    `json:"target_max"`
+		Killed    bool   `json:"killed"`
+	}{"combat", targetName, damage, hp, targetHealth.Max, targetHealth.Current <= 0})
+	attacker.Broadcast(util.TagMessage("EVENT", string(ev)))
+}
+
+// ApplyPlayerSpellDamage deals direct (non-melee) damage from a player caster to
+// a target NPC: it lowers the target's health, emits the combat event so the
+// client's enemy HP bar updates, and on a lethal hit runs the normal death flow
+// (XP, level-up, corpse, removal). Returns the damage dealt and whether the
+// target was slain. It is a no-op (0, false) if the target lacks Health/NPC.
+func ApplyPlayerSpellDamage(w *ecs.World, casterID, targetID common.EntityID, amount int) (int, bool) {
+	targetNPC, err := getNPCComponent(w, targetID)
+	if err != nil || targetNPC == nil {
+		return 0, false
+	}
+	targetHealth, err := getHealthComponent(w, targetID)
+	if err != nil {
+		return 0, false
+	}
+	if amount < 0 {
+		amount = 0
+	}
+
+	caster, _ := getPlayerComponent(w, casterID)
+
+	targetHealth.Current -= amount
+	killed := targetHealth.Current <= 0
+
+	emitCombatEvent(caster, targetNPC.Name, amount, targetHealth)
+
+	if killed {
+		handleTargetDeath(w.AsWorldLike(), casterID, targetID, caster, nil, nil, targetNPC)
+	}
+	return amount, killed
 }
 
 func broadcastStateToPlayer(w *ecs.World, entityID common.EntityID) {

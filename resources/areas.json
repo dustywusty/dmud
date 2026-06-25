@@ -4,7 +4,7 @@
         "region": "Whispering Woods",
         "exits": {
             "north": "2",
-            "east": "7",
+            "east": "306",
             "south": "100",
             "west": "101"
         },
@@ -16,7 +16,8 @@
         "exits": {
             "north": "3",
             "south": "1",
-            "east": "4"
+            "east": "4",
+            "west": "202"
         },
         "description": "TWISTED FOREST EDGE\n\nThe path leads to the threshold of a dense forest. Trees stand unnaturally twisted, their branches reaching down like grasping hands. A sickly green phosphorescence emanates from fungi growing on rotting logs. The undergrowth rustles with unseen movements."
     },
@@ -60,7 +61,7 @@
         "id": "7",
         "region": "Forsaken Keep",
         "exits": {
-            "west": "1",
+            "west": "306",
             "east": "8",
             "south": "11"
         },
@@ -150,7 +151,8 @@
         "id": "100",
         "region": "Whispering Woods",
         "exits": {
-            "north": "1"
+            "north": "1",
+            "south": "305"
         },
         "description": "ABANDONED CHICKEN FARM - WEST FIELD\n\nA dilapidated wooden fence surrounds this overgrown field. Feathers drift lazily across the patchy grass. A weather-beaten coop leans precariously to one side, its door hanging open. Chickens wander about freely, pecking at the ground without a care in the world. The distant sound of clucking fills the air."
     },
@@ -161,5 +163,129 @@
             "east": "1"
         },
         "description": "ABANDONED CHICKEN FARM - EAST FIELD\n\nThis neglected farmyard is overrun with chickens. Broken feeding troughs lie scattered about, and a collapsed barn provides some shelter from the elements. The chickens seem to have multiplied unchecked, forming small flocks that roam the area. Feathers and droppings cover everything."
+    },
+    {
+        "id": "200",
+        "region": "Cinderhollow",
+        "exits": {
+            "east": "202",
+            "west": "201"
+        },
+        "description": "THE CINDERHOLLOW BAKEHOUSE\n\nA crooked little bakehouse leans cozily into the woods, its chimney breathing out the smell of butter, sugar, and warm cinnamon. Flour dusts every surface, copper bowls hang from the rafters, and a wide windowsill has been propped open to the cool air, where fresh-baked cookies are set out to cool. A hand-painted sign reads: 'Help yourself to a cookie -- and if you see Wylie down by the river, they do so love a treat.' A grassy lane winds west toward the sound of running water."
+    },
+    {
+        "id": "201",
+        "region": "Cinderhollow",
+        "exits": {
+            "east": "200"
+        },
+        "description": "WYLIE'S RIVERSIDE PADDOCK\n\nThe trees open onto a sun-dappled meadow where a clear stream chuckles over smooth stones. A split-rail paddock fences in a stretch of green where horses graze and swish their tails, dozing in the warmth. Strings of violet fairy-lights and hand-stitched felt bats are looped along the fence rails, and a battered purple caravan sits in the shade -- unmistakably Wylie's. The air smells of clean straw, wildflowers, and just a little of cinnamon. A lane leads back east toward a warm, sugary smell."
+    },
+    {
+        "id": "202",
+        "region": "Cinderhollow",
+        "exits": {
+            "east": "2",
+            "west": "200"
+        },
+        "description": "MISTWOOD PATH\n\nThe forest thins into a low, mist-pooled hollow where the trees lean close like gossiping crones. Toadstools glow a soft violet along the trail's edge, and a faint dusting of flour -- with the distant smell of cinnamon -- drifts from somewhere further west. Whatever lives out this way, the woods feel gentler here, almost welcoming."
+    },
+    {
+        "id": "300",
+        "region": "Ravenmoor",
+        "exits": {
+            "north": "303",
+            "east": "301",
+            "west": "302",
+            "down": "310"
+        },
+        "description": "RAVENMOOR -- TOWN SQUARE\n\nA cobbled square ringed by leaning timber-framed houses, their windows glowing warm against the gloom of the surrounding wilds. A cracked stone fountain gurgles at the center, and a weathered notice-board flutters with bounties and lost-cat posters. This is the last truly safe place for miles -- travelers gather to rest, trade, and steel themselves before heading out into the blighted lands. A rusted iron grate in one corner breathes a dank draft from the tunnels below."
+    },
+    {
+        "id": "301",
+        "region": "Ravenmoor",
+        "exits": {
+            "west": "300"
+        },
+        "description": "RAVENMOOR -- MARKET ROW\n\nA narrow street crammed with awnings, barrows, and the cheerful haggling of merchants. Strings of dried herbs and tin charms sway overhead, and the air is thick with the smell of roasting nuts and tallow. Whatever you need for the road ahead, someone here will sell it to you -- at a price."
+    },
+    {
+        "id": "302",
+        "region": "Ravenmoor",
+        "exits": {
+            "east": "300"
+        },
+        "description": "THE GILDED LANTERN\n\nThe town's tavern is all low beams, spilled ale, and firelight. Mismatched stools crowd around scarred tables, and a great hearth throws dancing shadows across the walls. A hand-chalked board promises 'STEW - 2 COIN' and, beneath it, 'NO TROUBLE.' It is warm, loud, and blessedly free of anything trying to eat you."
+    },
+    {
+        "id": "303",
+        "region": "Ravenmoor",
+        "exits": {
+            "south": "300",
+            "north": "304"
+        },
+        "description": "RAVENMOOR -- NORTH GATE\n\nThe town's northern gate stands open beneath a heavy stone arch, its portcullis raised but ready to drop. A guard's brazier crackles against the chill. Beyond the wall, a rutted road runs off into pale farmland and, further still, into the dark line of the woods. A sign warns: 'BEYOND THIS GATE, YOU ARE ON YOUR OWN.'"
+    },
+    {
+        "id": "304",
+        "region": "Ravenmoor",
+        "exits": {
+            "south": "303",
+            "north": "305"
+        },
+        "description": "THE FARM ROAD\n\nA rutted dirt road winds north between dry-stone walls and fallow fields. Crows watch from a leaning scarecrow, and the town's chimney-smoke is a thin grey smudge to the south. Ahead, the cultivated land gives way to wilder, weedier country."
+    },
+    {
+        "id": "305",
+        "region": "Ravenmoor",
+        "exits": {
+            "south": "304",
+            "north": "100"
+        },
+        "description": "OUTLYING FARMSTEAD\n\nThe last farm before the wilds: a sagging barn, an empty pig-pen, and rows of vegetables long gone to seed. Feathers drift on the wind from the abandoned coops to the north, and the comforting bustle of town has faded to nothing behind you. Whatever tends these fields hasn't been seen in some time."
+    },
+    {
+        "id": "306",
+        "region": "Forsaken Keep",
+        "exits": {
+            "west": "1",
+            "east": "7"
+        },
+        "description": "THE OLD KINGSROAD\n\nA broad, broken road of weathered flagstones runs east to west, choked with weeds and toppled masonry. Cracked milestones still point the way to a kingdom that no longer exists. To the west lies the misty crossroads; to the east, the shattered silhouette of a great fortress claws at the sky."
+    },
+    {
+        "id": "310",
+        "region": "Ravenmoor Sewers",
+        "exits": {
+            "up": "300",
+            "north": "311"
+        },
+        "description": "RAVENMOOR SEWERS -- THE GRATE\n\nA slick stone stair descends from the town square into the reeking dark. Water trickles down the walls and pools underfoot, and the air hangs thick with damp rot. A faint, many-legged skittering echoes from the tunnels ahead. The pale light from the grate above is the only comfort here."
+    },
+    {
+        "id": "311",
+        "region": "Ravenmoor Sewers",
+        "exits": {
+            "south": "310",
+            "east": "312"
+        },
+        "description": "RAVENMOOR SEWERS -- DRIPPING TUNNEL\n\nA low, vaulted tunnel runs with foul water that laps at a narrow brick ledge. Pale fungus clings to the walls, and the steady drip... drip... drip is broken only by the squeak and scrabble of rats. Lots of rats."
+    },
+    {
+        "id": "312",
+        "region": "Ravenmoor Sewers",
+        "exits": {
+            "west": "311",
+            "north": "313"
+        },
+        "description": "RAVENMOOR SEWERS -- VERMINOUS CHANNEL\n\nThe tunnel widens into a junction of sludge-choked channels. Bones -- some of them disconcertingly large -- have collected against an old iron sluice-gate. The rats here are bolder, and bigger, and they do not scatter when you approach."
+    },
+    {
+        "id": "313",
+        "region": "Ravenmoor Sewers",
+        "exits": {
+            "south": "312"
+        },
+        "description": "RAVENMOOR SEWERS -- FLOODED CISTERN\n\nThe channels empty into a vast, flooded cistern, its black water still as glass and its ceiling lost in darkness. A crumbling walkway rings the edge, thick with nests of shredded rag and bone. Whatever the rats are so afraid of, it lives down here, somewhere in the deep water."
     }
 ]

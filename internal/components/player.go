@@ -3,10 +3,28 @@ package components
 import (
 	"dmud/internal/common"
 	"dmud/internal/util"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
 )
+
+// charVitals is the structured push that mirrors the STATE| frame.
+type charVitals struct {
+	Type    string         `json:"type"`
+	HP      int            `json:"hp"`
+	MaxHP   int            `json:"max_hp"`
+	EP      int            `json:"ep"`     // endurance (current)
+	MaxEP   int            `json:"max_ep"` // endurance (max)
+	Level   int            `json:"level"`
+	XP      int            `json:"xp"`
+	ReqXP   int            `json:"req_xp"`
+	Area    string         `json:"area"`
+	Effects []string       `json:"effects,omitempty"`
+	Mount   string         `json:"mount,omitempty"`
+	Stats   map[string]int `json:"stats,omitempty"`
+	Race    string         `json:"race,omitempty"`
+}
 
 type Player struct {
 	sync.RWMutex
@@ -18,11 +36,12 @@ type Player struct {
 	Name           string
 	IsAdmin        bool
 	EnteredWorld   bool
+	Created        bool // false = un-manifested "ghost" still in character creation
 }
 
 func (p *Player) Broadcast(msg string) {
 	if !p.Client.SupportsTags() {
-		if util.IsStateMessage(msg) {
+		if util.IsStateMessage(msg) || util.IsIdentityMessage(msg) || util.IsEventMessage(msg) {
 			return
 		}
 		msg = util.StripTag(msg)
@@ -52,41 +71,102 @@ func (p *Player) BroadcastState(w WorldLike, entityID common.EntityID) {
 
 	statusEffects, _ := w.GetComponent(entityID, "StatusEffects")
 	hpBonus := 0
-	var effectsStr string
+	var effectNames []string
 	if statusEffects != nil {
 		se := statusEffects.(*StatusEffects)
 		hpBonus = se.GetTotalHPBonus()
 		se.RLock()
-		for i, effect := range se.Effects {
-			if i > 0 {
-				effectsStr += ","
-			}
-			effectsStr += fmt.Sprintf("%s:%d", effect.Name, effect.HPBonus)
+		for _, effect := range se.Effects {
+			effectNames = append(effectNames, effect.Name)
 		}
 		se.RUnlock()
 	}
 
-	areaName := "Unknown"
-	if p.Area != nil {
-		areaName = strings.TrimSpace(p.Area.Description)
-		if len(areaName) > 50 {
-			areaName = areaName[:50] + "..."
+	// Constitution raises the effective HP ceiling (same path as status bonuses),
+	// and the raw stats ride along so the client can show them.
+	var statsMap map[string]int
+	var raceName string
+	if statsComp, err := w.GetComponent(entityID, "Stats"); err == nil {
+		if st, ok := statsComp.(*Stats); ok {
+			hpBonus += st.HPBonus()
+			raceName = st.Race
+			statsMap = make(map[string]int, numStats)
+			for _, t := range AllStats() {
+				statsMap[StatAbbrev(t)] = st.Get(t)
+			}
 		}
 	}
 
-	currentHP := h.Current
-	maxHP := h.Max + hpBonus
-
-	stateMsg := fmt.Sprintf("STATE|HP:%d/%d|LEVEL:%d|XP:%d/%d|AREA:%s", currentHP, maxHP, level, currentXP, requiredXP, areaName)
-	if effectsStr != "" {
-		stateMsg += "|EFFECTS:" + effectsStr
+	// A beast form shows up as an effect tag (e.g. "Bear Form").
+	if shComp, err := w.GetComponent(entityID, "Shift"); err == nil {
+		if sh, ok := shComp.(*Shift); ok && sh.Form != "" {
+			if form, ok := FormFor(sh.Form); ok {
+				effectNames = append(effectNames, form.Label+" Form")
+			}
+		}
 	}
-	// log.Debug().Msgf("Broadcasting state for %s: %s", p.Name, stateMsg)
-	p.Broadcast(stateMsg)
+
+	ep, maxEP := 0, 0
+	if endComp, err := w.GetComponent(entityID, "Endurance"); err == nil {
+		if end, ok := endComp.(*Endurance); ok {
+			end.Regen()
+			ep, maxEP = end.Current, end.Max
+		}
+	}
+
+	areaTitle := "Unknown"
+	if p.Area != nil {
+		areaTitle = strings.TrimSpace(strings.SplitN(p.Area.Description, "\n", 2)[0])
+	}
+
+	var mountName string
+	if mountComp, err := w.GetComponent(entityID, "Mount"); err == nil {
+		if m, ok := mountComp.(*Mount); ok {
+			mountName = m.Name
+		}
+	}
+
+	// Authoritative status push for event-aware clients (replaces STATE|).
+	vitals := charVitals{
+		Type: "char.vitals", HP: h.Current, MaxHP: h.Max + hpBonus, EP: ep, MaxEP: maxEP, Level: level,
+		XP: currentXP, ReqXP: requiredXP, Area: areaTitle, Effects: effectNames, Mount: mountName,
+		Stats: statsMap, Race: raceName,
+	}
+	if data, err := json.Marshal(vitals); err == nil {
+		p.Broadcast(util.TagMessage("EVENT", string(data)))
+	}
 }
 
 func (p *Player) Look(w WorldLike) {
 	p.Broadcast(p.DescribeArea(w))
+	p.BroadcastRoomInfo()
+}
+
+// roomInfoEvent is the structured room header: name, exits, region.
+type roomInfoEvent struct {
+	Type   string   `json:"type"`
+	Name   string   `json:"name"`
+	Exits  []string `json:"exits"`
+	Region string   `json:"region,omitempty"`
+}
+
+// BroadcastRoomInfo pushes the current room's name/exits/region so event-aware
+// clients can drive the map and exit list authoritatively (not by scraping text).
+func (p *Player) BroadcastRoomInfo() {
+	if p.Area == nil {
+		return
+	}
+	ev := roomInfoEvent{
+		Type:   "room.info",
+		Name:   strings.TrimSpace(strings.SplitN(p.Area.Description, "\n", 2)[0]),
+		Region: p.Area.Region,
+	}
+	for _, e := range p.Area.Exits {
+		ev.Exits = append(ev.Exits, e.Direction)
+	}
+	if data, err := json.Marshal(ev); err == nil {
+		p.Broadcast(util.TagMessage("EVENT", string(data)))
+	}
 }
 
 // DescribeArea returns information about the player's current area, including

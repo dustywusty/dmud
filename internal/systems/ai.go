@@ -183,6 +183,8 @@ func (as *AISystem) attemptWander(_ *ecs.World, _ ecs.Entity, npc *components.NP
 	npc.LastMovement = time.Now()
 
 	destination.Broadcast(util.TagMessage("STATUS", name+" wanders in."))
+	currentArea.MarkDirty()
+	destination.MarkDirty()
 }
 
 func regionExits(area *components.Area) []components.Exit {

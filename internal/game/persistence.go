@@ -10,7 +10,9 @@ import (
 	"dmud/internal/components"
 	"dmud/internal/ecs"
 	"dmud/internal/persistence"
+	"dmud/internal/util"
 
+	"github.com/google/uuid"
 	"github.com/rs/zerolog/log"
 )
 
@@ -143,6 +145,7 @@ func (g *Game) buildPlayerState(entityID common.EntityID, player *components.Pla
 		Version:   playerStateVersion,
 		Name:      player.Name,
 		AreaID:    g.getAreaID(player.Area),
+		Created:   player.Created,
 		UpdatedAt: time.Now().UTC(),
 	}
 
@@ -173,6 +176,17 @@ func (g *Game) buildPlayerState(entityID common.EntityID, player *components.Pla
 		}
 	}
 
+	if statsComp, err := g.world.GetComponent(entityID, "Stats"); err == nil {
+		if stats, ok := statsComp.(*components.Stats); ok {
+			state.Stats = make(map[string]int, len(components.AllStats()))
+			for _, t := range components.AllStats() {
+				state.Stats[components.StatAbbrev(t)] = stats.Get(t)
+			}
+			state.Race = stats.Race
+			state.Class = stats.Class
+		}
+	}
+
 	if questsComp, err := g.world.GetComponent(entityID, "PlayerQuests"); err == nil {
 		if quests, ok := questsComp.(*components.PlayerQuests); ok {
 			quests.RLock()
@@ -184,6 +198,14 @@ func (g *Game) buildPlayerState(entityID common.EntityID, player *components.Pla
 				state.Quests[questID] = persistence.QuestStatusRecord{Status: quest.Status}
 			}
 			quests.RUnlock()
+		}
+	}
+
+	if factionsComp, err := g.world.GetComponent(entityID, "Factions"); err == nil {
+		if factions, ok := factionsComp.(*components.Factions); ok {
+			if snapshot := factions.Snapshot(); len(snapshot) > 0 {
+				state.Factions = snapshot
+			}
 		}
 	}
 
@@ -215,6 +237,10 @@ func (g *Game) applyPlayerState(entityID common.EntityID, player *components.Pla
 	if state == nil || player == nil {
 		return
 	}
+
+	// Manifested if explicitly created, or (migration for saves predating the
+	// flag) if the character has clearly been played already.
+	player.Created = state.Created || state.Class != "" || state.Experience.Level > 1
 
 	if state.Health.Max > 0 {
 		if healthComp, err := g.world.GetComponent(entityID, "Health"); err == nil {
@@ -252,6 +278,23 @@ func (g *Game) applyPlayerState(entityID common.EntityID, player *components.Pla
 		}
 	}
 
+	if len(state.Stats) > 0 || state.Race != "" {
+		if statsComp, err := g.world.GetComponent(entityID, "Stats"); err == nil {
+			if stats, ok := statsComp.(*components.Stats); ok {
+				// Re-seed race (sets name + size), then overlay the trained values.
+				if state.Race != "" {
+					*stats = *components.NewStatsForRace(state.Race)
+				}
+				for _, t := range components.AllStats() {
+					if v, present := state.Stats[components.StatAbbrev(t)]; present {
+						stats.Set(t, v)
+					}
+				}
+				stats.Class = state.Class
+			}
+		}
+	}
+
 	if questsComp, err := g.world.GetComponent(entityID, "PlayerQuests"); err == nil {
 		if quests, ok := questsComp.(*components.PlayerQuests); ok {
 			quests.Lock()
@@ -263,6 +306,16 @@ func (g *Game) applyPlayerState(entityID common.EntityID, player *components.Pla
 				}
 			}
 			quests.Unlock()
+		}
+	}
+
+	if len(state.Factions) > 0 {
+		if factionsComp, err := g.world.GetComponent(entityID, "Factions"); err == nil {
+			if factions, ok := factionsComp.(*components.Factions); ok {
+				for factionID, points := range state.Factions {
+					factions.Set(factionID, points)
+				}
+			}
 		}
 	}
 
@@ -703,6 +756,46 @@ func (g *Game) persistenceDisabledMessage() string {
 		return fmt.Sprintf("Persistence unavailable: %v", g.persistenceErr)
 	}
 	return "Persistence is not configured."
+}
+
+// ensureIdentity guarantees a persistence-enabled session has a saved login id,
+// minting and persisting one on first use, then announces it to the client so it
+// can be stored and replayed via `login <id>` on reconnect. This is what makes
+// characters persist automatically, without the player having to run `save`. It
+// is a no-op when persistence is disabled; returns the active id ("" if off).
+func (g *Game) ensureIdentity(player *components.Player) string {
+	if player == nil || player.Client == nil || !g.persistenceEnabled() {
+		return ""
+	}
+
+	key := g.clientPersistenceKey(player.Client)
+	if key == "" {
+		key = uuid.New().String()
+		g.setClientPersistenceKey(player.Client, key)
+
+		if entityID, err := g.getPlayerEntity(player); err == nil {
+			if entity, err := g.world.FindEntity(entityID); err == nil {
+				player.Lock()
+				player.IsAdmin = g.resolveAdminStatus(key)
+				player.Unlock()
+				// Persist right away so even an instant disconnect is remembered.
+				_ = g.savePlayerState(key, &entity, player)
+			}
+		}
+		log.Info().Msgf("Assigned persistence id to %s", player.Name)
+	}
+
+	g.announceIdentity(player, key)
+	return key
+}
+
+// announceIdentity sends the client its login id as an IDENTITY| protocol frame
+// (hidden from legacy clients). The web client persists this and replays it.
+func (g *Game) announceIdentity(player *components.Player, key string) {
+	if player == nil || key == "" {
+		return
+	}
+	player.Broadcast(util.IdentityMessage(key))
 }
 
 func (g *Game) rebuildSpawnTracking() {

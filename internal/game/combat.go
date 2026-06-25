@@ -64,11 +64,12 @@ func (g *Game) HandleKillAll(player *components.Player) {
 	}
 
 	// Set player to attack the first target, queue the rest
+	minD, maxD := g.playerMeleeDamage(player)
 	combatComponent := &components.Combat{
 		TargetID:    targetEntityIDs[0],
 		TargetQueue: targetEntityIDs[1:], // Queue up the rest
-		MinDamage:   10,
-		MaxDamage:   50,
+		MinDamage:   minD,
+		MaxDamage:   maxD,
 	}
 	g.world.AddComponent(playerEntity, combatComponent)
 
@@ -131,10 +132,11 @@ func (g *Game) HandleKill(player *components.Player, targetName string) {
 		// However, the combat component needs IDs.
 		// We can refactor the construction of the Combat component to use the IDs directly.
 
+		minD, maxD := g.playerMeleeDamage(player)
 		combatComponent := &components.Combat{
 			TargetID:  targetEntityIDs[0],
-			MinDamage: 10,
-			MaxDamage: 50,
+			MinDamage: minD,
+			MaxDamage: maxD,
 		}
 
 		if len(targetEntityIDs) > 1 {
@@ -170,10 +172,11 @@ func (g *Game) HandleKill(player *components.Player, targetName string) {
 		return
 	}
 
+	minD, maxD := g.playerMeleeDamage(player)
 	combatComponent := &components.Combat{
 		TargetID:  targetEntity.ID,
-		MinDamage: 10,
-		MaxDamage: 50,
+		MinDamage: minD,
+		MaxDamage: maxD,
 	}
 
 	g.world.AddComponent(playerEntity, combatComponent)

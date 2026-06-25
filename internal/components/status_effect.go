@@ -12,6 +12,7 @@ const (
 	StatusEffectGuardBlessing StatusEffectType = iota
 	StatusEffectControlledUndead
 	StatusEffectCharmed
+	StatusEffectBlessed
 )
 
 type StatusEffect struct {
@@ -138,6 +139,24 @@ func (se *StatusEffects) HasSuppressedRetaliation() bool {
 		}
 	}
 
+	return false
+}
+
+// ControlledBy reports whether this creature is under an active charm or control
+// effect cast by the given master entity — i.e. it should follow that master
+// around. Expired effects and effects from other casters don't count.
+func (se *StatusEffects) ControlledBy(master common.EntityID) bool {
+	se.RLock()
+	defer se.RUnlock()
+
+	for _, effect := range se.Effects {
+		if se.isExpired(effect) || effect.SourceEntityID != master {
+			continue
+		}
+		if effect.Type == StatusEffectCharmed || effect.Type == StatusEffectControlledUndead {
+			return true
+		}
+	}
 	return false
 }
 

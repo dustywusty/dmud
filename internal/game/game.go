@@ -85,7 +85,7 @@ func NewGame() *Game {
 	world.AddSystem(corpseSystem)
 	world.AddSystem(statusEffectSystem)
 
-	defaultAreaUntyped, err := world.GetComponent("1", "Area")
+	defaultAreaUntyped, err := world.GetComponent("300", "Area")
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to get default area")
 	}
@@ -141,6 +141,7 @@ func NewGame() *Game {
 }
 
 type spawnConfigJSON struct {
+	Type               string  `json:"type,omitempty"` // "npc" (default) or "item"
 	TemplateID         string  `json:"template_id"`
 	MinCount           int     `json:"min_count"`
 	MaxCount           int     `json:"max_count"`
@@ -164,8 +165,12 @@ func (g *Game) initializeSpawns() {
 	for _, areaSpawn := range areaSpawns {
 		var configs []components.SpawnConfig
 		for _, s := range areaSpawn.Spawns {
+			spawnType := components.SpawnTypeNPC
+			if strings.EqualFold(s.Type, "item") {
+				spawnType = components.SpawnTypeItem
+			}
 			configs = append(configs, components.SpawnConfig{
-				Type:        components.SpawnTypeNPC,
+				Type:        spawnType,
 				TemplateID:  s.TemplateID,
 				MinCount:    s.MinCount,
 				MaxCount:    s.MaxCount,
@@ -234,6 +239,52 @@ func (g *Game) initCommands() {
 		Hidden:      true,
 	})
 	g.RegisterCommand(&Command{
+		Name:        "spawnitem",
+		Aliases:     []string{"giveitem"},
+		Handler:     g.handleSpawnItem,
+		Description: "Admin: put an item into your inventory (spawnitem <item_id> [qty]).",
+		Hidden:      true,
+	})
+	g.RegisterCommand(&Command{
+		Name:        "spells",
+		Aliases:     []string{"spellbook"},
+		Handler:     g.handleSpells,
+		Description: "List spells by school with their level requirements.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "stats",
+		Aliases:     []string{"score"},
+		Handler:     g.handleScore,
+		Description: "Show your attributes (STR/DEX/CON/INT/WIS) and their bonuses.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "race",
+		Handler:     g.handleRace,
+		Description: "Show or change your race (race <name> reforges your stats).",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "classes",
+		Handler:     g.handleClasses,
+		Description: "List the character classes, their schools, and their spells.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "class",
+		Handler:     g.handleClass,
+		Description: "Show or choose your class (class <name>): grants affinity, a macro loadout, and locks you to its schools.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "shift",
+		Aliases:     []string{"shapeshift"},
+		Handler:     g.handleShift,
+		Description: "Take a beast form for melee combat (shift <bear|wolf|panther>).",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "revert",
+		Aliases:     []string{"unshift"},
+		Handler:     g.handleRevert,
+		Description: "Return from a beast form to your own shape.",
+	})
+	g.RegisterCommand(&Command{
 		Name:        "recall",
 		Handler:     handleRecall,
 		Description: "Return to the starting area.",
@@ -247,6 +298,12 @@ func (g *Game) initCommands() {
 		Name:        "shout",
 		Handler:     handleShout,
 		Description: "Shout a message to nearby players.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "tell",
+		Aliases:     []string{"whisper", "t"},
+		Handler:     handleTell,
+		Description: "Send a private message to a player. Usage: tell <player> <message>",
 	})
 	g.RegisterCommand(&Command{
 		Name:        "kill",
@@ -322,6 +379,12 @@ func (g *Game) initCommands() {
 		Description: "Drop all items (optionally matching a pattern).",
 	})
 	g.RegisterCommand(&Command{
+		Name:        "eat",
+		Aliases:     []string{"drink", "quaff", "consume", "use"},
+		Handler:     g.handleConsume,
+		Description: "Eat or drink a consumable to restore endurance (and sometimes health).",
+	})
+	g.RegisterCommand(&Command{
 		Name:        "sacrifice",
 		Handler:     g.handleSacrifice,
 		Aliases:     []string{"sac"},
@@ -337,6 +400,45 @@ func (g *Game) initCommands() {
 		Name:        "hail",
 		Handler:     g.handleHail,
 		Description: "Hail an NPC to interact with them.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "give",
+		Handler:     g.handleGive,
+		Description: "Give an item to an NPC. Usage: give <item> [qty] to <npc>",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "buy",
+		Handler:     g.handleBuy,
+		Description: "Buy an item from a merchant. Usage: buy <item> [qty]",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "list",
+		Aliases:     []string{"wares", "shop"},
+		Handler:     g.handleList,
+		Description: "List a merchant's wares.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "faction",
+		Aliases:     []string{"standing", "rep"},
+		Handler:     g.handleFaction,
+		Description: "Show your faction standings.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "mount",
+		Handler:     g.handleMount,
+		Description: "Saddle a horse you own. Usage: mount [horse]",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "dismount",
+		Aliases:     []string{"unmount"},
+		Handler:     g.handleDismount,
+		Description: "Climb down from your horse.",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "ride",
+		Aliases:     []string{"gallop"},
+		Handler:     g.handleRide,
+		Description: "Mount a horse, or gallop several rooms. Usage: ride <horse> | ride <direction>",
 	})
 	g.RegisterCommand(&Command{
 		Name:        "uptime",
@@ -410,7 +512,11 @@ func (g *Game) handleCommand(c ClientCommand) {
 
 	cmd, exists := commandRegistry[cmdInput]
 	if exists {
-		cmd.Handler(player, cmdArgs, g)
+		if !player.Created && !ghostCommands[cmd.Name] {
+			player.Broadcast("You are but a formless spirit -- take shape first (choose a name, a race, and a class).")
+		} else {
+			cmd.Handler(player, cmdArgs, g)
+		}
 	} else {
 		player.Broadcast(fmt.Sprintf("What do you mean, \"%s\"?", cmdInput))
 	}
@@ -449,8 +555,11 @@ func (g *Game) HandleConnect(c common.Client) {
 	}
 	experienceComponent := components.NewExperience()
 	healthComponent := components.NewHealth(experienceComponent.Level)
+	enduranceComponent := components.NewEndurance(experienceComponent.Level)
+	statsComponent := components.NewStats()
 	inventoryComponent := components.NewInventory(0) // unlimited inventory
 	questsComponent := components.NewPlayerQuests()
+	factionsComponent := components.NewFactions()
 
 	playerEntity := ecs.NewEntity()
 	g.world.AddEntity(playerEntity)
@@ -458,16 +567,28 @@ func (g *Game) HandleConnect(c common.Client) {
 	g.world.AddComponent(&playerEntity, playerComponent)
 	g.world.AddComponent(&playerEntity, experienceComponent)
 	g.world.AddComponent(&playerEntity, healthComponent)
+	g.world.AddComponent(&playerEntity, enduranceComponent)
+	g.world.AddComponent(&playerEntity, statsComponent)
 	g.world.AddComponent(&playerEntity, inventoryComponent)
 	g.world.AddComponent(&playerEntity, questsComponent)
+	g.world.AddComponent(&playerEntity, factionsComponent)
 
 	if loadedState != nil {
 		g.applyPlayerState(playerEntity.ID, playerComponent, loadedState)
+	} else {
+		// Brand-new character: a small starter kit so the endurance/consumable
+		// loop is usable from the first minute (bread, a draught, a potion).
+		inventoryComponent.AddItem(components.CreateItem("bread", 2))
+		inventoryComponent.AddItem(components.CreateItem("stamina_draught", 1))
+		inventoryComponent.AddItem(components.CreateItem("healing_potion", 1))
 	}
 
 	g.playersMu.Lock()
 	g.players[playerComponent.Name] = &playerEntity
 	g.playersMu.Unlock()
+
+	// A character that hasn't manifested yet is a ghost in character creation.
+	g.ensureCreation(playerEntity.ID, playerComponent)
 
 	// Track connection stats
 	g.TotalConnectMu.Lock()
@@ -487,6 +608,9 @@ func (g *Game) HandleConnect(c common.Client) {
 		playerComponent.Broadcast(util.WelcomeBanner)
 		playerComponent.Look(g.world.AsWorldLike())
 		playerComponent.BroadcastState(g.world.AsWorldLike(), playerEntity.ID)
+		if !playerComponent.Created {
+			g.ghostIntro(playerComponent, playerEntity.ID)
+		}
 
 		g.Broadcast(fmt.Sprintf("%s has joined the game.", playerComponent.Name), c)
 
@@ -533,9 +657,16 @@ func (g *Game) enterWorld(c common.Client) {
 	player.Look(g.world.AsWorldLike())
 	if entityID, err := g.getPlayerEntity(player); err == nil {
 		player.BroadcastState(g.world.AsWorldLike(), entityID)
+		if !player.Created {
+			g.ghostIntro(player, entityID)
+		}
 	}
 
 	g.Broadcast(util.TagMessage("STATUS", fmt.Sprintf("%s has joined the game.", player.Name)), c)
+
+	// New web clients that didn't restore a character get an auto-assigned,
+	// auto-saved identity so their progress persists without a manual `save`.
+	g.ensureIdentity(player)
 }
 
 func (g *Game) HandleDisconnect(c common.Client) {
@@ -613,6 +744,8 @@ func (g *Game) loop() {
 	updateTicker := time.NewTicker(10 * time.Millisecond)
 	defer updateTicker.Stop()
 
+	var lastContentsFlush time.Time
+
 	for {
 		select {
 		case client := <-g.AddPlayerChan:
@@ -626,6 +759,37 @@ func (g *Game) loop() {
 		case <-updateTicker.C:
 			g.world.Update()
 			g.autosaveTick()
+			// Push room.contents for changed rooms a few times a second so
+			// clients keep a live "who/what is here" without anyone looking.
+			if time.Since(lastContentsFlush) >= 200*time.Millisecond {
+				g.flushAreaContents()
+				lastContentsFlush = time.Now()
+			}
+		}
+	}
+}
+
+// flushAreaContents broadcasts room.contents for every area whose contents
+// changed since the last flush.
+func (g *Game) flushAreaContents() {
+	areas, err := g.world.FindEntitiesByComponentPredicate("Area", func(i interface{}) bool {
+		return true
+	})
+	if err != nil {
+		return
+	}
+	w := g.world.AsWorldLike()
+	for _, entity := range areas {
+		areaComp, err := g.world.GetComponent(entity.ID, "Area")
+		if err != nil {
+			continue
+		}
+		area, ok := areaComp.(*components.Area)
+		if !ok || area == nil {
+			continue
+		}
+		if area.TakeDirty() {
+			area.BroadcastContents(w)
 		}
 	}
 }
