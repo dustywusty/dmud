@@ -539,7 +539,8 @@ func handleTime(player *components.Player, args []string, game *Game) {
 	mins := int(remaining.Minutes())
 	secs := int(remaining.Seconds()) % 60
 
-	player.Broadcast(fmt.Sprintf("Day %d - It is currently %s.", dc.DayNumber, dc.CurrentTime.String()))
+	phase := components.MoonPhaseForDay(dc.DayNumber)
+	player.Broadcast(fmt.Sprintf("Day %d - It is currently %s. The moon is a %s.", dc.DayNumber, dc.CurrentTime.String(), phase.String()))
 	player.Broadcast(dc.GetDescription())
 	player.Broadcast(fmt.Sprintf("Time until next period: %d minutes, %d seconds.", mins, secs))
 }

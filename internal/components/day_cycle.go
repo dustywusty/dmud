@@ -103,6 +103,82 @@ func (dc *DayCycle) IsDark() bool {
 	return dc.CurrentTime == Dusk || dc.CurrentTime == Night
 }
 
+// MoonPhase is the current phase of the moon, cycling once per lunarCycleDays.
+type MoonPhase int
+
+const (
+	NewMoon MoonPhase = iota
+	WaxingCrescent
+	FirstQuarter
+	WaxingGibbous
+	FullMoon
+	WaningGibbous
+	LastQuarter
+	WaningCrescent
+)
+
+const lunarCycleDays = 8
+
+func (p MoonPhase) String() string {
+	switch p {
+	case NewMoon:
+		return "new moon"
+	case WaxingCrescent:
+		return "waxing crescent"
+	case FirstQuarter:
+		return "first quarter"
+	case WaxingGibbous:
+		return "waxing gibbous"
+	case FullMoon:
+		return "full moon"
+	case WaningGibbous:
+		return "waning gibbous"
+	case LastQuarter:
+		return "last quarter"
+	case WaningCrescent:
+		return "waning crescent"
+	default:
+		return "moonless"
+	}
+}
+
+// MoonPhase derives the phase from the day count (an 8-day lunar month).
+func (dc *DayCycle) MoonPhase() MoonPhase {
+	dc.RLock()
+	defer dc.RUnlock()
+	return MoonPhaseForDay(dc.DayNumber)
+}
+
+func MoonPhaseForDay(day int) MoonPhase {
+	return MoonPhase(((day-1)%lunarCycleDays + lunarCycleDays) % lunarCycleDays)
+}
+
+// LunarPower is the multiplier moon magic gets from the sky: strongest at the
+// full moon, weakest at the new moon, with a small bonus while the moon is up
+// (dusk/night). 1.0 is the neutral baseline (quarter moon, daylight).
+func (dc *DayCycle) LunarPower() float64 {
+	dc.RLock()
+	defer dc.RUnlock()
+
+	mult := 1.0
+	switch MoonPhaseForDay(dc.DayNumber) {
+	case FullMoon:
+		mult = 1.5
+	case WaxingGibbous, WaningGibbous:
+		mult = 1.25
+	case FirstQuarter, LastQuarter:
+		mult = 1.0
+	case WaxingCrescent, WaningCrescent:
+		mult = 0.8
+	case NewMoon:
+		mult = 0.6
+	}
+	if dc.CurrentTime == Dusk || dc.CurrentTime == Night {
+		mult *= 1.1 // the moon rides the sky
+	}
+	return mult
+}
+
 // GetDescription returns a descriptive string for the current time
 func (dc *DayCycle) GetDescription() string {
 	dc.RLock()

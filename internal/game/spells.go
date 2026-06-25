@@ -23,6 +23,7 @@ type damageSpellSpec struct {
 	areaVerb       string  // fmt args: casterName, targetName
 	burnHP         int     // if >0, leaves a Burning DoT dealing this much HP per tick
 	burnTicks      int     // number of burn ticks (with burnHP > 0)
+	lunarScaled    bool    // if true, the current moon phase amplifies the damage
 }
 
 // makeDamageSpell builds a SpellHandler for a damage spell from its spec.
@@ -77,6 +78,9 @@ func (g *Game) castDamageSpell(caster *components.Player, args []string, spec da
 	if stats != nil {
 		damage = int(float64(damage) * stats.Factor(spec.scaleStat)) // the school's stat amplifies it
 	}
+	if spec.lunarScaled {
+		damage = int(float64(damage) * g.lunarPower()) // the moon waxes and wanes
+	}
 
 	// ApplyPlayerSpellDamage handles the hit, the enemy HP bar, and (on a kill)
 	// death/XP/corpse — exactly like a melee blow. NPC retaliation, if any, is the
@@ -116,6 +120,18 @@ func (g *Game) castDamageSpell(caster *components.Player, args []string, spec da
 	}
 
 	components.TrainStat(caster, stats, spec.scaleStat) // casting trains the school's stat
+}
+
+// lunarPower is the current moon-phase multiplier for lunar magic (1.0 if the
+// world has no day cycle).
+func (g *Game) lunarPower() float64 {
+	if g.dayCycleSystem == nil {
+		return 1.0
+	}
+	if dc := g.dayCycleSystem.GetDayCycle(); dc != nil {
+		return dc.LunarPower()
+	}
+	return 1.0
 }
 
 type SpellHandler func(caster *components.Player, args []string, game *Game)
@@ -384,7 +400,7 @@ func registerLunar() {
 			"Starlight rains down on %s for %d!", "%s pulls a rain of stars down upon %s."},
 	}
 	for _, s := range ladder {
-		spec := damageSpellSpec{minDmg: s.minDmg, maxDmg: s.maxDmg, scaleStat: components.WIS, hitLine: s.hitLine, areaVerb: s.areaVerb}
+		spec := damageSpellSpec{minDmg: s.minDmg, maxDmg: s.maxDmg, scaleStat: components.WIS, hitLine: s.hitLine, areaVerb: s.areaVerb, lunarScaled: true}
 		registerSpell(&SpellDefinition{
 			Name:        s.name,
 			Usage:       "cast " + s.name + " <target>",
