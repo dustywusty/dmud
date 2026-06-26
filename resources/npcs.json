@@ -1,5 +1,20 @@
 [
   {
+    "id": "ogre",
+    "name": "a hulking ogre",
+    "description": "A mountain of grey muscle and foul temper, tusks like daggers and tiny eyes that struggle to focus on anything cleverer than 'smash'.",
+    "health": 120,
+    "min_damage": 12,
+    "max_damage": 25,
+    "behavior": "aggressive",
+    "race": "ogre",
+    "dialogue": ["GRAAH!", "ME CRUSH TINY THING!", "...uhh... smash?"],
+    "respawn_time_seconds": 90,
+    "loot_table": [
+      {"item_id": "gold_coin", "chance": 1.0, "min_count": 5, "max_count": 20}
+    ]
+  },
+  {
     "id": "rat",
     "name": "a small rat",
     "description": "A small, scurrying rat with beady eyes and a twitching nose.",
@@ -89,5 +104,19 @@
       {"item_id": "bone", "chance": 0.8, "min_count": 1, "max_count": 3},
       {"item_id": "gold_coin", "chance": 0.5, "min_count": 1, "max_count": 10}
     ]
+  },
+  {
+    "id": "wylie",
+    "name": "Wylie",
+    "description": "Wylie is the Cinderhollow stablemaster: a small, soft-cheeked goblin with sage-green skin and big dark-lined eyes that crinkle whenever they smile. They wear layered black lace over a plum-purple pinafore, chunky buckled riding boots, and a whole constellation of silver ear-cuffs; a smudge of flour dusts one cheek and a wisp of straw is tucked behind one ear. Their whole look is unapologetically alt -- velvet, chains, and hand-stitched bats -- yet there's nothing but warmth in the way they beam at you (and an unmistakable, hopeful glance toward your pockets, in case you've brought cookies for the horses... and for them).",
+    "creature_type": "humanoid",
+    "health": 999999999,
+    "min_damage": 999999,
+    "max_damage": 9999999,
+    "behavior": "merchant",
+    "dialogue": ["Cookies make everything better, don't you think?", "Mind the lace, love -- it's freshly dyed.", "Ooh, do you smell that? Second batch is nearly done.", "Purple and black go with absolutely everything, I'll hear no arguments."],
+    "respawn_time_seconds": 120,
+    "stationary": true,
+    "loot_table": []
   }
 ]

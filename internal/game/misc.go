@@ -6,6 +6,7 @@ import (
 	"dmud/internal/components"
 	"fmt"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +16,11 @@ import (
 )
 
 func handleLook(player *components.Player, args []string, game *Game) {
+	// "look <target>" examines that target; bare "look" surveys the area.
+	if len(args) > 0 {
+		handleExamine(player, args, game)
+		return
+	}
 	player.Look(game.world.AsWorldLike())
 }
 
@@ -91,6 +97,7 @@ func handleCast(player *components.Player, args []string, game *Game) {
 	if len(args) == 0 {
 		player.Broadcast("Usage: cast <spell> [target]")
 		player.Broadcast("Known spells: " + strings.Join(listKnownSpells(), ", "))
+		player.Broadcast("Type 'spells' for your spellbook with level requirements.")
 		return
 	}
 
@@ -101,75 +108,162 @@ func handleCast(player *components.Player, args []string, game *Game) {
 		return
 	}
 
+	casterID, idErr := game.getPlayerEntity(player)
+
+	// Beast forms can't speak incantations — shift is melee, casting is humanoid.
+	if idErr == nil && game.playerShift(casterID) != nil {
+		player.Broadcast("You can't weave spells in beast form -- 'revert' to your own shape first.")
+		return
+	}
+
+	// Class discipline: a chosen class can only cast its own schools (classless
+	// casters are unrestricted).
+	if idErr == nil && !classAllowsSchool(game.getStats(casterID), spell.School) {
+		player.Broadcast(fmt.Sprintf("Your discipline doesn't include %s magic.", spell.School))
+		return
+	}
+
+	// Level gate: higher-tier spells require training (a class level).
+	if idErr == nil && spell.MinLevel > 1 {
+		if lvl := game.casterLevel(casterID); lvl < spell.MinLevel {
+			player.Broadcast(fmt.Sprintf("You aren't skilled enough to cast %s yet -- it requires level %d (you are level %d).",
+				spell.Name, spell.MinLevel, lvl))
+			return
+		}
+	}
+
+	// Endurance gate: spells cost endurance, so they can't be spammed. Dexterity
+	// makes casting more efficient (lower effective cost). Refuse the cast
+	// (changing nothing) when the caster is too exhausted.
+	effCost := spell.Cost
+	if effCost > 0 && idErr == nil {
+		if stats := game.getStats(casterID); stats != nil {
+			if effCost = int(float64(effCost) * stats.CostFactor()); effCost < 1 {
+				effCost = 1
+			}
+		}
+		if end := getEndurance(game, casterID); end != nil {
+			if !end.Spend(effCost) {
+				end.Regen()
+				player.Broadcast(fmt.Sprintf("You're too exhausted to cast %s — it needs %d endurance and you have %d/%d.",
+					spell.Name, effCost, end.Current, end.Max))
+				player.BroadcastState(game.world.AsWorldLike(), casterID)
+				return
+			}
+		}
+	}
+
 	spell.Handler(player, args[consumed:], game)
+
+	// Refresh the caster's vitals so the endurance bar reflects the spend.
+	if spell.Cost > 0 && idErr == nil {
+		player.BroadcastState(game.world.AsWorldLike(), casterID)
+	}
 }
 
-func castHeal(caster *components.Player, args []string, game *Game) {
-	target := caster
-	if len(args) > 0 {
-		name := strings.ToLower(strings.TrimSpace(strings.Join(args, " ")))
-		if name != "" && name != "me" && name != "self" {
-			if caster.Area == nil {
-				caster.Broadcast("You are nowhere.")
-				return
-			}
-			candidate := caster.Area.GetPlayer(name)
-			if candidate == nil {
-				caster.Broadcast("You don't see that player here.")
-				return
-			}
-			target = candidate
+// getStats returns a player entity's Stats component, or nil if absent.
+func (g *Game) getStats(entityID common.EntityID) *components.Stats {
+	if comp, err := g.world.GetComponent(entityID, "Stats"); err == nil {
+		if s, ok := comp.(*components.Stats); ok {
+			return s
 		}
 	}
+	return nil
+}
 
-	targetEntityID, err := game.getPlayerEntity(target)
+// casterLevel returns a player entity's character level (1 if unknown).
+func (g *Game) casterLevel(entityID common.EntityID) int {
+	if exp, err := g.world.GetComponent(entityID, "Experience"); err == nil {
+		if e, ok := exp.(*components.Experience); ok {
+			return e.GetLevel()
+		}
+	}
+	return 1
+}
+
+// getEndurance returns the entity's Endurance component, or nil if absent.
+func getEndurance(game *Game, entityID common.EntityID) *components.Endurance {
+	comp, err := game.world.GetComponent(entityID, "Endurance")
 	if err != nil {
-		caster.Broadcast("Unable to find that target.")
-		return
+		return nil
 	}
+	end, _ := comp.(*components.Endurance)
+	return end
+}
 
-	level := 1
-	if expComp, err := game.world.GetComponent(targetEntityID, "Experience"); err == nil {
-		if exp, ok := expComp.(*components.Experience); ok {
-			level = exp.GetLevel()
-		}
-	}
-
-	healAmount := 15 + (level * 8)
-	// TODO: When wisdom is added, scale healing drastically based on wisdom.
-
-	healthComp, err := game.world.GetComponent(targetEntityID, "Health")
+// handleRace shows or changes the player's race. Changing it reforges stats to
+// that race's baseline (and updates size), so it's a fresh start as that race.
+func (g *Game) handleRace(player *components.Player, args []string, game *Game) {
+	entityID, err := g.getPlayerEntity(player)
 	if err != nil {
-		caster.Broadcast("Healing failed.")
+		player.Broadcast("Unable to read your character.")
 		return
 	}
-	health := healthComp.(*components.Health)
+	stats := g.getStats(entityID)
+	if stats == nil {
+		player.Broadcast("You have no stats.")
+		return
+	}
 
-	missing := health.Max - health.Current
-	if missing <= 0 {
-		if target == caster {
-			caster.Broadcast("You are already at full health.")
-		} else {
-			caster.Broadcast(fmt.Sprintf("%s is already at full health.", target.Name))
+	if len(args) == 0 {
+		player.Broadcast(fmt.Sprintf("You are a %s %s.", stats.Size, stats.Race))
+		player.Broadcast("Races: " + strings.Join(components.RaceNames(), ", ") + "   (race <name> reforges your stats)")
+		return
+	}
+
+	key := strings.ToLower(strings.TrimSpace(args[0]))
+	def, ok := components.RaceFor(key)
+	if !ok {
+		player.Broadcast("No such race. Try: " + strings.Join(components.RaceNames(), ", "))
+		return
+	}
+	// Reforging to a race rebases stats — preserve any chosen class (and its
+	// affinity) so race/class can be picked in any order during creation.
+	prevClass := stats.Class
+	*stats = *components.NewStatsForRace(key)
+	if prevClass != "" {
+		stats.Class = prevClass
+		if cdef, ok := classByKey(prevClass); ok {
+			stats.Set(cdef.PrimaryStat, stats.Get(cdef.PrimaryStat)+classAffinityBonus)
 		}
+	}
+	player.Broadcast(fmt.Sprintf("You are reforged as a %s %s.", def.Size, def.Name))
+	g.handleScore(player, nil, game)
+	player.BroadcastState(g.world.AsWorldLike(), entityID)
+	g.creationStep(player, "race")
+}
+
+// handleScore (the `stats`/`score` command) shows the player's attributes and
+// the bonuses they confer.
+func (g *Game) handleScore(player *components.Player, args []string, game *Game) {
+	entityID, err := g.getPlayerEntity(player)
+	if err != nil {
+		player.Broadcast("Unable to read your character.")
 		return
 	}
-	if healAmount > missing {
-		healAmount = missing
+	stats := g.getStats(entityID)
+	if stats == nil {
+		player.Broadcast("You have no stats.")
+		return
 	}
-	health.Current += healAmount
 
-	if target == caster {
-		caster.Broadcast(fmt.Sprintf("You cast heal and restore %d health.", healAmount))
+	player.Broadcast(fmt.Sprintf("== %s -- level %d ==", player.Name, g.casterLevel(entityID)))
+	if def, ok := classByKey(stats.Class); ok {
+		player.Broadcast(fmt.Sprintf("  %s %s   schools: %s", stats.Race, def.Name, strings.Join(def.Schools, ", ")))
 	} else {
-		caster.Broadcast(fmt.Sprintf("You cast heal on %s, restoring %d health.", target.Name, healAmount))
-		target.Broadcast(fmt.Sprintf("%s casts heal on you, restoring %d health.", caster.Name, healAmount))
-		if caster.Area != nil {
-			caster.Area.Broadcast(fmt.Sprintf("%s casts heal on %s.", caster.Name, target.Name), caster, target)
+		player.Broadcast(fmt.Sprintf("  %s (no class -- 'class <name>' to choose)", stats.Race))
+	}
+	player.Broadcast(fmt.Sprintf("  %s %3d   melee damage x%.2f", components.StatAbbrev(components.STR), stats.Get(components.STR), stats.MeleeFactor()))
+	player.Broadcast(fmt.Sprintf("  %s %3d   endurance cost x%.2f", components.StatAbbrev(components.DEX), stats.Get(components.DEX), stats.CostFactor()))
+	player.Broadcast(fmt.Sprintf("  %s %3d   +%d max HP", components.StatAbbrev(components.CON), stats.Get(components.CON), stats.HPBonus()))
+	player.Broadcast(fmt.Sprintf("  %s %3d   spell damage x%.2f", components.StatAbbrev(components.INT), stats.Get(components.INT), stats.ArcaneFactor()))
+	player.Broadcast(fmt.Sprintf("  %s %3d   healing x%.2f", components.StatAbbrev(components.WIS), stats.Get(components.WIS), stats.HealFactor()))
+	if sh := g.playerShift(entityID); sh != nil {
+		if form, ok := components.FormFor(sh.Form); ok {
+			player.Broadcast(fmt.Sprintf("  form: %s (melee %d-%d, ×STR)", form.Name, form.MinDamage, form.MaxDamage))
 		}
 	}
-
-	target.BroadcastState(game.world.AsWorldLike(), targetEntityID)
+	player.Broadcast("Stats rise as you act -- fight, cast, heal, take hits, and roam.")
 }
 
 func handleSummon(player *components.Player, args []string, game *Game) {
@@ -232,7 +326,7 @@ func handleRecall(player *components.Player, args []string, game *Game) {
 	if player.Area == nil {
 		player.Area = game.defaultArea
 		game.defaultArea.AddPlayer(player)
-		player.Broadcast("You gather your senses and return to the starting area.")
+		player.Broadcast("You gather your senses and return to the safety of Ravenmoor.")
 		player.Look(game.world.AsWorldLike())
 		if playerEntity != nil {
 			player.BroadcastState(game.world.AsWorldLike(), playerEntity.ID)
@@ -241,14 +335,14 @@ func handleRecall(player *components.Player, args []string, game *Game) {
 	}
 
 	if player.Area == game.defaultArea {
-		player.Broadcast("You are already at the starting area.")
+		player.Broadcast("You are already in Ravenmoor.")
 		return
 	}
 
 	player.Area.RemovePlayer(player)
 	player.Area = game.defaultArea
 	game.defaultArea.AddPlayer(player)
-	player.Broadcast("You focus for a moment and recall to the starting area.\n")
+	player.Broadcast("You focus for a moment and recall to the town of Ravenmoor.\n")
 	player.Look(game.world.AsWorldLike())
 	if playerEntity != nil {
 		player.BroadcastState(game.world.AsWorldLike(), playerEntity.ID)
@@ -282,6 +376,7 @@ func (g *Game) HandleRename(player *components.Player, newName string) {
 	player.Unlock()
 
 	g.Broadcast(fmt.Sprintf("%s has changed their name to %s", oldName, newName))
+	g.creationStep(player, "name")
 }
 
 func (g *Game) HandleLogin(player *components.Player, identity string) {
@@ -350,6 +445,7 @@ func (g *Game) HandleLogin(player *components.Player, identity string) {
 	}
 
 	g.applyPlayerState(entity.ID, player, state)
+	g.ensureCreation(entity.ID, player) // a loaded-but-unfinished ghost resumes creation
 
 	addedToArea := false
 	if area := g.resolveArea(state.AreaID); area != nil && area != player.Area {
@@ -383,6 +479,7 @@ func (g *Game) HandleLogin(player *components.Player, identity string) {
 	}
 	player.Look(g.world.AsWorldLike())
 	player.BroadcastState(g.world.AsWorldLike(), entity.ID)
+	g.announceIdentity(player, identity)
 }
 
 func (g *Game) HandleSave(player *components.Player) {
@@ -425,6 +522,7 @@ func (g *Game) HandleSave(player *components.Player) {
 		return
 	}
 	player.Broadcast("Saved. Your login id: " + key)
+	g.announceIdentity(player, key)
 }
 
 func handleTime(player *components.Player, args []string, game *Game) {
@@ -441,7 +539,8 @@ func handleTime(player *components.Player, args []string, game *Game) {
 	mins := int(remaining.Minutes())
 	secs := int(remaining.Seconds()) % 60
 
-	player.Broadcast(fmt.Sprintf("Day %d - It is currently %s.", dc.DayNumber, dc.CurrentTime.String()))
+	phase := components.MoonPhaseForDay(dc.DayNumber)
+	player.Broadcast(fmt.Sprintf("Day %d - It is currently %s. The moon is a %s.", dc.DayNumber, dc.CurrentTime.String(), phase.String()))
 	player.Broadcast(dc.GetDescription())
 	player.Broadcast(fmt.Sprintf("Time until next period: %d minutes, %d seconds.", mins, secs))
 }
@@ -488,6 +587,13 @@ func handleExamine(player *components.Player, args []string, game *Game) {
 					}
 				}
 				se.RUnlock()
+			}
+
+			if mountComp, err := game.world.GetComponent(playerEntity.ID, "Mount"); err == nil {
+				if m, ok := mountComp.(*components.Mount); ok {
+					m.Regen()
+					msg.WriteString(fmt.Sprintf("\nMounted on a %s (move speed %d, endurance %d/%d).\n", m.Name, m.Speed, m.Endurance, m.MaxEndurance))
+				}
 			}
 
 			player.Broadcast(msg.String())
@@ -588,6 +694,52 @@ func (g *Game) playerFromEntity(entityID common.EntityID) (*components.Player, b
 		return nil, false
 	}
 	return player, true
+}
+
+// handleSpawnItem is an admin cheat that drops items straight into your
+// inventory — handy for testing quest turn-ins and other item content without
+// grinding for drops. Usage: spawnitem <item_id> [qty].
+func (g *Game) handleSpawnItem(player *components.Player, args []string, game *Game) {
+	key := g.clientPersistenceKey(player.Client)
+	isAdmin := g.resolveAdminStatus(key)
+	player.Lock()
+	player.IsAdmin = isAdmin
+	player.Unlock()
+	if !isAdmin {
+		player.Broadcast("You lack permission.")
+		return
+	}
+
+	if len(args) == 0 {
+		player.Broadcast("Usage: spawnitem <item_id> [qty]   (e.g. spawnitem goblin_ear 10)")
+		return
+	}
+	itemID := strings.ToLower(args[0])
+	qty := 1
+	if len(args) > 1 {
+		if n, err := strconv.Atoi(args[1]); err == nil && n > 0 {
+			qty = n
+		}
+	}
+
+	item := components.CreateItem(itemID, qty)
+	if item == nil {
+		player.Broadcast(fmt.Sprintf("Unknown item template %q.", itemID))
+		return
+	}
+
+	entityID, err := g.getPlayerEntity(player)
+	if err != nil {
+		player.Broadcast("Something went wrong.")
+		return
+	}
+	invComp, err := g.world.GetComponent(entityID, "Inventory")
+	if err != nil {
+		player.Broadcast("You have no inventory.")
+		return
+	}
+	invComp.(*components.Inventory).AddItem(item)
+	player.Broadcast(fmt.Sprintf("[admin] Spawned %s x%d into your inventory.", item.Name, qty))
 }
 
 func handleAdminStats(player *components.Player, args []string, game *Game) {

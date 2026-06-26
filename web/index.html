@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dmud — live</title>
+<style>
+  :root{
+    --bg:#0d0f12; --panel:#0a0c0f; --line:#20242a; --fg:#cdd3da; --dim:#5b6470;
+    --accent:#7ee0a0; --chat:#f0b060; --combat:#e08a78; --sys:#7fb0e0; --me:#6b7480;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);
+    font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  #app{display:flex;flex-direction:column;height:100%;max-width:920px;margin:0 auto;padding:10px;gap:8px}
+  #bar{display:flex;align-items:center;gap:8px;color:var(--dim);padding:2px 4px;font-size:13px}
+  #dot{width:9px;height:9px;border-radius:50%;background:#e05050;flex:none;transition:background .2s}
+  #dot.on{background:var(--accent)}
+  #title{font-weight:600;color:var(--fg)}
+  #spacer{flex:1}
+  #out{flex:1;overflow-y:auto;white-space:pre-wrap;overflow-wrap:anywhere;
+    padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+  #out .chat{color:var(--chat)} #out .combat{color:var(--combat)}
+  #out .sys{color:var(--sys)} #out .me{color:var(--me)}
+  #out .system{color:var(--dim);font-style:italic}
+  form{display:flex;gap:8px}
+  #in{flex:1;background:var(--panel);color:var(--fg);border:1px solid var(--line);
+    border-radius:10px;padding:10px 12px;font:inherit;outline:none}
+  #in:focus{border-color:var(--accent)}
+  button{background:#161a20;color:var(--fg);border:1px solid var(--line);
+    border-radius:10px;padding:0 16px;font:inherit;cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  /* Spectator (read-only) embed: hide the command input entirely. */
+  body.spectate #form{display:none}
+  #eye{display:none;color:var(--dim)}
+  body.spectate #eye{display:inline}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="bar">
+    <span id="dot"></span><span id="status">connecting…</span>
+    <span id="spacer"></span><span id="eye">👁 spectating&nbsp;·&nbsp;</span><span id="title">dmud</span>
+  </div>
+  <div id="out" aria-live="polite"></div>
+  <form id="form" autocomplete="off">
+    <input id="in" placeholder="type a command — look · n s e w · say hi · who · help"
+      autocomplete="off" autocapitalize="off" spellcheck="false" autofocus>
+    <button type="submit">send</button>
+  </form>
+</div>
+<script>
+(() => {
+  "use strict";
+
+  // --- Point this at your dmud server's WebSocket endpoint. ---------------
+  // Leave SERVER = "" to connect to the same host that serves this page, or set
+  // it (e.g. "wss://dmud.example.com/ws") when hosting the page elsewhere.
+  // You can also override per-visit with ?ws=wss://host/ws.
+  const SERVER = "";
+  const WS = new URLSearchParams(location.search).get("ws") || SERVER ||
+    ((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+  const idKey = "dmud:id:" + WS; // remembers this server's saved character
+
+  // Spectator mode (?spectate): a read-only embed for a website — the command
+  // input is hidden and we auto-"look" on connect so there's content to watch.
+  const SPECTATE = new URLSearchParams(location.search).has("spectate");
+  if (SPECTATE) document.body.classList.add("spectate");
+
+  const out = document.getElementById("out");
+  const inp = document.getElementById("in");
+  const dot = document.getElementById("dot");
+  const statusEl = document.getElementById("status");
+
+  let ws = null, retry = 0, atBottom = true;
+  out.addEventListener("scroll", () => {
+    atBottom = out.scrollHeight - out.scrollTop - out.clientHeight < 24;
+  });
+
+  function append(text, cls) {
+    if (!text) return;
+    const span = document.createElement("span");
+    if (cls) span.className = cls;
+    span.textContent = text + "\n";
+    out.appendChild(span);
+    while (out.childElementCount > 2000) out.removeChild(out.firstChild);
+    if (atBottom) out.scrollTop = out.scrollHeight;
+  }
+
+  // Translate the server's tag protocol into plain display text + a CSS class.
+  // Structured frames (STATE|, EVENT|, IDENTITY|) are hidden.
+  const TAG = /^([A-Z]{2,})\|([\s\S]*)$/;
+  function render(frame) {
+    for (let line of String(frame).replace(/\r/g, "").split("\n")) {
+      const id = line.match(/^IDENTITY\|(.+)$/);
+      if (id) { try { localStorage.setItem(idKey, id[1]); } catch (_) {} continue; }
+      if (/^(STATE|EVENT|IDENTITY)\|/.test(line)) continue;
+      let m = line.match(TAG);
+      if (m) {
+        let tag = m[1], rest = m[2];
+        const inner = rest.match(TAG);     // drop a status word, e.g. DMG|DEATH|…
+        if (inner) rest = inner[2];
+        if (tag === "DMG") { append(rest, "combat"); continue; }
+        if (tag === "CHAT") { append(rest, "chat"); continue; }
+        if (tag === "STATUS") { append(rest, "system"); continue; }
+        append(rest); continue;            // SYS or anything else: plain
+      }
+      // light coloring for untagged chat / combat
+      if (/^(You (say|shout)|.+ (says|shouts|tells you|whispers))[:\s]/.test(line)) append(line, "chat");
+      else if (/\b(attacked?|attacks|slain|defeated|\d+ damage)\b/i.test(line)) append(line, "combat");
+      else append(line);
+    }
+  }
+
+  function setStatus(text, on) {
+    statusEl.textContent = text;
+    dot.classList.toggle("on", !!on);
+  }
+
+  function connect() {
+    setStatus("connecting…", false);
+    try { ws = new WebSocket(WS); }
+    catch (e) { setStatus("bad server URL", false); return; }
+    ws.onopen = () => {
+      retry = 0; setStatus(SPECTATE ? "spectating" : "connected", true);
+      try { const id = localStorage.getItem(idKey); if (id) ws.send("login " + id); } catch (_) {}
+      if (SPECTATE) ws.send("look"); // populate the embed immediately
+      else inp.focus();
+    };
+    ws.onmessage = (e) => { if (typeof e.data === "string") render(e.data); };
+    ws.onerror = () => { try { ws.close(); } catch (_) {} };
+    ws.onclose = () => {
+      setStatus("disconnected — reconnecting…", false);
+      const delay = Math.min(15000, 800 * 2 ** retry++);
+      setTimeout(connect, delay);
+    };
+  }
+
+  // command input with a little history
+  const hist = []; let hpos = 0;
+  document.getElementById("form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const cmd = inp.value;
+    inp.value = "";
+    if (!cmd.trim()) return;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(cmd);
+      append("» " + cmd, "me");
+      hist.push(cmd); hpos = hist.length;
+    } else {
+      append("(not connected)", "system");
+    }
+  });
+  inp.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowUp" && hpos > 0) { inp.value = hist[--hpos]; e.preventDefault(); }
+    else if (e.key === "ArrowDown") {
+      if (hpos < hist.length - 1) inp.value = hist[++hpos];
+      else { hpos = hist.length; inp.value = ""; }
+      e.preventDefault();
+    }
+  });
+
+  connect();
+})();
+</script>
+</body>
+</html>

@@ -33,6 +33,11 @@ type PlayerState struct {
 	Experience    ExperienceState              `json:"experience"`
 	Inventory     InventoryState               `json:"inventory"`
 	Quests        map[string]QuestStatusRecord `json:"quests"`
+	Factions      map[string]int               `json:"factions,omitempty"`
+	Stats         map[string]int               `json:"stats,omitempty"`
+	Race          string                       `json:"race,omitempty"`
+	Class         string                       `json:"class,omitempty"`
+	Created       bool                         `json:"created,omitempty"`
 	StatusEffects []StatusEffectState          `json:"status_effects"`
 	UpdatedAt     time.Time                    `json:"updated_at"`
 }

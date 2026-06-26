@@ -63,6 +63,26 @@ func IsStateMessage(msg string) bool {
 	return strings.HasPrefix(msg, "STATE|")
 }
 
+// IsEventMessage returns true for EVENT| structured frames (JSON game-state
+// pushes). Like STATE|, these are tag-aware-only and hidden from plain clients.
+func IsEventMessage(msg string) bool {
+	return strings.HasPrefix(msg, "EVENT|")
+}
+
+// IdentityMessage builds an IDENTITY| protocol frame carrying a player's saved
+// login id. A web client stores this id and sends `login <id>` on reconnect to
+// restore the same character automatically.
+func IdentityMessage(id string) string {
+	return "IDENTITY|" + id
+}
+
+// IsIdentityMessage returns true for IDENTITY| protocol frames. Like STATE|,
+// these are structured frames meant for tag-aware clients and are hidden from
+// legacy/plain-text clients.
+func IsIdentityMessage(msg string) bool {
+	return strings.HasPrefix(msg, "IDENTITY|")
+}
+
 func isTag(tag string) bool {
 	switch tag {
 	case "DMG", "SYS", "CHAT":

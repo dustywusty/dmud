@@ -246,6 +246,47 @@ func (h *QuestDialogueHandler) checkQuestProgress(player *Player, playerEntityID
 	}
 }
 
+// questRequiresItem reports whether a quest's requirements include an item.
+func questRequiresItem(q *Quest, itemID string) bool {
+	for _, req := range q.Requirements {
+		if req.ItemID == itemID {
+			return true
+		}
+	}
+	return false
+}
+
+// TryTurnInItem handles `give <item> to <npc>` for quest items: if this NPC
+// offers a quest that needs the item, it is treated as a turn-in (complete when
+// in progress with everything required; otherwise a helpful nudge). Returns true
+// when the give was a quest interaction so the caller doesn't also "decline" it.
+func (h *QuestDialogueHandler) TryTurnInItem(player *Player, playerEntityID common.EntityID, npc *NPC, itemID string) bool {
+	for _, questDef := range QuestRegistry {
+		if questDef.NPCID != npc.TemplateID || !questRequiresItem(questDef, itemID) {
+			continue
+		}
+
+		var quests *PlayerQuests
+		if comp, err := h.World.GetComponent(playerEntityID, "PlayerQuests"); err == nil {
+			quests = comp.(*PlayerQuests)
+		} else {
+			quests = NewPlayerQuests()
+		}
+
+		npc.HoldConversation(60 * time.Second)
+		switch quests.GetQuestStatus(questDef.ID) {
+		case QuestStatusInProgress:
+			h.completeQuest(player, playerEntityID, questDef, npc, quests)
+		case QuestStatusCompleted:
+			player.Broadcast(fmt.Sprintf("%s says: You've already settled that debt — keep them.", npc.Name))
+		default: // NotStarted
+			player.Broadcast(fmt.Sprintf("%s says: I never hired you for that. Ask me about [work] first.", npc.Name))
+		}
+		return true
+	}
+	return false
+}
+
 // completeQuest is a generic handler for completing any quest
 func (h *QuestDialogueHandler) completeQuest(player *Player, playerEntityID common.EntityID, questDef *Quest, npc *NPC, quests *PlayerQuests) {
 	inventoryComp, err := h.World.GetComponent(playerEntityID, "Inventory")

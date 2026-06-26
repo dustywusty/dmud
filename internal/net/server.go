@@ -6,12 +6,20 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"dmud/internal/common"
 	"dmud/internal/game"
 
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog/log"
+)
+
+// Connection rate limit: a single IP may open at most connRateMax WebSocket
+// connections within connRateWindow. Protects the public endpoint from spam.
+const (
+	connRateWindow = time.Minute
+	connRateMax    = 20
 )
 
 type ServerConfig struct {
@@ -38,6 +46,34 @@ type Server struct {
 
 	wsMux     *http.ServeMux
 	wsMuxOnce sync.Once
+
+	connRateMu sync.Mutex
+	connRate   map[string][]time.Time
+}
+
+// allowConnection reports whether ip may open another connection now, recording
+// the attempt. It prunes timestamps older than the window per IP.
+func (s *Server) allowConnection(ip string) bool {
+	now := time.Now()
+	cutoff := now.Add(-connRateWindow)
+
+	s.connRateMu.Lock()
+	defer s.connRateMu.Unlock()
+	if s.connRate == nil {
+		s.connRate = make(map[string][]time.Time)
+	}
+	kept := s.connRate[ip][:0]
+	for _, t := range s.connRate[ip] {
+		if t.After(cutoff) {
+			kept = append(kept, t)
+		}
+	}
+	if len(kept) >= connRateMax {
+		s.connRate[ip] = kept
+		return false
+	}
+	s.connRate[ip] = append(kept, now)
+	return true
 }
 
 func (s *Server) Run() {
@@ -150,6 +186,15 @@ func (s *Server) runWebSocketServer() {
 		mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 			if !websocket.IsWebSocketUpgrade(r) {
 				http.Error(w, "websocket upgrade required", http.StatusUpgradeRequired)
+				return
+			}
+			ip := getRealClientIP(r)
+			if ip == "" {
+				ip, _, _ = net.SplitHostPort(r.RemoteAddr)
+			}
+			if !s.allowConnection(ip) {
+				log.Warn().Msgf("Rate-limited WebSocket connection from %s", ip)
+				http.Error(w, "too many connections, slow down", http.StatusTooManyRequests)
 				return
 			}
 			conn, err := upgrader.Upgrade(w, r, nil)

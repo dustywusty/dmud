@@ -64,11 +64,12 @@ func (g *Game) HandleKillAll(player *components.Player) {
 	}
 
 	// Set player to attack the first target, queue the rest
+	minD, maxD := g.playerMeleeDamage(player)
 	combatComponent := &components.Combat{
 		TargetID:    targetEntityIDs[0],
 		TargetQueue: targetEntityIDs[1:], // Queue up the rest
-		MinDamage:   10,
-		MaxDamage:   50,
+		MinDamage:   minD,
+		MaxDamage:   maxD,
 	}
 	g.world.AddComponent(playerEntity, combatComponent)
 
@@ -84,9 +85,11 @@ func (g *Game) HandleKillAll(player *components.Player) {
 func (g *Game) HandleKill(player *components.Player, targetName string) {
 	log.Trace().Msgf("Kill: %s", targetName)
 
-	// First check for players
-	g.playersMu.Lock()
-	defer g.playersMu.Unlock()
+	// We only read the player table here; take a read lock, not a write lock.
+	// (A write lock self-deadlocks: playerMeleeDamage -> getPlayerEntity re-locks
+	// playersMu for reading, and Go's RWMutex is not reentrant.)
+	g.playersMu.RLock()
+	defer g.playersMu.RUnlock()
 
 	targetEntity := g.players[targetName]
 	playerEntity := g.players[player.Name]
@@ -131,10 +134,11 @@ func (g *Game) HandleKill(player *components.Player, targetName string) {
 		// However, the combat component needs IDs.
 		// We can refactor the construction of the Combat component to use the IDs directly.
 
+		minD, maxD := g.playerMeleeDamage(player)
 		combatComponent := &components.Combat{
 			TargetID:  targetEntityIDs[0],
-			MinDamage: 10,
-			MaxDamage: 50,
+			MinDamage: minD,
+			MaxDamage: maxD,
 		}
 
 		if len(targetEntityIDs) > 1 {
@@ -170,10 +174,11 @@ func (g *Game) HandleKill(player *components.Player, targetName string) {
 		return
 	}
 
+	minD, maxD := g.playerMeleeDamage(player)
 	combatComponent := &components.Combat{
 		TargetID:  targetEntity.ID,
-		MinDamage: 10,
-		MaxDamage: 50,
+		MinDamage: minD,
+		MaxDamage: maxD,
 	}
 
 	g.world.AddComponent(playerEntity, combatComponent)
