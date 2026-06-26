@@ -2,7 +2,10 @@ package components
 
 import (
 	"dmud/internal/util"
+	"encoding/json"
+	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/rs/zerolog/log"
 )
@@ -11,6 +14,7 @@ type Exit struct {
 	Direction string
 	AreaID    string
 	Area      *Area
+	MaxSize   Size // largest creature that fits; 0 = no limit
 }
 
 type Area struct {
@@ -26,6 +30,68 @@ type Area struct {
 
 	PlayersMutex sync.RWMutex
 	ItemsMutex   sync.RWMutex
+
+	// dirty is set whenever the room's contents change; the game loop flushes
+	// dirty areas as room.contents events a few times a second.
+	dirty atomic.Bool
+}
+
+// MarkDirty flags the room's contents as changed.
+func (a *Area) MarkDirty() { a.dirty.Store(true) }
+
+// TakeDirty atomically reads and clears the dirty flag.
+func (a *Area) TakeDirty() bool { return a.dirty.Swap(false) }
+
+// roomContentsEvent is the structured "what's in this room" push.
+type roomContentsEvent struct {
+	Type    string   `json:"type"`
+	Players []string `json:"players"`
+	NPCs    []string `json:"npcs"`
+	Items   []string `json:"items"`
+	Corpses []string `json:"corpses"`
+}
+
+// BroadcastContents pushes a room.contents event to each tag-capable player in
+// the area (each sees the others, not themselves), so clients can keep a live
+// "who/what is here" list without anyone having to look.
+func (a *Area) BroadcastContents(w WorldLike) {
+	a.PlayersMutex.RLock()
+	players := make([]*Player, len(a.Players))
+	copy(players, a.Players)
+	a.PlayersMutex.RUnlock()
+
+	var npcs []string
+	for _, npc := range a.GetNPCs(w) {
+		npcs = append(npcs, npc.Name)
+	}
+	var corpses []string
+	for _, c := range a.GetCorpses(w) {
+		corpses = append(corpses, c.GetDescription())
+	}
+	var items []string
+	for _, it := range a.GetItems() {
+		if it.Stackable && it.Quantity > 1 {
+			items = append(items, fmt.Sprintf("%s x%d", it.Name, it.Quantity))
+		} else {
+			items = append(items, it.Name)
+		}
+	}
+
+	for _, p := range players {
+		if p.Client == nil || !p.Client.SupportsTags() {
+			continue
+		}
+		others := make([]string, 0, len(players))
+		for _, q := range players {
+			if q != p {
+				others = append(others, q.Name)
+			}
+		}
+		ev := roomContentsEvent{Type: "room.contents", Players: others, NPCs: npcs, Items: items, Corpses: corpses}
+		if data, err := json.Marshal(ev); err == nil {
+			p.Broadcast(util.TagMessage("EVENT", string(data)))
+		}
+	}
 }
 
 func (a *Area) AddPlayer(p *Player) {
@@ -36,6 +102,8 @@ func (a *Area) AddPlayer(p *Player) {
 	a.PlayersMutex.Lock()
 	a.Players = append(a.Players, p)
 	a.PlayersMutex.Unlock()
+
+	a.MarkDirty()
 }
 
 func (a *Area) GetExit(direction string) *Exit {
@@ -103,6 +171,7 @@ func (a *Area) AddItem(item *Item) {
 	if item == nil {
 		return
 	}
+	defer a.MarkDirty()
 	a.ItemsMutex.Lock()
 	defer a.ItemsMutex.Unlock()
 
@@ -124,6 +193,7 @@ func (a *Area) AddItem(item *Item) {
 func (a *Area) RemoveItem(itemID string, quantity int) *Item {
 	a.ItemsMutex.Lock()
 	defer a.ItemsMutex.Unlock()
+	defer a.MarkDirty()
 
 	for i, item := range a.Items {
 		item.Lock()
@@ -199,6 +269,28 @@ func (a *Area) Broadcast(msg string, exclude ...*Player) {
 	}
 }
 
+// BroadcastChat delivers a chat line to everyone in the area (minus excluded
+// players): the structured event frame to tag-capable clients, the plain text to
+// the rest. Snapshots under a read lock, then sends outside it.
+func (a *Area) BroadcastChat(event, plain string, exclude ...*Player) {
+	a.PlayersMutex.RLock()
+	players := make([]*Player, 0, len(a.Players))
+	for _, p := range a.Players {
+		if !contains(exclude, p) {
+			players = append(players, p)
+		}
+	}
+	a.PlayersMutex.RUnlock()
+
+	for _, p := range players {
+		if p.Client != nil && p.Client.SupportsTags() {
+			p.Broadcast(event)
+		} else {
+			p.Broadcast(plain)
+		}
+	}
+}
+
 func (a *Area) RemovePlayer(p *Player) {
 	a.PlayersMutex.Lock()
 	removed := false
@@ -213,6 +305,7 @@ func (a *Area) RemovePlayer(p *Player) {
 
 	if removed {
 		a.Broadcast(util.TagMessage("STATUS", p.Name+" leaves"))
+		a.MarkDirty()
 	}
 }
 

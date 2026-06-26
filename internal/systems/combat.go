@@ -5,6 +5,7 @@ import (
 	"dmud/internal/components"
 	"dmud/internal/ecs"
 	"dmud/internal/util"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"time"
@@ -245,11 +246,12 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 			targetPlayer.Area.Broadcast(util.TagMessageWithStatus("DMG", "DEATH", fmt.Sprintf("%s has been slain by %s!", targetPlayer.Name, attackerNPC.Name)))
 		}
 
-		// Create player corpse with their inventory
+		// Create player corpse with their inventory (worn gear drops too)
 		var corpseInventory *components.Inventory
 		if invComp, err := w.GetComponent(targetID, "Inventory"); err == nil {
 			corpseInventory = invComp.(*components.Inventory)
 		}
+		dropEquipmentInto(w, targetID, corpseInventory)
 		spawnCorpse(w, targetPlayer.Name, targetID, true, targetPlayer.Area, corpseInventory)
 
 		// TODO: Handle respawn
@@ -268,6 +270,21 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 
 		if attackerPlayer != nil {
 			attackerPlayer.Broadcast(util.TagMessage("DMG", "You have defeated "+targetNPC.Name+"!"))
+
+			// Coin drops, scaled like XP off the NPC's threat.
+			goldReward := 1 + rand.Intn(3)
+			if template, ok := components.NPCTemplates[targetNPC.TemplateID]; ok && template.MaxDamage > 0 {
+				goldReward = template.MaxDamage*2 + rand.Intn(template.MaxDamage+1)
+			}
+			if goldReward < 1 {
+				goldReward = 1
+			}
+			if invComp, err := w.GetComponent(attackerID, "Inventory"); err == nil {
+				if inv, ok := invComp.(*components.Inventory); ok {
+					inv.AddItem(components.CreateItem("gold_coin", goldReward))
+					attackerPlayer.Broadcast(util.TagMessage("STATUS", fmt.Sprintf("You loot %d gold from %s.", goldReward, targetNPC.Name)))
+				}
+			}
 
 			// Award experience based on NPC level/difficulty
 			xpReward := 50
@@ -301,15 +318,37 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 			}
 		}
 
-		// Create NPC corpse with their inventory before removing entity
+		// Create NPC corpse with their inventory before removing entity (gear drops)
 		var corpseInventory *components.Inventory
 		if invComp, err := w.GetComponent(targetID, "Inventory"); err == nil {
 			corpseInventory = invComp.(*components.Inventory)
 		}
+		dropEquipmentInto(w, targetID, corpseInventory)
 		spawnCorpse(w, targetNPC.Name, targetID, false, targetNPC.Area, corpseInventory)
 
 		// Remove NPC from world (spawn system will respawn it)
 		w.RemoveEntity(targetID)
+	}
+}
+
+// dropEquipmentInto moves a dying creature's worn gear into the corpse inventory
+// so it can be looted, just like carried items.
+func dropEquipmentInto(w components.WorldLike, entityID common.EntityID, inv *components.Inventory) {
+	if inv == nil {
+		return
+	}
+	eqComp, err := w.GetComponent(entityID, "Equipment")
+	if err != nil {
+		return
+	}
+	eq, ok := eqComp.(*components.Equipment)
+	if !ok {
+		return
+	}
+	for _, slot := range []components.EquipSlot{components.SlotWeapon, components.SlotArmor, components.SlotShield} {
+		if it := eq.Remove(slot); it != nil {
+			inv.AddItem(it)
+		}
 	}
 }
 
@@ -325,6 +364,9 @@ func spawnCorpse(w components.WorldLike, victimName string, victimID common.Enti
 	// Create and add corpse component with inventory
 	corpse := components.NewCorpse(victimName, victimID, wasPlayer, area, inventory)
 	w.AddComponentToEntity(corpseEntity, corpse)
+	if area != nil {
+		area.MarkDirty()
+	}
 
 	log.Debug().Msgf("Spawned corpse of %s (entity: %s) at area (%d,%d,%d)",
 		victimName, corpseEntity.GetID(), area.X, area.Y, area.Z)
@@ -346,6 +388,30 @@ func performAttack(w *ecs.World, attackerID common.EntityID, attackerPlayer, tar
 			scaling := components.GetLevelScaling(level)
 			damage = int(float64(baseDamage) * scaling)
 		}
+		if stats, err := ecs.GetTypedComponent[*components.Stats](w, attackerID, "Stats"); err == nil && stats != nil {
+			damage = int(float64(damage) * stats.MeleeFactor()) // Strength hits harder
+		}
+	}
+
+	// NPCs are statted too: a brawny ogre hits harder than its base damage.
+	if attackerNPC != nil {
+		if stats, err := ecs.GetTypedComponent[*components.Stats](w, attackerID, "Stats"); err == nil && stats != nil {
+			damage = int(float64(damage) * stats.MeleeFactor())
+		}
+	}
+
+	// Equipped weapon adds to the swing; the target's worn armor soaks part of it.
+	if eq, e := ecs.GetTypedComponent[*components.Equipment](w, attackerID, "Equipment"); e == nil && eq != nil {
+		if lo, hi := eq.WeaponDamage(); hi > 0 && hi >= lo {
+			damage += lo + r.Intn(hi-lo+1)
+		}
+	}
+	if eq, e := ecs.GetTypedComponent[*components.Equipment](w, combat.TargetID, "Equipment"); e == nil && eq != nil {
+		if armor := eq.ArmorValue(); armor > 0 {
+			if damage -= armor; damage < 1 {
+				damage = 1
+			}
+		}
 	}
 
 	targetHealth.Current -= damage
@@ -353,13 +419,72 @@ func performAttack(w *ecs.World, attackerID common.EntityID, attackerPlayer, tar
 	// Send appropriate messages based on entity types
 	if attackerPlayer != nil {
 		attackerPlayer.Broadcast(util.TagMessage("DMG", fmt.Sprintf("You attacked %s for %d damage!", targetName, damage)))
+		emitCombatEvent(attackerPlayer, targetName, damage, targetHealth)
+		if stats, err := ecs.GetTypedComponent[*components.Stats](w, attackerID, "Stats"); err == nil {
+			components.TrainStat(attackerPlayer, stats, components.STR) // swinging trains Strength
+		}
 	}
 
 	if targetPlayer != nil {
 		targetPlayer.Broadcast(util.TagMessage("DMG", fmt.Sprintf("%s attacked you for %d damage!", attackerName, damage)))
+		if stats, err := ecs.GetTypedComponent[*components.Stats](w, combat.TargetID, "Stats"); err == nil {
+			components.TrainStat(targetPlayer, stats, components.CON) // taking hits trains Constitution
+		}
 	}
 
 	log.Trace().Msg(fmt.Sprintf("%s attacked %s for %d damage!", attackerName, targetName, damage))
+}
+
+// emitCombatEvent sends the structured combat event to a player attacker so the
+// client can draw the target's HP bar. Shared by melee and spell damage.
+func emitCombatEvent(attacker *components.Player, targetName string, damage int, targetHealth *components.Health) {
+	if attacker == nil {
+		return
+	}
+	hp := targetHealth.Current
+	if hp < 0 {
+		hp = 0
+	}
+	ev, _ := json.Marshal(struct {
+		Type      string `json:"type"`
+		Target    string `json:"target"`
+		Damage    int    `json:"damage"`
+		TargetHP  int    `json:"target_hp"`
+		TargetMax int    `json:"target_max"`
+		Killed    bool   `json:"killed"`
+	}{"combat", targetName, damage, hp, targetHealth.Max, targetHealth.Current <= 0})
+	attacker.Broadcast(util.TagMessage("EVENT", string(ev)))
+}
+
+// ApplyPlayerSpellDamage deals direct (non-melee) damage from a player caster to
+// a target NPC: it lowers the target's health, emits the combat event so the
+// client's enemy HP bar updates, and on a lethal hit runs the normal death flow
+// (XP, level-up, corpse, removal). Returns the damage dealt and whether the
+// target was slain. It is a no-op (0, false) if the target lacks Health/NPC.
+func ApplyPlayerSpellDamage(w *ecs.World, casterID, targetID common.EntityID, amount int) (int, bool) {
+	targetNPC, err := getNPCComponent(w, targetID)
+	if err != nil || targetNPC == nil {
+		return 0, false
+	}
+	targetHealth, err := getHealthComponent(w, targetID)
+	if err != nil {
+		return 0, false
+	}
+	if amount < 0 {
+		amount = 0
+	}
+
+	caster, _ := getPlayerComponent(w, casterID)
+
+	targetHealth.Current -= amount
+	killed := targetHealth.Current <= 0
+
+	emitCombatEvent(caster, targetNPC.Name, amount, targetHealth)
+
+	if killed {
+		handleTargetDeath(w.AsWorldLike(), casterID, targetID, caster, nil, nil, targetNPC)
+	}
+	return amount, killed
 }
 
 func broadcastStateToPlayer(w *ecs.World, entityID common.EntityID) {

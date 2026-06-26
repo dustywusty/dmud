@@ -23,7 +23,7 @@ var commandHelpText = map[string]string{
 	"up":        "Move up to the adjacent area (if an exit exists).",
 	"down":      "Move down to the adjacent area (if an exit exists).",
 	"name":      "Change your player name. Usage: name <new_name>",
-	"recall":    "Return to the starting area instantly.",
+	"recall":    "Return to the town of Ravenmoor instantly.",
 	"help":      "Show help information. Usage: help [command]",
 	"history":   "Show your command history (last 100 commands).",
 	"clear":     "Clear your command history.",
@@ -42,6 +42,13 @@ var commandHelpText = map[string]string{
 	"summon":    "Summon a player to your location. Admins can always summon. Usage: summon <player>",
 	"hail":      "Hail an NPC to start a conversation. Usage: hail <npc_name>",
 	"uptime":    "Show server uptime, current players, and connection statistics.",
+	"give":      "Give an item to an NPC. Some NPCs (like Wylie) reward gifts with faction standing. Usage: give <item> [qty] to <npc>",
+	"buy":       "Buy an item from a merchant in your area. Some merchants require faction standing. Usage: buy <item> [qty]",
+	"list":      "List the wares of a merchant in your area, with prices and your standing. (aliases: wares, shop)",
+	"faction":   "Show your standing with the factions you've earned reputation with. (aliases: standing, rep)",
+	"mount":     "Saddle a horse you own so you can gallop. Usage: mount [horse]",
+	"dismount":  "Climb down off your horse. (alias: unmount)",
+	"ride":      "Mount a horse, or gallop several rooms at once. Usage: ride <horse> | ride <direction> (alias: gallop)",
 }
 
 // handleHistory shows the player's command history
@@ -154,11 +161,22 @@ func handleHelp(player *components.Player, args []string, game *Game) {
 		b.WriteString("  drop <pattern>    - Drop items by pattern (supports * or regex)\n")
 		b.WriteString("  dropall [pattern] - Drop all items (optionally matching)\n\n")
 
+		b.WriteString("MERCHANTS & FACTIONS\n")
+		b.WriteString("  list              - See a merchant's wares (aliases: wares, shop)\n")
+		b.WriteString("  buy <item> [qty]  - Buy from a merchant\n")
+		b.WriteString("  give <item> to <npc> - Give an item to an NPC\n")
+		b.WriteString("  faction           - View your standings (aliases: standing, rep)\n\n")
+
+		b.WriteString("MOUNTS\n")
+		b.WriteString("  mount [horse]     - Saddle a horse you own\n")
+		b.WriteString("  ride <direction>  - Gallop several rooms (alias: gallop)\n")
+		b.WriteString("  dismount          - Climb down (alias: unmount)\n\n")
+
 		b.WriteString("CHARACTER\n")
 		b.WriteString("  name <new_name>   - Change your name\n")
 		b.WriteString("  login <uuid>      - Link this session to a UUID\n")
 		b.WriteString("  save              - Save your character and get a UUID\n")
-		b.WriteString("  recall            - Return to starting area\n\n")
+		b.WriteString("  recall            - Return to town (Ravenmoor)\n\n")
 		b.WriteString("  cast <spell> [target] - Cast a spell (heal, charm, control undead)\n\n")
 
 		b.WriteString("UTILITY\n")

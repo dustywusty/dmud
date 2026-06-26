@@ -56,28 +56,13 @@ func (inv *Inventory) RemoveItem(itemID string, quantity int) *Item {
 			if item.Stackable && item.Quantity > quantity {
 				// Partial removal from stack
 				item.Quantity -= quantity
-				removed := &Item{
-					ID:          item.ID,
-					Name:        item.Name,
-					Description: item.Description,
-					Type:        item.Type,
-					Value:       item.Value,
-					Stackable:   item.Stackable,
-					Quantity:    quantity,
-				}
+				removed := item.cloneLocked()
+				removed.Quantity = quantity
 				item.Unlock()
 				return removed
 			} else {
 				// Remove entire item/stack
-				removed := &Item{
-					ID:          item.ID,
-					Name:        item.Name,
-					Description: item.Description,
-					Type:        item.Type,
-					Value:       item.Value,
-					Stackable:   item.Stackable,
-					Quantity:    item.Quantity,
-				}
+				removed := item.cloneLocked()
 				item.Unlock()
 				inv.Items = append(inv.Items[:i], inv.Items[i+1:]...)
 				return removed
@@ -122,4 +107,23 @@ func (inv *Inventory) IsFull() bool {
 	defer inv.RUnlock()
 
 	return inv.MaxSlots > 0 && len(inv.Items) >= inv.MaxSlots
+}
+
+// CountItem returns the total quantity of an item (by ID) currently held.
+func (inv *Inventory) CountItem(itemID string) int {
+	inv.RLock()
+	defer inv.RUnlock()
+
+	total := 0
+	for _, item := range inv.Items {
+		if item == nil {
+			continue
+		}
+		item.RLock()
+		if item.ID == itemID {
+			total += item.Quantity
+		}
+		item.RUnlock()
+	}
+	return total
 }

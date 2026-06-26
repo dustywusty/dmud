@@ -166,13 +166,28 @@ func TestServer_BotsSmoke(t *testing.T) {
 		}
 	}
 
+	// New characters spawn as un-manifested ghosts; this test exercises
+	// post-creation play, so manifest the bots before they act.
+	g.playersMu.RLock()
+	for _, ent := range g.players {
+		if pc, err := g.world.GetComponent(ent.ID, "Player"); err == nil {
+			if p, ok := pc.(*components.Player); ok {
+				p.Created = true
+			}
+		}
+		g.world.RemoveComponent(ent.ID, "Creation")
+	}
+	g.playersMu.RUnlock()
+
 	// 2) Chat propagates between co-located bots: they all start in the default
-	//    area, so a `say` from one must reach the others.
+	//    area, so a `say` from one must reach the others. These bots are
+	//    tag-capable, so the speech arrives as a structured comms event with the
+	//    words in its JSON "text" field (plain-text clients get "X says: …").
 	const phrase = "smoke-test-marker"
 	g.ExecuteCommandChan <- smokeCmd(bots[0], "say "+phrase)
 	heard := waitFor(func() bool {
 		for _, b := range bots[1:] {
-			if b.hasMessageContaining("says: " + phrase) {
+			if b.hasMessageContaining(`"text":"` + phrase + `"`) {
 				return true
 			}
 		}
@@ -223,7 +238,7 @@ func TestServer_BotsSmoke(t *testing.T) {
 	//    command, not a stale one still in the queue.
 	const probe = "liveness-probe-9f3a2b"
 	g.ExecuteCommandChan <- smokeCmd(bots[0], "say "+probe)
-	if !waitFor(func() bool { return bots[0].hasMessageContaining("You say: " + probe) }, 2*time.Second) {
+	if !waitFor(func() bool { return bots[0].hasMessageContaining(`"text":"` + probe + `"`) }, 2*time.Second) {
 		t.Fatal("game loop stopped responding after the bot churn (possible deadlock)")
 	}
 

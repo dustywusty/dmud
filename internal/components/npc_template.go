@@ -80,6 +80,7 @@ type NPCTemplate struct {
 	RespawnTime  time.Duration
 	Stationary   bool       // If true, NPC will not wander between areas
 	LootTable    []LootDrop // Possible items this NPC can drop
+	Race         string     // optional race key (ogre, goblin, …) → stats + size
 }
 
 // JSON structs for loading
@@ -103,6 +104,7 @@ type npcTemplateJSON struct {
 	RespawnTimeSeconds int            `json:"respawn_time_seconds"`
 	Stationary         bool           `json:"stationary,omitempty"`
 	LootTable          []lootDropJSON `json:"loot_table"`
+	Race               string         `json:"race,omitempty"`
 }
 
 var NPCTemplates = make(map[string]NPCTemplate)
@@ -154,6 +156,7 @@ func LoadNPCTemplates(filename string) error {
 			RespawnTime:  time.Duration(t.RespawnTimeSeconds) * time.Second,
 			Stationary:   t.Stationary,
 			LootTable:    lootTable,
+			Race:         t.Race,
 		}
 	}
 

@@ -4,6 +4,7 @@ import (
 	"dmud/internal/common"
 	"dmud/internal/components"
 	"dmud/internal/ecs"
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -124,26 +125,83 @@ func (ss *SpawnSystem) processSpawn(w *ecs.World, spawnEntity ecs.Entity) {
 	defer spawn.Unlock()
 
 	for _, config := range spawn.Configs {
-		if config.Type != components.SpawnTypeNPC {
-			continue // For now, only handle NPCs
-		}
+		switch config.Type {
+		case components.SpawnTypeItem:
+			ss.processItemSpawn(area, config, spawn)
+		default: // SpawnTypeNPC
+			// Skip night-only spawns during the day
+			if config.NightOnly && !ss.isNightTime() {
+				continue
+			}
 
-		// Skip night-only spawns during the day
-		if config.NightOnly && !ss.isNightTime() {
-			continue
-		}
+			// Count active spawns of this type
+			activeCount := ss.countActiveNPCs(w, spawn, config.TemplateID)
 
-		// Count active spawns of this type
-		activeCount := ss.countActiveNPCs(w, spawn, config.TemplateID)
-
-		// Check if we need to spawn more
-		if activeCount < config.MinCount {
-			// Check spawn chance
-			if rand.Float64() <= config.Chance {
-				ss.spawnNPC(w, area, config, spawn)
+			// Check if we need to spawn more
+			if activeCount < config.MinCount {
+				// Check spawn chance
+				if rand.Float64() <= config.Chance {
+					ss.spawnNPC(w, area, config, spawn)
+				}
 			}
 		}
 	}
+}
+
+// processItemSpawn keeps an area's stock of a ground item topped up to MaxCount.
+// Unlike NPC spawns it is gated by a real respawn timer (RespawnTime), so items
+// like the bakery's cookies reappear on a schedule rather than instantly. The
+// caller holds spawn's lock, so LastItemSpawn is mutated without further locking.
+func (ss *SpawnSystem) processItemSpawn(area *components.Area, config components.SpawnConfig, spawn *components.Spawn) {
+	if config.MaxCount <= 0 {
+		return
+	}
+
+	current := countAreaItems(area, config.TemplateID)
+	if current >= config.MaxCount {
+		return // the sill is already full
+	}
+
+	// Respawn timer: the first batch appears immediately (zero time), then
+	// refills wait RespawnTime after the previous batch was set out.
+	last := spawn.LastItemSpawn[config.TemplateID]
+	if !last.IsZero() && time.Since(last) < config.RespawnTime {
+		return
+	}
+
+	if config.Chance < 1.0 && rand.Float64() > config.Chance {
+		return
+	}
+
+	toAdd := config.MaxCount - current
+	item := components.CreateItem(config.TemplateID, toAdd)
+	if item == nil {
+		log.Error().Msgf("Item template not found for spawn: %s", config.TemplateID)
+		return
+	}
+
+	area.AddItem(item)
+	spawn.LastItemSpawn[config.TemplateID] = time.Now()
+
+	if toAdd > 1 {
+		area.Broadcast(fmt.Sprintf("%s x%d appears here, fresh and warm.", item.Name, toAdd))
+	} else {
+		area.Broadcast(fmt.Sprintf("%s appears here, fresh and warm.", item.Name))
+	}
+
+	log.Info().Msgf("Spawned item: %s x%d in area %s", item.Name, toAdd, spawn.AreaID)
+}
+
+// countAreaItems totals the quantity of a given item ID currently on the ground
+// in an area.
+func countAreaItems(area *components.Area, itemID string) int {
+	total := 0
+	for _, item := range area.GetItems() {
+		if item.ID == itemID {
+			total += item.Quantity
+		}
+	}
+	return total
 }
 
 func (ss *SpawnSystem) countActiveNPCs(w *ecs.World, spawn *components.Spawn, templateID string) int {
@@ -199,11 +257,18 @@ func (ss *SpawnSystem) spawnNPC(w *ecs.World, area *components.Area, config comp
 		LastMovement: time.Now(),
 	}
 	w.AddComponent(&npcEntity, npc)
+	area.MarkDirty()
 
-	// Add Health component
+	// Race-derived stats drive this NPC's combat (STR → damage, CON → toughness)
+	// and its size (→ which exits it could fit through).
+	stats := components.NewStatsForRace(template.Race)
+	w.AddComponent(&npcEntity, stats)
+
+	// Add Health component — Constitution makes a creature tankier.
+	hpMax := template.Health + stats.HPBonus()
 	health := &components.Health{
-		Current: template.Health,
-		Max:     template.Health,
+		Current: hpMax,
+		Max:     hpMax,
 		Status:  components.Healthy,
 	}
 	w.AddComponent(&npcEntity, health)

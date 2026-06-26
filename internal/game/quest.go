@@ -37,11 +37,42 @@ func (g *Game) handleNPCHail(player *components.Player, npc *components.NPC) {
 		}
 	}
 
+	// Vendors greet with their shop pitch and the player's current standing.
+	if vendor, ok := components.VendorForNPC(npc.TemplateID); ok {
+		greeting := vendor.GreetingLine
+		if greeting == "" {
+			greeting = "Looking to trade?"
+		}
+		player.Broadcast(fmt.Sprintf("%s says: %s", npc.Name, greeting))
+		g.broadcastVendorStanding(player, npc, vendor)
+		player.Broadcast("(Try 'list' to see the wares, or 'give cookies to " + strings.ToLower(npc.Name) + "' to win them over.)")
+		return
+	}
+
 	// Default hail response for NPCs without quest dialogue
 	if len(npc.Dialogue) > 0 {
 		player.Broadcast(fmt.Sprintf("%s says: %s", npc.Name, npc.Dialogue[0]))
 	} else {
 		player.Broadcast(fmt.Sprintf("%s nods at you.", npc.Name))
+	}
+}
+
+// broadcastVendorStanding tells the player where they stand with a vendor's
+// faction and whether they've earned the right to shop.
+func (g *Game) broadcastVendorStanding(player *components.Player, npc *components.NPC, vendor *components.VendorDef) {
+	def := components.FactionRegistry[vendor.FactionID]
+	if def == nil {
+		return
+	}
+	playerEntity, err := g.getPlayerEntity(player)
+	if err != nil {
+		return
+	}
+	rep := g.getFactions(playerEntity).Get(vendor.FactionID)
+	if rep >= vendor.MinRepToBuy {
+		player.Broadcast(fmt.Sprintf("%s beams at you -- you're %s with %s.", npc.Name, def.RankTitle(rep), def.Name))
+	} else {
+		player.Broadcast(fmt.Sprintf("You are %s with %s (%d/%d to shop here).", def.RankTitle(rep), def.Name, rep, vendor.MinRepToBuy))
 	}
 }
 
