@@ -430,6 +430,17 @@ func (g *Game) initCommands() {
 		Description: "Buy an item from a merchant. Usage: buy <item> [qty]",
 	})
 	g.RegisterCommand(&Command{
+		Name:        "sell",
+		Handler:     g.handleSell,
+		Description: "Sell an item to a merchant for gold. Usage: sell <item> [qty]",
+	})
+	g.RegisterCommand(&Command{
+		Name:        "gold",
+		Aliases:     []string{"wealth", "money", "purse"},
+		Handler:     g.handleGold,
+		Description: "Check how much gold you're carrying.",
+	})
+	g.RegisterCommand(&Command{
 		Name:        "list",
 		Aliases:     []string{"wares", "shop"},
 		Handler:     g.handleList,

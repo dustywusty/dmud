@@ -188,6 +188,96 @@ func (g *Game) handleBuy(player *components.Player, args []string, game *Game) {
 	player.Area.Broadcast(fmt.Sprintf("%s buys %s from %s.", player.Name, label, npc.Name), player)
 }
 
+// sellPrice is what a vendor pays for an item: half its value, at least 1.
+func sellPrice(value int) int {
+	if p := value / 2; p > 1 {
+		return p
+	}
+	return 1
+}
+
+// handleSell sells an item from the player's inventory to a vendor here for gold.
+func (g *Game) handleSell(player *components.Player, args []string, game *Game) {
+	if player.Area == nil {
+		player.Broadcast("You are nowhere.")
+		return
+	}
+	npc, _ := g.findAreaVendor(player, "")
+	if npc == nil {
+		player.Broadcast("There's no merchant here to sell to.")
+		return
+	}
+	if len(args) == 0 {
+		player.Broadcast("Sell what? Usage: sell <item> [qty]")
+		return
+	}
+
+	itemName, qty := parseArgsWithQuantity(args)
+	if qty < 1 {
+		qty = 1
+	}
+
+	playerEntity, err := g.getPlayerEntity(player)
+	if err != nil {
+		return
+	}
+	invComp, err := g.world.GetComponent(playerEntity, "Inventory")
+	if err != nil {
+		player.Broadcast("You don't have an inventory!")
+		return
+	}
+	inventory := invComp.(*components.Inventory)
+
+	// Find a matching item to sell (never the gold itself).
+	var match *components.Item
+	for _, it := range inventory.GetItems() {
+		if it.ID == goldItemID {
+			continue
+		}
+		if strings.Contains(strings.ToLower(it.Name), strings.ToLower(itemName)) {
+			match = it
+			break
+		}
+	}
+	if match == nil {
+		player.Broadcast(fmt.Sprintf("%s says: You're not carrying that, love.", npc.Name))
+		return
+	}
+	if match.Value <= 0 {
+		player.Broadcast(fmt.Sprintf("%s says: That's worthless to me, I'm afraid.", npc.Name))
+		return
+	}
+
+	removed := inventory.RemoveItem(match.ID, qty)
+	if removed == nil {
+		player.Broadcast(fmt.Sprintf("%s says: You're not carrying that, love.", npc.Name))
+		return
+	}
+	total := sellPrice(match.Value) * removed.Quantity
+	if total < 1 {
+		total = 1
+	}
+	inventory.AddItem(components.CreateItem(goldItemID, total))
+
+	label := itemStackLabel(match.Name, removed.Quantity)
+	player.Broadcast(fmt.Sprintf("You sell %s to %s for %d gold.", label, npc.Name, total))
+	player.Area.Broadcast(fmt.Sprintf("%s sells %s to %s.", player.Name, label, npc.Name), player)
+	player.BroadcastState(g.world.AsWorldLike(), playerEntity)
+}
+
+// handleGold reports the player's current coin purse.
+func (g *Game) handleGold(player *components.Player, args []string, game *Game) {
+	entityID, err := g.getPlayerEntity(player)
+	if err != nil {
+		return
+	}
+	gold := 0
+	if invComp, err := g.world.GetComponent(entityID, "Inventory"); err == nil {
+		gold = invComp.(*components.Inventory).CountItem(goldItemID)
+	}
+	player.Broadcast(fmt.Sprintf("You have %d gold.", gold))
+}
+
 // handleList shows a vendor's wares along with the player's current standing.
 func (g *Game) handleList(player *components.Player, args []string, game *Game) {
 	if player.Area == nil {

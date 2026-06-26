@@ -271,6 +271,21 @@ func handleTargetDeath(w components.WorldLike, attackerID common.EntityID, targe
 		if attackerPlayer != nil {
 			attackerPlayer.Broadcast(util.TagMessage("DMG", "You have defeated "+targetNPC.Name+"!"))
 
+			// Coin drops, scaled like XP off the NPC's threat.
+			goldReward := 1 + rand.Intn(3)
+			if template, ok := components.NPCTemplates[targetNPC.TemplateID]; ok && template.MaxDamage > 0 {
+				goldReward = template.MaxDamage*2 + rand.Intn(template.MaxDamage+1)
+			}
+			if goldReward < 1 {
+				goldReward = 1
+			}
+			if invComp, err := w.GetComponent(attackerID, "Inventory"); err == nil {
+				if inv, ok := invComp.(*components.Inventory); ok {
+					inv.AddItem(components.CreateItem("gold_coin", goldReward))
+					attackerPlayer.Broadcast(util.TagMessage("STATUS", fmt.Sprintf("You loot %d gold from %s.", goldReward, targetNPC.Name)))
+				}
+			}
+
 			// Award experience based on NPC level/difficulty
 			xpReward := 50
 			if template, ok := components.NPCTemplates[targetNPC.TemplateID]; ok {

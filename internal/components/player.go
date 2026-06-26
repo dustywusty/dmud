@@ -20,6 +20,7 @@ type charVitals struct {
 	XP      int            `json:"xp"`
 	ReqXP   int            `json:"req_xp"`
 	Area    string         `json:"area"`
+	Gold    int            `json:"gold"`
 	Effects []string       `json:"effects,omitempty"` // names only (legacy)
 	Fx      []EffectView   `json:"fx,omitempty"`      // structured: kind + remaining + magnitude
 	Mount   string         `json:"mount,omitempty"`
@@ -136,10 +137,17 @@ func (p *Player) BroadcastState(w WorldLike, entityID common.EntityID) {
 		}
 	}
 
+	gold := 0
+	if invComp, err := w.GetComponent(entityID, "Inventory"); err == nil {
+		if inv, ok := invComp.(*Inventory); ok {
+			gold = inv.CountItem("gold_coin")
+		}
+	}
+
 	// Authoritative status push for event-aware clients (replaces STATE|).
 	vitals := charVitals{
 		Type: "char.vitals", HP: h.Current, MaxHP: h.Max + hpBonus, EP: ep, MaxEP: maxEP, Level: level,
-		XP: currentXP, ReqXP: requiredXP, Area: areaTitle, Effects: effectNames, Fx: fx, Mount: mountName,
+		XP: currentXP, ReqXP: requiredXP, Area: areaTitle, Gold: gold, Effects: effectNames, Fx: fx, Mount: mountName,
 		Stats: statsMap, Race: raceName,
 	}
 	if data, err := json.Marshal(vitals); err == nil {

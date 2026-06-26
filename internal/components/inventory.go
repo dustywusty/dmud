@@ -108,3 +108,22 @@ func (inv *Inventory) IsFull() bool {
 
 	return inv.MaxSlots > 0 && len(inv.Items) >= inv.MaxSlots
 }
+
+// CountItem returns the total quantity of an item (by ID) currently held.
+func (inv *Inventory) CountItem(itemID string) int {
+	inv.RLock()
+	defer inv.RUnlock()
+
+	total := 0
+	for _, item := range inv.Items {
+		if item == nil {
+			continue
+		}
+		item.RLock()
+		if item.ID == itemID {
+			total += item.Quantity
+		}
+		item.RUnlock()
+	}
+	return total
+}
