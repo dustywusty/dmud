@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -290,6 +291,8 @@ func (m *model) runSlash(line string) tea.Cmd {
 		return m.handleHighlight(rest)
 	case "trigger", "trig":
 		return m.handleTrigger(rest)
+	case "alarm":
+		return m.handleAlarm(rest)
 	default:
 		m.appendMain(dimStyle.Render("unknown command: /" + cmd + "   (try /help)"))
 		return nil
@@ -448,6 +451,34 @@ func (m *model) toggleLog(arg string) tea.Cmd {
 	m.logFile = f
 	m.appendMain(noticeStyle.Render("logging to " + path))
 	return nil
+}
+
+// handleAlarm views or sets the low HP/EN warning threshold.
+func (m *model) handleAlarm(rest string) tea.Cmd {
+	rest = strings.TrimSpace(strings.ToLower(rest))
+	switch rest {
+	case "":
+		if m.alarmPct <= 0 {
+			m.appendMain(noticeStyle.Render("low HP/EN alarm: off   (/alarm <pct> to enable)"))
+		} else {
+			m.appendMain(noticeStyle.Render(fmt.Sprintf("low HP/EN alarm: %d%%   (/alarm off to disable)", m.alarmPct)))
+		}
+		return nil
+	case "off", "0":
+		m.alarmPct = -1
+		m.hpAlarmed, m.enAlarmed = false, false
+		m.appendMain(noticeStyle.Render("alarm off"))
+		return saveConfigCmd(m.config())
+	}
+	pct, err := strconv.Atoi(rest)
+	if err != nil || pct < 1 || pct > 99 {
+		m.appendMain(dimStyle.Render("usage: /alarm <1-99> | off"))
+		return nil
+	}
+	m.alarmPct = pct
+	m.hpAlarmed, m.enAlarmed = false, false
+	m.appendMain(noticeStyle.Render(fmt.Sprintf("alarm set to %d%% — bell + warning when HP or EN drops that low", pct)))
+	return saveConfigCmd(m.config())
 }
 
 func bellCmd() tea.Cmd {

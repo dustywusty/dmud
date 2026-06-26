@@ -225,6 +225,7 @@ func effectsLabel(effects []string) string {
 }
 
 var (
+	alarmStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Bold(true)
 	goldStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
 	fxDotStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("203")) // damage-over-time
 	fxCtrlStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("214")) // control

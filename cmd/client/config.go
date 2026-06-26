@@ -15,6 +15,9 @@ type clientConfig struct {
 	Macros     map[string]macro  `json:"macros,omitempty"` // hotkey macros, keyed by slot
 	Highlights []ruleConfig      `json:"highlights,omitempty"`
 	Triggers   []ruleConfig      `json:"triggers,omitempty"`
+	Alarm      int               `json:"alarm,omitempty"`  // low HP/EN warn threshold (%); -1 = off, 0 = default
+	Theme      string            `json:"theme,omitempty"`  // color theme name
+	Prompt     string            `json:"prompt,omitempty"` // status prompt template
 }
 
 // layoutPrefs is the persisted UI layout.

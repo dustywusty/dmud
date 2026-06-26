@@ -52,6 +52,13 @@ type model struct {
 	target combatMsg // current attack target, for the enemy HP bar (Target=="" when idle)
 	hasGot bool      // received at least one STATE frame
 
+	alarmPct  int  // low HP/EN warn threshold (%); <=0 disables the alarm
+	hpAlarmed bool // edge state so the alarm fires once per dip, not every tick
+	enAlarmed bool
+
+	themeName string // selected color theme name ("" = default)
+	prompt    string // status prompt template ("" = default segments)
+
 	focus      focusTarget
 	showRight  bool
 	fullMap    bool // full-screen map overlay (/map)
@@ -141,6 +148,12 @@ func (m *model) applyConfig(c clientConfig) {
 	}
 	m.compact = c.Compact
 	m.comms.roomy = !c.Compact
+	m.alarmPct = c.Alarm
+	if m.alarmPct == 0 {
+		m.alarmPct = 20 // default threshold; -1 disables
+	}
+	m.themeName = c.Theme
+	m.prompt = c.Prompt
 	if c.Aliases != nil {
 		m.aliases = c.Aliases
 	}
@@ -160,6 +173,9 @@ func (m model) config() clientConfig {
 		Macros:     m.macros,
 		Highlights: rulesToConfig(m.highlights),
 		Triggers:   rulesToConfig(m.triggers),
+		Alarm:      m.alarmPct,
+		Theme:      m.themeName,
+		Prompt:     m.prompt,
 	}
 }
 
@@ -474,6 +490,7 @@ func (m *model) handleChunk(raw string) tea.Cmd {
 	if r.status != nil {
 		m.status = *r.status
 		m.hasGot = true
+		cmds = append(cmds, m.checkAlarms()...)
 	}
 	if r.room != nil {
 		if r.room.Title != m.room.Title {
@@ -701,6 +718,39 @@ func (m *model) resizeFocused(dx, dy int) {
 		m.wantMapH -= dy // growing COMMS shrinks the MAP above it
 	}
 	m.recalc()
+}
+
+// checkAlarms rings the bell and warns when HP or EN crosses below the alarm
+// threshold. Edge-triggered (hpAlarmed/enAlarmed) so it fires once per dip, then
+// rearms when the bar recovers.
+func (m *model) checkAlarms() []tea.Cmd {
+	if m.alarmPct <= 0 {
+		return nil
+	}
+	var cmds []tea.Cmd
+	if m.status.HasHP && m.status.MaxHP > 0 && m.status.HP > 0 {
+		if m.status.HP*100/m.status.MaxHP <= m.alarmPct {
+			if !m.hpAlarmed {
+				m.hpAlarmed = true
+				m.appendMain(alarmStyle.Render(fmt.Sprintf("⚠ LOW HEALTH  %d/%d", m.status.HP, m.status.MaxHP)))
+				cmds = append(cmds, bellCmd())
+			}
+		} else {
+			m.hpAlarmed = false
+		}
+	}
+	if m.status.HasEP && m.status.MaxEP > 0 {
+		if m.status.EP*100/m.status.MaxEP <= m.alarmPct {
+			if !m.enAlarmed {
+				m.enAlarmed = true
+				m.appendMain(alarmStyle.Render(fmt.Sprintf("⚠ LOW ENDURANCE  %d/%d", m.status.EP, m.status.MaxEP)))
+				cmds = append(cmds, bellCmd())
+			}
+		} else {
+			m.enAlarmed = false
+		}
+	}
+	return cmds
 }
 
 func (m *model) appendMain(s string) {
