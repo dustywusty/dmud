@@ -817,30 +817,44 @@ func (g *Game) rebuildSpawnTracking() {
 		if err != nil {
 			continue
 		}
-		area, err := ecs.GetTypedComponent[*components.Area](g.world, spawnEntity.ID, "Area")
-		if err != nil {
-			continue
-		}
+
 		spawn.Lock()
 		spawn.ActiveSpawns = make(map[string][]common.EntityID)
+		maxByTemplate := make(map[string]int)
 		for _, config := range spawn.Configs {
 			spawn.ActiveSpawns[config.TemplateID] = make([]common.EntityID, 0)
+			maxByTemplate[config.TemplateID] = config.MaxCount
 		}
+
 		for _, npcEntity := range npcEntities {
 			npcComp, err := g.world.GetComponent(npcEntity.ID, "NPC")
 			if err != nil {
-				continue
+				continue // already pruned by an earlier spawn's trim
 			}
 			npc, ok := npcComp.(*components.NPC)
 			if !ok || npc == nil {
 				continue
 			}
-			matchesArea := npc.Area == area
-			templateID := npc.TemplateID
-			if !matchesArea {
+			// Re-register a restored NPC to the spawn that *manages its template*,
+			// regardless of where it has since wandered. Matching by current area
+			// (the old behaviour) lost wandering NPCs — "traveling merchants" and
+			// roaming chickens — so the spawner saw zero and duplicated them on
+			// every restart, piling up a horde over a long dev session.
+			if _, manages := maxByTemplate[npc.TemplateID]; !manages {
 				continue
 			}
-			spawn.ActiveSpawns[templateID] = append(spawn.ActiveSpawns[templateID], npcEntity.ID)
+			spawn.ActiveSpawns[npc.TemplateID] = append(spawn.ActiveSpawns[npc.TemplateID], npcEntity.ID)
+		}
+
+		// Enforce MaxCount on load: prune any surplus so an already-accumulated
+		// horde collapses back to the intended population instead of persisting.
+		for templateID, ids := range spawn.ActiveSpawns {
+			if max := maxByTemplate[templateID]; max > 0 && len(ids) > max {
+				for _, extra := range ids[max:] {
+					g.world.RemoveEntity(extra)
+				}
+				spawn.ActiveSpawns[templateID] = ids[:max]
+			}
 		}
 		spawn.Unlock()
 	}
