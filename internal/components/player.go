@@ -90,9 +90,11 @@ func (p *Player) BroadcastState(w WorldLike, entityID common.EntityID) {
 	// and the raw stats ride along so the client can show them.
 	var statsMap map[string]int
 	var raceName string
+	epBonus := 0
 	if statsComp, err := w.GetComponent(entityID, "Stats"); err == nil {
 		if st, ok := statsComp.(*Stats); ok {
 			hpBonus += st.HPBonus()
+			epBonus = st.EnduranceBonus()
 			raceName = st.Race
 			statsMap = make(map[string]int, numStats)
 			for _, t := range AllStats() {
@@ -120,6 +122,13 @@ func (p *Player) BroadcastState(w WorldLike, entityID common.EntityID) {
 	ep, maxEP := 0, 0
 	if endComp, err := w.GetComponent(entityID, "Endurance"); err == nil {
 		if end, ok := endComp.(*Endurance); ok {
+			// Constitution (and level) set the endurance ceiling, mirroring HP —
+			// a high-CON ogre carries a deep stamina pool.
+			newMax := EnduranceBaseForLevel(level) + epBonus
+			if end.Current >= end.Max && end.Current < newMax {
+				end.Current = newMax // pool grew while full; stay topped up
+			}
+			end.Max = newMax
 			end.Regen()
 			ep, maxEP = end.Current, end.Max
 		}

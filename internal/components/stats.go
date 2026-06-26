@@ -144,6 +144,16 @@ func (s *Stats) HPBonus() int {
 	return 0
 }
 
+// EnduranceBonus is the extra maximum endurance Constitution grants (+5 per
+// point). Endurance is the stamina pool, so a brawny ogre carries a deep
+// reserve; a frail mage runs out fast.
+func (s *Stats) EnduranceBonus() int {
+	if v := s.Get(CON) - statBase; v > 0 {
+		return v * 5
+	}
+	return 0
+}
+
 // CostFactor scales an endurance cost down with Dexterity, to a 50% floor.
 func (s *Stats) CostFactor() float64 {
 	red := float64(s.Get(DEX)-statBase) * 0.004

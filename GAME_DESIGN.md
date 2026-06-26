@@ -53,8 +53,9 @@ Two axes that compose:
   mastery is a long tail. A racial penalty trains *back* a little faster than a
   bonus, so races flavor a character without dooming it.
 
-Stat → role: STR melee, INT arcane, WIS healing, CON toughness (HP), DEX
-efficiency (cheaper actions). The exact curves live in `internal/components/stats.go`.
+Stat → role: STR melee, INT arcane, WIS healing, CON toughness (HP **and**
+endurance — a brawny ogre carries a deep stamina pool), DEX efficiency (cheaper
+actions). The exact curves live in `internal/components/stats.go`.
 
 ## Classes & schools
 

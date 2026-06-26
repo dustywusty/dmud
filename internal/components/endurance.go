@@ -21,11 +21,17 @@ type Endurance struct {
 
 func (e *Endurance) Type() string { return "Endurance" }
 
+// EnduranceBaseForLevel is the base endurance pool at a level, before any
+// Constitution bonus. Exposed so the ceiling can be recomputed as you level or
+// train CON (mirroring how Health's effective max is derived).
+func EnduranceBaseForLevel(level int) int {
+	return int(math.Floor(100 * GetLevelScaling(level)))
+}
+
 // NewEndurance gives a generous starting pool that scales with level, the same
-// way Health does.
+// way Health does. Constitution adds to it later (see EnduranceBonus).
 func NewEndurance(level int) *Endurance {
-	base := 100
-	max := int(math.Floor(float64(base) * GetLevelScaling(level)))
+	max := EnduranceBaseForLevel(level)
 	return &Endurance{Current: max, Max: max, LastRegen: time.Now()}
 }
 
