@@ -9,6 +9,14 @@ import (
 	"dmud/internal/util"
 )
 
+// fxEffect is one active status effect with its countdown, for the FX bar.
+type fxEffect struct {
+	Name      string
+	Kind      string // buff | dot | heal | control
+	Remaining int    // seconds; 0 = permanent
+	Magnitude int
+}
+
 // statusInfo is the parsed form of a STATE| frame.
 type statusInfo struct {
 	HP, MaxHP int
@@ -16,7 +24,9 @@ type statusInfo struct {
 	Level     int
 	XP, ReqXP int
 	Area      string
+	Gold      int
 	Effects   []string
+	Fx        []fxEffect // structured effects with timers (preferred over Effects)
 	Stats     map[string]int // STR/DEX/CON/INT/WIS
 	Race      string
 	HasHP     bool
@@ -236,15 +246,26 @@ func parseEvent(payload string) routed {
 			XP      int            `json:"xp"`
 			ReqXP   int            `json:"req_xp"`
 			Area    string         `json:"area"`
+			Gold    int            `json:"gold"`
 			Effects []string       `json:"effects"`
-			Stats   map[string]int `json:"stats"`
-			Race    string         `json:"race"`
+			Fx      []struct {
+				Name      string `json:"name"`
+				Kind      string `json:"kind"`
+				Remaining int    `json:"remaining"`
+				Magnitude int    `json:"magnitude"`
+			} `json:"fx"`
+			Stats map[string]int `json:"stats"`
+			Race  string         `json:"race"`
 		}
 		if json.Unmarshal([]byte(payload), &v) == nil {
+			var fx []fxEffect
+			for _, f := range v.Fx {
+				fx = append(fx, fxEffect{Name: f.Name, Kind: f.Kind, Remaining: f.Remaining, Magnitude: f.Magnitude})
+			}
 			s := statusInfo{
 				HP: v.HP, MaxHP: v.MaxHP, EP: v.EP, MaxEP: v.MaxEP,
 				Level: v.Level, XP: v.XP, ReqXP: v.ReqXP,
-				Area: v.Area, Effects: v.Effects, Stats: v.Stats, Race: v.Race,
+				Area: v.Area, Gold: v.Gold, Effects: v.Effects, Fx: fx, Stats: v.Stats, Race: v.Race,
 				HasHP: true, HasXP: true, HasEP: v.MaxEP > 0,
 			}
 			return routed{status: &s}

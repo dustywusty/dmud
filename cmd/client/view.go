@@ -188,8 +188,11 @@ func (m model) renderStatus() string {
 			xpFillStyle.Render("XP")+" "+bar(s.XP, s.ReqXP, 10, xpFillStyle, hpTroughStyle)+
 				fmt.Sprintf(" %d/%d", s.XP, s.ReqXP),
 			fmt.Sprintf("Lv %d", s.Level),
-			"FX "+effectsLabel(s.Effects),
 		)
+		if s.Gold > 0 {
+			segs = append(segs, goldStyle.Render(fmt.Sprintf("%d gold", s.Gold)))
+		}
+		segs = append(segs, "FX "+fxLabel(s.Fx, s.Effects))
 		if seg := statsSeg(s.Stats); seg != "" {
 			segs = append(segs, seg)
 		}
@@ -219,6 +222,40 @@ func effectsLabel(effects []string) string {
 		return dimStyle.Render("none")
 	}
 	return strings.Join(effects, ", ")
+}
+
+var (
+	goldStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
+	fxDotStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("203")) // damage-over-time
+	fxCtrlStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("214")) // control
+	fxHealStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("84"))  // heal-over-time
+	fxBuffStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("117")) // buff
+)
+
+// fxLabel renders active effects with countdowns, colored by kind. Falls back to
+// the legacy name-only list when the server doesn't send structured fx.
+func fxLabel(fx []fxEffect, legacy []string) string {
+	if len(fx) == 0 {
+		return effectsLabel(legacy)
+	}
+	parts := make([]string, 0, len(fx))
+	for _, f := range fx {
+		st := fxBuffStyle
+		switch f.Kind {
+		case "dot":
+			st = fxDotStyle
+		case "control":
+			st = fxCtrlStyle
+		case "heal":
+			st = fxHealStyle
+		}
+		label := f.Name
+		if f.Remaining > 0 {
+			label += fmt.Sprintf(" %ds", f.Remaining)
+		}
+		parts = append(parts, st.Render(label))
+	}
+	return strings.Join(parts, ", ")
 }
 
 // statsSeg renders the five attributes compactly for the status line, e.g.

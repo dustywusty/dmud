@@ -25,6 +25,40 @@ func TestEventRoomContents(t *testing.T) {
 	}
 }
 
+func TestEventCharVitalsFxAndGold(t *testing.T) {
+	raw := `EVENT|{"type":"char.vitals","hp":40,"max_hp":100,"level":2,"xp":0,"req_xp":100,"area":"X","gold":57,` +
+		`"fx":[{"name":"Burning","kind":"dot","remaining":6,"magnitude":-4},{"name":"Blessing","kind":"buff","remaining":0,"magnitude":10}]}`
+
+	r := classify(raw)
+	if r.status == nil {
+		t.Fatal("char.vitals should decode into a status update")
+	}
+	if r.status.Gold != 57 {
+		t.Errorf("gold = %d, want 57", r.status.Gold)
+	}
+	if len(r.status.Fx) != 2 {
+		t.Fatalf("fx len = %d, want 2", len(r.status.Fx))
+	}
+	if f := r.status.Fx[0]; f.Name != "Burning" || f.Kind != "dot" || f.Remaining != 6 {
+		t.Errorf("fx[0] = %+v, want Burning/dot/6", f)
+	}
+
+	// A DoT with a timer renders its name and countdown; legacy names still work.
+	if got := fxLabel(r.status.Fx, nil); !strings.Contains(got, "Burning") || !strings.Contains(got, "6s") {
+		t.Errorf("fxLabel = %q, want Burning + 6s", got)
+	}
+	if got := fxLabel(nil, []string{"bless"}); !strings.Contains(got, "bless") {
+		t.Errorf("fxLabel legacy fallback = %q, want bless", got)
+	}
+
+	// Gold shows on the rendered status bar.
+	m := newModel(newConn(transportWS, "x"), nil)
+	m = drive(m, tea.WindowSizeMsg{Width: 140, Height: 40}, chunkMsg{raw: raw})
+	if view := ansi.Strip(m.View()); !strings.Contains(view, "57 gold") {
+		t.Error("status bar should render the gold amount")
+	}
+}
+
 func TestEventCharVitals(t *testing.T) {
 	raw := `EVENT|{"type":"char.vitals","hp":42,"max_hp":100,"level":3,"xp":120,"req_xp":300,"area":"Whispering Woods","effects":["bless"]}`
 
