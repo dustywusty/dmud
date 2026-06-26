@@ -77,6 +77,10 @@ type model struct {
 	// command palette overlay (nil when closed)
 	cmdpal *cmdPalette
 
+	// inventory/equipment overlay
+	gearOpen  bool
+	equipment []equipItem // last-known worn gear (from equipment events)
+
 	mapper *mapper
 	roster map[string]bool // confirmed online player names, for HERE highlighting
 
@@ -380,9 +384,17 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.openPalette()
 		return m, nil
 
+	case "ctrl+e":
+		m.gearOpen = !m.gearOpen
+		m.fullMap = false
+		return m, nil
+
 	case "esc":
 		if m.fullMap {
 			m.fullMap = false
+		}
+		if m.gearOpen {
+			m.gearOpen = false
 		}
 		return m, nil
 
@@ -536,6 +548,9 @@ func (m *model) handleChunk(raw string) tea.Cmd {
 	}
 	if r.combat != nil {
 		m.target = *r.combat
+	}
+	if r.hasEquip {
+		m.equipment = r.equip
 	}
 	if len(r.macros) > 0 {
 		applied := 0

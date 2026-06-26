@@ -76,6 +76,15 @@ type combatMsg struct {
 	Killed    bool   `json:"killed"`
 }
 
+// equipItem is one worn item from an EVENT|{equipment} event.
+type equipItem struct {
+	Slot    string `json:"slot"`
+	Name    string `json:"name"`
+	Damage  string `json:"damage"`
+	Armor   int    `json:"armor"`
+	HPBonus int    `json:"hp_bonus"`
+}
+
 // routed is the result of classifying one server chunk: where each part of it
 // should be displayed in the UI.
 type routed struct {
@@ -86,6 +95,8 @@ type routed struct {
 	comms    *commsMsg      // non-nil: structured chat for a COMMS tab
 	combat   *combatMsg     // non-nil: combat event with target health
 	macros   []macroBinding // non-empty: server-pushed hotkey loadout to apply
+	equip    []equipItem    // worn gear from an equipment event
+	hasEquip bool           // an equipment event was present (equip may be empty)
 	identity string         // non-empty: server-assigned login id to remember (silent)
 	toChat   string         // non-empty: append to the chat panel
 	toMain   string         // non-empty: append to the main view
@@ -235,6 +246,13 @@ func parseEvent(payload string) routed {
 		}
 		if json.Unmarshal([]byte(payload), &v) == nil && len(v.Set) > 0 {
 			return routed{macros: v.Set}
+		}
+	case "equipment":
+		var v struct {
+			Slots []equipItem `json:"slots"`
+		}
+		if json.Unmarshal([]byte(payload), &v) == nil {
+			return routed{equip: v.Slots, hasEquip: true}
 		}
 	case "char.vitals":
 		var v struct {

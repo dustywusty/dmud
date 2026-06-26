@@ -26,6 +26,8 @@ func (m model) View() string {
 		middle = m.renderMacroEditor()
 	case m.rulesOpen:
 		middle = m.renderRules()
+	case m.gearOpen:
+		middle = m.renderGear()
 	case m.fullMap:
 		middle = m.renderFullMap()
 	default:
@@ -227,6 +229,38 @@ func effectsLabel(effects []string) string {
 		return dimStyle.Render("none")
 	}
 	return strings.Join(effects, ", ")
+}
+
+// renderGear is the inventory/equipment overlay: worn gear and its modifiers,
+// fed live by the server's equipment events.
+func (m model) renderGear() string {
+	var b strings.Builder
+	b.WriteString(titleStyle.Render("⚔ Equipment") + "   " +
+		dimStyle.Render("ctrl+e / esc to close · type 'equipment' to refresh") + "\n\n")
+
+	if len(m.equipment) == 0 {
+		b.WriteString(dimStyle.Render("  Nothing equipped.\n  Wield a weapon or wear armor with:  equip <item>"))
+	} else {
+		for _, e := range m.equipment {
+			line := fmt.Sprintf("  %-9s %s", "["+e.Slot+"]", e.Name)
+			var extras []string
+			if e.Damage != "" {
+				extras = append(extras, "dmg "+e.Damage)
+			}
+			if e.Armor > 0 {
+				extras = append(extras, fmt.Sprintf("armor %d", e.Armor))
+			}
+			if e.HPBonus > 0 {
+				extras = append(extras, fmt.Sprintf("+%d HP", e.HPBonus))
+			}
+			if len(extras) > 0 {
+				line += "  " + dimStyle.Render("("+strings.Join(extras, ", ")+")")
+			}
+			b.WriteString(line + "\n")
+		}
+	}
+	b.WriteString("\n" + dimStyle.Render("Carried items: type 'inventory' (or 'i')."))
+	return panelStyle(true).Width(m.width - 2).Render(b.String())
 }
 
 // renderPromptLine fills a user prompt template with the current vitals.
