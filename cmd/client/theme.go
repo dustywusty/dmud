@@ -53,6 +53,56 @@ var (
 	macroKeyStyle    = lipgloss.NewStyle().Foreground(colExit).Bold(true)                  // F-key labels on the macro bar
 )
 
+// palette is a full named color scheme. applyTheme swaps every style over to one.
+type palette struct {
+	border, focus, title, room, exit, chatName, dim    lipgloss.Color
+	hp, hpBg, xp, en, ok, bad, combat, player, enemy   lipgloss.Color
+}
+
+var palettes = map[string]palette{
+	// The original dark, retro-terminal scheme.
+	"default": {"240", "213", "117", "228", "84", "215", "244", "203", "236", "75", "179", "84", "203", "173", "81", "173"},
+	// Monochrome amber, like an old CRT.
+	"amber": {"94", "214", "214", "220", "178", "215", "94", "208", "235", "178", "214", "214", "208", "208", "222", "208"},
+	// Green phosphor.
+	"green": {"22", "46", "48", "84", "40", "120", "28", "46", "235", "84", "48", "46", "196", "84", "120", "84"},
+	// Tuned for light terminals.
+	"light": {"250", "161", "25", "94", "28", "130", "245", "124", "254", "26", "136", "28", "124", "130", "26", "130"},
+}
+
+func themeNames() []string { return []string{"default", "amber", "green", "light"} }
+
+// applyTheme swaps the live palette and rebuilds every style from it. Unknown
+// names fall back to "default". Safe to call at startup and on /theme.
+func applyTheme(name string) {
+	p, ok := palettes[name]
+	if !ok {
+		p = palettes["default"]
+	}
+	colBorder, colFocus, colTitle, colRoom, colExit, colChatName, colDim =
+		p.border, p.focus, p.title, p.room, p.exit, p.chatName, p.dim
+	colHP, colHPBg, colXP, colEN, colOK, colBad = p.hp, p.hpBg, p.xp, p.en, p.ok, p.bad
+
+	titleStyle = lipgloss.NewStyle().Foreground(p.title).Bold(true)
+	roomNameStyle = lipgloss.NewStyle().Foreground(p.room).Bold(true)
+	exitStyle = lipgloss.NewStyle().Foreground(p.exit)
+	dimStyle = lipgloss.NewStyle().Foreground(p.dim)
+	chatNameStyle = lipgloss.NewStyle().Foreground(p.chatName).Bold(true)
+	okStyle = lipgloss.NewStyle().Foreground(p.ok).Bold(true)
+	badStyle = lipgloss.NewStyle().Foreground(p.bad).Bold(true)
+	hpFillStyle = lipgloss.NewStyle().Foreground(p.hp)
+	hpTroughStyle = lipgloss.NewStyle().Foreground(p.hpBg)
+	xpFillStyle = lipgloss.NewStyle().Foreground(p.xp)
+	enFillStyle = lipgloss.NewStyle().Foreground(p.en)
+	noticeStyle = lipgloss.NewStyle().Foreground(p.title).Bold(true)
+	combatStyle = lipgloss.NewStyle().Foreground(p.combat)
+	playerStyle = lipgloss.NewStyle().Foreground(p.player).Bold(true)
+	enemyFillStyle = lipgloss.NewStyle().Foreground(p.enemy)
+	commsActiveStyle = lipgloss.NewStyle().Foreground(p.title).Bold(true).Underline(true)
+	commsUnreadStyle = lipgloss.NewStyle().Foreground(p.chatName).Bold(true)
+	macroKeyStyle = lipgloss.NewStyle().Foreground(p.exit).Bold(true)
+}
+
 // bar renders a fixed-width [####----] progress bar.
 func bar(cur, max, width int, fill, trough lipgloss.Style) string {
 	if width < 1 {

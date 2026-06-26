@@ -293,6 +293,10 @@ func (m *model) runSlash(line string) tea.Cmd {
 		return m.handleTrigger(rest)
 	case "alarm":
 		return m.handleAlarm(rest)
+	case "theme":
+		return m.handleTheme(rest)
+	case "prompt":
+		return m.handlePrompt(rest)
 	default:
 		m.appendMain(dimStyle.Render("unknown command: /" + cmd + "   (try /help)"))
 		return nil
@@ -451,6 +455,49 @@ func (m *model) toggleLog(arg string) tea.Cmd {
 	m.logFile = f
 	m.appendMain(noticeStyle.Render("logging to " + path))
 	return nil
+}
+
+// handleTheme views or switches the color theme.
+func (m *model) handleTheme(rest string) tea.Cmd {
+	rest = strings.TrimSpace(strings.ToLower(rest))
+	if rest == "" {
+		cur := m.themeName
+		if cur == "" {
+			cur = "default"
+		}
+		m.appendMain(noticeStyle.Render("theme: " + cur + "   available: " + strings.Join(themeNames(), ", ")))
+		return nil
+	}
+	if _, ok := palettes[rest]; !ok {
+		m.appendMain(dimStyle.Render("unknown theme: " + rest + "   (try: " + strings.Join(themeNames(), ", ") + ")"))
+		return nil
+	}
+	m.themeName = rest
+	applyTheme(rest)
+	m.appendMain(noticeStyle.Render("theme set to " + rest))
+	return saveConfigCmd(m.config())
+}
+
+// handlePrompt views, sets, or clears the custom status prompt template.
+func (m *model) handlePrompt(rest string) tea.Cmd {
+	rest = strings.TrimSpace(rest)
+	switch strings.ToLower(rest) {
+	case "":
+		if m.prompt == "" {
+			m.appendMain(noticeStyle.Render("prompt: default   (set one, e.g. /prompt HP {hp}/{maxhp}  EN {ep}  {gold}g  {area})"))
+		} else {
+			m.appendMain(noticeStyle.Render("prompt: " + m.prompt + "   (/prompt off to restore default)"))
+		}
+		m.appendMain(dimStyle.Render("tokens: {hp} {maxhp} {ep} {maxep} {xp} {reqxp} {lvl} {gold} {area}"))
+		return nil
+	case "off", "default", "clear":
+		m.prompt = ""
+		m.appendMain(noticeStyle.Render("prompt reset to default"))
+		return saveConfigCmd(m.config())
+	}
+	m.prompt = rest
+	m.appendMain(noticeStyle.Render("prompt set"))
+	return saveConfigCmd(m.config())
 }
 
 // handleAlarm views or sets the low HP/EN warning threshold.

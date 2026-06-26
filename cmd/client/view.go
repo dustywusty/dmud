@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -174,6 +175,8 @@ func (m model) renderStatus() string {
 	var line string
 	if !m.hasGot {
 		line = dimStyle.Render(" awaiting status…")
+	} else if m.prompt != "" {
+		line = renderPromptLine(m.prompt, m.status)
 	} else {
 		s := m.status
 		segs := []string{
@@ -222,6 +225,18 @@ func effectsLabel(effects []string) string {
 		return dimStyle.Render("none")
 	}
 	return strings.Join(effects, ", ")
+}
+
+// renderPromptLine fills a user prompt template with the current vitals.
+func renderPromptLine(tmpl string, s statusInfo) string {
+	r := strings.NewReplacer(
+		"{hp}", strconv.Itoa(s.HP), "{maxhp}", strconv.Itoa(s.MaxHP),
+		"{ep}", strconv.Itoa(s.EP), "{maxep}", strconv.Itoa(s.MaxEP),
+		"{xp}", strconv.Itoa(s.XP), "{reqxp}", strconv.Itoa(s.ReqXP),
+		"{lvl}", strconv.Itoa(s.Level), "{gold}", strconv.Itoa(s.Gold),
+		"{area}", s.Area,
+	)
+	return " " + r.Replace(tmpl)
 }
 
 var (

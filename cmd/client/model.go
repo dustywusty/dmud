@@ -154,6 +154,7 @@ func (m *model) applyConfig(c clientConfig) {
 	}
 	m.themeName = c.Theme
 	m.prompt = c.Prompt
+	applyTheme(c.Theme)
 	if c.Aliases != nil {
 		m.aliases = c.Aliases
 	}
