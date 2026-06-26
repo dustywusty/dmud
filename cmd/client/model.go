@@ -81,6 +81,10 @@ type model struct {
 	gearOpen  bool
 	equipment []equipItem // last-known worn gear (from equipment events)
 
+	// tab-targeting: cycle-able enemies in the current room
+	npcs      []string
+	targetIdx int
+
 	mapper *mapper
 	roster map[string]bool // confirmed online player names, for HERE highlighting
 
@@ -598,6 +602,8 @@ func (m *model) applyContents(c roomContents) {
 	occ = append(occ, c.Corpses...)
 	occ = append(occ, c.Items...)
 	m.room.Occupants = occ
+	m.npcs = c.NPCs // the cycle-able target list
+	m.targetIdx = 0
 	m.refreshHere()
 }
 

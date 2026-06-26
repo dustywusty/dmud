@@ -297,6 +297,8 @@ func (m *model) runSlash(line string) tea.Cmd {
 		return m.handleTheme(rest)
 	case "prompt":
 		return m.handlePrompt(rest)
+	case "target", "t":
+		return m.handleTarget(rest)
 	default:
 		m.appendMain(dimStyle.Render("unknown command: /" + cmd + "   (try /help)"))
 		return nil
@@ -455,6 +457,37 @@ func (m *model) toggleLog(arg string) tea.Cmd {
 	m.logFile = f
 	m.appendMain(noticeStyle.Render("logging to " + path))
 	return nil
+}
+
+// handleTarget attacks the next enemy in the room (cycling through them on
+// repeat presses), or a specifically named one. The enemy HP bar in the status
+// line then tracks it via the server's combat events.
+func (m *model) handleTarget(rest string) tea.Cmd {
+	rest = strings.TrimSpace(rest)
+	if rest != "" {
+		return m.dispatch("kill " + rest)
+	}
+	if len(m.npcs) == 0 {
+		m.appendMain(dimStyle.Render("no targets here"))
+		return nil
+	}
+	if m.targetIdx >= len(m.npcs) {
+		m.targetIdx = 0
+	}
+	name := m.npcs[m.targetIdx]
+	m.targetIdx++
+	m.appendMain(noticeStyle.Render("⚔ attacking " + name))
+	return m.dispatch("kill " + stripArticle(name))
+}
+
+// stripArticle drops a leading a/an/the so "a sneaky goblin" -> "sneaky goblin".
+func stripArticle(s string) string {
+	for _, art := range []string{"a ", "an ", "the "} {
+		if strings.HasPrefix(strings.ToLower(s), art) {
+			return s[len(art):]
+		}
+	}
+	return s
 }
 
 // handleTheme views or switches the color theme.
