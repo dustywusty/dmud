@@ -20,6 +20,8 @@ func (m model) View() string {
 
 	var middle string
 	switch {
+	case m.cmdpal != nil:
+		middle = m.renderPalette()
 	case m.macroEd != nil:
 		middle = m.renderMacroEditor()
 	case m.rulesOpen:

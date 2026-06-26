@@ -74,6 +74,9 @@ type model struct {
 	// macro editor overlay (nil when closed)
 	macroEd *macroEditor
 
+	// command palette overlay (nil when closed)
+	cmdpal *cmdPalette
+
 	mapper *mapper
 	roster map[string]bool // confirmed online player names, for HERE highlighting
 
@@ -284,6 +287,9 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.keyDebug {
 		m.appendMain(dimStyle.Render("key: " + msg.String()))
 	}
+	if m.cmdpal != nil {
+		return m.handlePaletteKey(msg)
+	}
 	if m.macroEd != nil {
 		return m.handleMacroEditorKey(msg)
 	}
@@ -368,6 +374,10 @@ func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.rulesOpen = true
 		m.rulesCursor = 0
 		m.fullMap = false
+		return m, nil
+
+	case "ctrl+k":
+		m.openPalette()
 		return m, nil
 
 	case "esc":
