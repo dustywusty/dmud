@@ -126,6 +126,8 @@ go run ./cmd/webtty -listen :8091 -mud localhost:8080 \
 | `Tab` / `Shift+Tab` | complete the last word; or (empty input) cycle focus through all panes — HERE / OUTPUT / MAP / COMMS |
 | `↑` / `↓`      | browse command history (persists across sessions; your draft is kept) |
 | `^G`           | toggle the full-screen map                       |
+| `^K`           | command palette — fuzzy-find any command/spell/alias (type · `↑↓` · `⏎` inserts) |
+| `^E`           | inventory/equipment overlay (worn gear + modifiers) |
 | `^A`           | RULES panel — view/edit macros, aliases, highlights, triggers (`↑↓` select · `e` edit · `d` delete) |
 | `^N` / `^P`    | next / previous COMMS channel tab               |
 | `^O`           | **resize mode** — `Tab` picks the pane, `←/→` `↑/↓` resize it, `Esc` to finish |
@@ -198,6 +200,10 @@ the server:
 | `/alias gc get all from corpse` | define an alias (`;` chains commands; `/alias gc` removes it) |
 | `/highlight yellow tells you`   | colorize output matching a regex (`/highlight off` clears) |
 | `/trigger low health = quaff red = /bell` | auto-run a command (or `/bell`) when output matches |
+| `/alarm 20` · `/alarm off`      | ring the bell + warn when HP/EN drops to a threshold |
+| `/theme amber`                  | switch color theme (`default`, `amber`, `green`, `light`) |
+| `/prompt HP {hp}/{maxhp} {gold}g` | custom status line (tokens: `{hp} {maxhp} {ep} {xp} {lvl} {gold} {area}`; `/prompt off` resets) |
+| `/target` · `/t orc`            | attack the next enemy (cycles), or a named one |
 | `/map` · `/map reset`           | full-screen map · wipe the saved map and start fresh |
 | `/spacing`                      | toggle blank lines between messages (roomy ↔ compact) |
 | `/mouse`                        | toggle mouse capture (off to select/copy text) |
