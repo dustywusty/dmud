@@ -220,6 +220,24 @@ func registerRestoration() {
 			Handler: makeHealSpell(healSpellSpec{name: s.name, base: s.base, perLevel: s.perLevel}),
 		})
 	}
+
+	// Endurance regeneration — a lasting "second wind" so casters aren't stranded
+	// out of endurance. Restores EN per tick for a Wisdom-scaled duration.
+	registerSpell(&SpellDefinition{
+		Name:        "invigorate",
+		Aliases:     []string{"second wind", "renew vigor"},
+		Usage:       "cast invigorate [target]",
+		Description: "Channel a second wind that steadily restores endurance over time.",
+		School:      "restoration", MinLevel: 4, Cost: 25,
+		Power: "+4 EN/3s, ~15–30m (×WIS)",
+		Handler: makeBuffSpell(buffSpellSpec{
+			name: "Invigorated", effect: components.StatusEffectInvigorated,
+			duration: 15 * time.Minute, scaleStat: components.WIS,
+			tickEP: 4, tickInterval: 3 * time.Second,
+			selfMsg: "A second wind fills %s — endurance returns (+%d every few seconds) for %s.",
+			areaMsg: "%s draws a deep, restoring breath.",
+		}),
+	})
 }
 
 // healSpellSpec parameterizes a restoration heal: amount = base + level*perLevel,
@@ -431,9 +449,10 @@ func registerHoly() {
 		Name: "bless", Usage: "cast bless [target]",
 		Description: "Ward yourself or an ally with a protective blessing (+max HP).",
 		School:      "holy", MinLevel: 5, Cost: 30,
-		Power: "+40 max HP, 5m",
+		Power: "+40 max HP, ~15–30m (×WIS)",
 		Handler: makeBuffSpell(buffSpellSpec{
-			name: "Blessed", effect: components.StatusEffectBlessed, hpBonus: 40, duration: 5 * time.Minute,
+			name: "Blessed", effect: components.StatusEffectBlessed, hpBonus: 40,
+			duration: 15 * time.Minute, scaleStat: components.WIS,
 			selfMsg: "A holy ward wreathes %s (+%d max HP for %s).",
 			areaMsg: "%s is wreathed in holy light.",
 		}),
@@ -467,12 +486,37 @@ func registerShadow() {
 
 // buffSpellSpec parameterizes a self/ally buff that applies a status effect.
 type buffSpellSpec struct {
-	name     string
-	effect   components.StatusEffectType
-	hpBonus  int
-	duration time.Duration
-	selfMsg  string // fmt args: targetName, hpBonus, duration
-	areaMsg  string // fmt args: targetName
+	name         string
+	effect       components.StatusEffectType
+	hpBonus      int
+	duration     time.Duration       // base lifetime, before skill scaling
+	scaleStat    components.StatType // skill in this stat extends the duration (and is trained)
+	tickEP       int                 // endurance restored per tick (0 = none)
+	tickInterval time.Duration       // cadence for tickEP
+	selfMsg      string              // fmt args: targetName, magnitude, duration
+	areaMsg      string              // fmt args: targetName
+}
+
+// buffDuration scales a buff's lifetime with the caster's governing stat: a flat
+// base plus extra time per point of skill above the starting value, capped. Tuned
+// to land roughly 15–30 minutes across typical skill (and longer for masters).
+func buffDuration(base time.Duration, stats *components.Stats, scaleStat components.StatType) time.Duration {
+	const (
+		perPoint = 30 * time.Second
+		maxLife  = 45 * time.Minute
+	)
+	v := components.StatBase
+	if stats != nil {
+		v = stats.Get(scaleStat)
+	}
+	d := base + time.Duration(v-components.StatBase)*perPoint
+	if d < base {
+		d = base
+	}
+	if d > maxLife {
+		d = maxLife
+	}
+	return d
 }
 
 func makeBuffSpell(spec buffSpellSpec) SpellHandler {
@@ -510,17 +554,25 @@ func (g *Game) castBuffSpell(caster *components.Player, args []string, spec buff
 		caster.Broadcast("The blessing fails to take hold.")
 		return
 	}
+	casterID, _ := g.getPlayerEntity(caster)
+	dur := buffDuration(spec.duration, g.getStats(casterID), spec.scaleStat)
+
 	se.AddEffect(components.StatusEffect{
 		Type: spec.effect, Name: spec.name, AppliedAt: time.Now(),
-		Duration: spec.duration, Applied: true, HPBonus: spec.hpBonus,
+		Duration: dur, Applied: true, HPBonus: spec.hpBonus,
+		TickEP: spec.tickEP, TickInterval: spec.tickInterval,
 	})
 
-	caster.Broadcast(fmt.Sprintf(spec.selfMsg, target.Name, spec.hpBonus, shortDuration(spec.duration)))
+	mag := spec.hpBonus
+	if spec.tickEP > 0 {
+		mag = spec.tickEP
+	}
+	caster.Broadcast(fmt.Sprintf(spec.selfMsg, target.Name, mag, shortDuration(dur)))
 	if caster.Area != nil && spec.areaMsg != "" {
 		caster.Area.Broadcast(fmt.Sprintf(spec.areaMsg, target.Name), caster)
 	}
-	if casterID, e := g.getPlayerEntity(caster); e == nil {
-		components.TrainStat(caster, g.getStats(casterID), components.WIS)
+	if casterID != "" {
+		components.TrainStat(caster, g.getStats(casterID), spec.scaleStat)
 	}
 	target.BroadcastState(g.world.AsWorldLike(), targetEntityID)
 }

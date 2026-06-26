@@ -34,30 +34,40 @@ func (ses *StatusEffectSystem) Update(w *ecs.World, deltaTime float64) {
 		player, _ := ecs.GetTypedComponent[*components.Player](w, entity.ID, "Player")
 		npc, _ := ecs.GetTypedComponent[*components.NPC](w, entity.ID, "NPC")
 		health, _ := ecs.GetTypedComponent[*components.Health](w, entity.ID, "Health")
+		endurance, _ := ecs.GetTypedComponent[*components.Endurance](w, entity.ID, "Endurance")
 
-		// 1) Periodic damage/heal (burning, poison, regeneration).
+		// 1) Periodic effects: HP damage/heal (burning, poison, regeneration) and
+		//    endurance regen (invigorate).
 		stateDirty := false
-		if ticks := statusEffects.Tick(now); len(ticks) > 0 && health != nil {
-			maxHP := health.Max + statusEffects.GetTotalHPBonus()
+		if ticks := statusEffects.Tick(now); len(ticks) > 0 {
+			maxHP := 0
+			if health != nil {
+				maxHP = health.Max + statusEffects.GetTotalHPBonus()
+			}
 			var killer common.EntityID
 			for _, t := range ticks {
-				health.Current += t.HPDelta
-				if health.Current > maxHP {
-					health.Current = maxHP
-				}
-				if t.HPDelta < 0 {
-					killer = t.Source
-					if player != nil {
-						player.Broadcast(util.TagMessage("DMG", fmt.Sprintf("%s sears you for %d damage!", t.Name, -t.HPDelta)))
-					} else if npc != nil && npc.Area != nil {
-						npc.Area.Broadcast(fmt.Sprintf("%s writhes as %s takes hold.", npc.Name, strings.ToLower(t.Name)))
+				if t.HPDelta != 0 && health != nil {
+					health.Current += t.HPDelta
+					if health.Current > maxHP {
+						health.Current = maxHP
 					}
-				} else if t.HPDelta > 0 && player != nil {
-					player.Broadcast(util.TagMessage("STATUS", fmt.Sprintf("%s knits your wounds for %d.", t.Name, t.HPDelta)))
+					if t.HPDelta < 0 {
+						killer = t.Source
+						if player != nil {
+							player.Broadcast(util.TagMessage("DMG", fmt.Sprintf("%s sears you for %d damage!", t.Name, -t.HPDelta)))
+						} else if npc != nil && npc.Area != nil {
+							npc.Area.Broadcast(fmt.Sprintf("%s writhes as %s takes hold.", npc.Name, strings.ToLower(t.Name)))
+						}
+					} else if player != nil {
+						player.Broadcast(util.TagMessage("STATUS", fmt.Sprintf("%s knits your wounds for %d.", t.Name, t.HPDelta)))
+					}
+				}
+				if t.EPDelta > 0 && endurance != nil {
+					endurance.Restore(t.EPDelta)
 				}
 			}
 			stateDirty = true
-			if health.Current <= 0 {
+			if health != nil && health.Current <= 0 {
 				health.Current = 0
 				applyEffectDeath(w, killer, entity.ID, player, npc)
 				continue // entity is dead/revived; nothing more to do this pass

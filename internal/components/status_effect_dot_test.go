@@ -69,6 +69,32 @@ func TestStatusEffectSnapshot(t *testing.T) {
 	}
 }
 
+func TestStatusEffectEnduranceTick(t *testing.T) {
+	se := NewStatusEffects()
+	now := time.Now()
+	se.AddEffect(StatusEffect{
+		Type:         StatusEffectInvigorated,
+		Name:         "Invigorated",
+		AppliedAt:    now.Add(-9 * time.Second), // 3 intervals elapsed
+		Duration:     15 * time.Minute,
+		TickEP:       4,
+		TickInterval: 3 * time.Second,
+	})
+
+	ticks := se.Tick(now)
+	if len(ticks) != 1 {
+		t.Fatalf("want 1 ticking effect, got %d", len(ticks))
+	}
+	if ticks[0].EPDelta != 12 || ticks[0].HPDelta != 0 {
+		t.Errorf("want EPDelta 12 / HPDelta 0 (3 ticks x 4 EN), got EP=%d HP=%d", ticks[0].EPDelta, ticks[0].HPDelta)
+	}
+
+	v := se.Snapshot()
+	if len(v) != 1 || v[0].Kind != "heal" || v[0].Magnitude != 4 {
+		t.Errorf("snapshot = %+v, want kind=heal magnitude=4", v)
+	}
+}
+
 func TestStatusEffectKind(t *testing.T) {
 	cases := map[StatusEffectType]string{
 		StatusEffectBurning:       "dot",

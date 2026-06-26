@@ -14,7 +14,7 @@
 | Spell | Lvl | EP | Effect |
 |---|---|---|---|
 | smite | 3 | 22 | 14–24 holy dmg (×WIS) |
-| bless | 5 | 30 | +40 max HP, 5m |
+| bless | 5 | 30 | +40 max HP, ~15–30m (×WIS) |
 
 ## Lunar
 
@@ -40,6 +40,7 @@
 |---|---|---|---|
 | heal | 1 | 25 | heal 15+8/lvl (×WIS) |
 | mend | 1 | 10 | heal 8+4/lvl (×WIS) |
+| invigorate | 4 | 25 | +4 EN/3s, ~15–30m (×WIS) |
 | greater heal | 8 | 50 | heal 40+14/lvl (×WIS) |
 
 ## Shadow

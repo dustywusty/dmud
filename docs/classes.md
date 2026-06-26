@@ -28,9 +28,10 @@ A battle-priest: mends allies, smites foes with holy light, and shields with ble
 |---|---|---|---|
 | heal | 1 | 25 | heal 15+8/lvl (×WIS) |
 | mend | 1 | 10 | heal 8+4/lvl (×WIS) |
+| invigorate | 4 | 25 | +4 EN/3s, ~15–30m (×WIS) |
 | greater heal | 8 | 50 | heal 40+14/lvl (×WIS) |
 | smite | 3 | 22 | 14–24 holy dmg (×WIS) |
-| bless | 5 | 30 | +40 max HP, 5m |
+| bless | 5 | 30 | +40 max HP, ~15–30m (×WIS) |
 
 ## Warlock
 
@@ -58,6 +59,7 @@ A keeper of the wild — mends wounds, calls down moonlight, and takes beast sha
 |---|---|---|---|
 | heal | 1 | 25 | heal 15+8/lvl (×WIS) |
 | mend | 1 | 10 | heal 8+4/lvl (×WIS) |
+| invigorate | 4 | 25 | +4 EN/3s, ~15–30m (×WIS) |
 | greater heal | 8 | 50 | heal 40+14/lvl (×WIS) |
 | moonfire | 1 | 10 | 5–11 lunar dmg (×WIS) |
 | moonbeam | 6 | 26 | 18–32 lunar dmg (×WIS) |

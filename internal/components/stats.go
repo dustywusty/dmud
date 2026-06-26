@@ -25,6 +25,10 @@ const (
 	statTrainBaseChance = 18  // % chance to gain at the base value, scaling to 0 at the cap
 )
 
+// StatBase is the starting value of a stat, exported so other packages can scale
+// effects relative to "untrained" (e.g. buff duration grows with skill above it).
+const StatBase = statBase
+
 var statNames = [numStats]string{"Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom"}
 var statAbbrev = [numStats]string{"STR", "DEX", "CON", "INT", "WIS"}
 

@@ -19,6 +19,7 @@ const (
 	StatusEffectRegenerating // heal over time
 	StatusEffectSlowed       // control
 	StatusEffectStunned      // control
+	StatusEffectInvigorated  // endurance regen over time
 )
 
 // Kind buckets an effect for the client UI: "buff", "dot", "heal", or "control".
@@ -26,7 +27,7 @@ func (t StatusEffectType) Kind() string {
 	switch t {
 	case StatusEffectBurning, StatusEffectPoisoned:
 		return "dot"
-	case StatusEffectRegenerating:
+	case StatusEffectRegenerating, StatusEffectInvigorated:
 		return "heal"
 	case StatusEffectSlowed, StatusEffectStunned:
 		return "control"
@@ -45,7 +46,9 @@ type StatusEffect struct {
 
 	// Periodic HP change: <0 damages (DoT), >0 heals (regen), 0 = none. Applied
 	// once per TickInterval by the StatusEffectSystem.
-	TickHP       int
+	TickHP int
+	// Periodic endurance change (>0 restores), on the same TickInterval/LastTick.
+	TickEP       int
 	TickInterval time.Duration
 	LastTick     time.Time
 
@@ -144,6 +147,7 @@ func (se *StatusEffects) isExpired(effect StatusEffect) bool {
 type EffectTick struct {
 	Name    string
 	HPDelta int // <0 damage, >0 heal
+	EPDelta int // >0 restores endurance
 	Source  common.EntityID
 }
 
@@ -157,7 +161,7 @@ func (se *StatusEffects) Tick(now time.Time) []EffectTick {
 	var out []EffectTick
 	for i := range se.Effects {
 		e := &se.Effects[i]
-		if e.TickHP == 0 || e.TickInterval <= 0 || se.isExpired(*e) {
+		if (e.TickHP == 0 && e.TickEP == 0) || e.TickInterval <= 0 || se.isExpired(*e) {
 			continue
 		}
 		if e.LastTick.IsZero() {
@@ -168,7 +172,7 @@ func (se *StatusEffects) Tick(now time.Time) []EffectTick {
 			continue
 		}
 		e.LastTick = e.LastTick.Add(time.Duration(n) * e.TickInterval)
-		out = append(out, EffectTick{Name: e.Name, HPDelta: e.TickHP * n, Source: e.SourceEntityID})
+		out = append(out, EffectTick{Name: e.Name, HPDelta: e.TickHP * n, EPDelta: e.TickEP * n, Source: e.SourceEntityID})
 	}
 	return out
 }
@@ -194,6 +198,9 @@ func (se *StatusEffects) Snapshot() []EffectView {
 		mag := e.HPBonus
 		if e.TickHP != 0 {
 			mag = e.TickHP
+		}
+		if e.TickEP != 0 {
+			mag = e.TickEP
 		}
 		out = append(out, EffectView{
 			Name:      e.Name,
