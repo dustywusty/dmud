@@ -85,9 +85,11 @@ func (g *Game) HandleKillAll(player *components.Player) {
 func (g *Game) HandleKill(player *components.Player, targetName string) {
 	log.Trace().Msgf("Kill: %s", targetName)
 
-	// First check for players
-	g.playersMu.Lock()
-	defer g.playersMu.Unlock()
+	// We only read the player table here; take a read lock, not a write lock.
+	// (A write lock self-deadlocks: playerMeleeDamage -> getPlayerEntity re-locks
+	// playersMu for reading, and Go's RWMutex is not reentrant.)
+	g.playersMu.RLock()
+	defer g.playersMu.RUnlock()
 
 	targetEntity := g.players[targetName]
 	playerEntity := g.players[player.Name]
